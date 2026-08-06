@@ -3,5 +3,6 @@ node_modules/
 # Everything a check writes: coverage, mutation reports, Stryker's sandbox.
 reports/
 
-# Local Claude Code overrides
+# Local Claude Code overrides. The rest of .claude/ is committed on purpose:
+# the hooks, skills and reviewer are how the conventions are enforced.
 .claude/settings.local.json

@@ -103,6 +103,11 @@ src/edges/      every effect — files, HTTP, win32, spawning
   presence.ts       are you at the keyboard (win32 GetLastInputInfo via koffi)
   store.ts          the queue, the per-project stamps, the watcher lock
   usage-api.ts      the account's own usage endpoint
+  telegram.ts       sendMessage, and what setup needs to find your chat
+  config.ts         reading and writing config.json
+  log.ts            the one log file every decision lands in
+  paths.ts          where the state directory and Claude Code's own files are
+  watcher-process.ts  is a watcher running, and starting one that outlives us
 src/hook.ts     entry point: one Claude Code event
 src/notify.ts   entry point: one ping, from the model or by hand
 src/watcher.ts  entry point: delivers what presence held back
@@ -110,10 +115,16 @@ src/setup.ts    entry point: the installer
 ```
 
 ```bash
-npm run check            # lint, types, tests — the gate to keep at zero
+npm run check            # lint, types, docs, tests — the gate to keep at zero
 npm run test:coverage    # floor 80%
 npm run test:mutation    # Stryker over domain/, breaks below 85%
 ```
+
+`.claude/` carries the conventions as tooling rather than as advice: a
+`PostToolUse` hook lints each file the moment it is written, `phase-reviewer`
+reviews a whole phase against `CLAUDE.md`, and four skills hold the procedures
+that would otherwise bloat it — `add-a-hook-event`, `write-a-spec`,
+`write-a-doc`, `finish-phase` (plus `retrospective`, which it runs last).
 
 `domain/` may not import `node:*`, `koffi` or anything from `edges/`, and
 ESLint fails the build if it does. [CLAUDE.md](CLAUDE.md) has the rest.

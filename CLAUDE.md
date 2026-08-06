@@ -1,5 +1,15 @@
 # claude-notify — how the code here is written
 
+This file is loaded before every session, so it holds only what has to be known
+*before* the first edit. Anything needed for one specific job lives in a skill:
+
+| Doing this | Read |
+|---|---|
+| Adding or changing a hook event | `add-a-hook-event` skill |
+| Writing or changing any spec | `write-a-spec` skill |
+| Closing a phase, running the gates | `finish-phase` skill |
+| Writing or changing any document | `write-a-doc` skill |
+
 Four documents, one job each: `README.md` for arriving and installing, `PLAN.md`
 for behaviour and the reasons behind it, this file for style and gates,
 `TECH-DEBT.md` for what is deliberately unfinished. The dividing question:
@@ -94,20 +104,24 @@ be wrong. `edges/store.ts` earns an `*.integration.spec.ts` against a real
 temporary directory, since a file that survives a crash is exactly what a mock
 cannot prove.
 
-Four files are outside coverage on purpose, and it is not a fudge: `paths.ts`,
-`presence.ts`, `telegram.ts`, `usage-api.ts`, `watcher-process.ts` and the
-entry points hold no decisions — they are the seam with somebody else's API. A
-unit that mocks `fetch` to watch `fetch` be called proves nothing; what they do
-is proven by sending a real ping.
+Some files are outside coverage on purpose; which, and why it is not a fudge,
+is in the `write-a-spec` skill.
 
 ```bash
 npm run check
 ```
 
-Lint, types, tests — the gate to keep at zero. Two more before a release:
-`npm run test:coverage` (floor 80%) and `npm run test:mutation` (breaks below
-85%), and the numbers go in the phase's commit message.
+Lint, types, docs and tests — the gate to keep at zero. `docs:check` resolves
+every link between the four documents, checks the source tree `README.md` shows
+against the real files, and holds this file to a line budget. Two more gates
+before a release: `npm run test:coverage` (floor 80%) and `npm run test:mutation`
+(breaks below 85%); the numbers go in the phase's commit message, and the
+`finish-phase` skill has the ritual.
+
+A `PostToolUse` hook lints each file as it is written, so a violation surfaces
+at the edit instead of at the end of the turn.
 
 **Say how big a phase is before starting it**, in a line, so it can be argued
-down. And when adding a gate, first commit a deliberate violation to watch it
-fail.
+down. When adding a gate, first commit a deliberate violation to watch it fail.
+And before calling anything done, **send a real ping**: every user-visible bug
+this project has had was found that way, never by a spec.

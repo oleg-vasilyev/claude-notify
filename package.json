@@ -17,10 +17,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
-    "check": "npm run lint && npm run typecheck && npm run test",
-    "lint": "eslint src",
-    "lint:fix": "eslint --fix src",
-    "typecheck": "tsc --noEmit"
+    "check": "npm run lint && npm run typecheck && npm run docs:check && npm run test",
+    "lint": "eslint src scripts",
+    "lint:fix": "eslint --fix src scripts",
+    "typecheck": "tsc --noEmit",
+    "docs:check": "node scripts/check-docs.ts"
   },
   "dependencies": {
     "koffi": "^2.15.1"

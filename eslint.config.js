@@ -191,7 +191,7 @@ export default [
     ignores: ["node_modules/**", "reports/**"],
   },
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "scripts/**/*.ts"],
     languageOptions: {
       parser: tsParser,
       ecmaVersion: "latest",
@@ -232,9 +232,9 @@ export default [
     ),
   },
   {
-    // The setup CLI and the log writer are the two places allowed to talk to a
-    // terminal: one is a wizard a person runs, the other is the log itself.
-    files: ["src/setup.ts", "src/edges/log.ts"],
+    // The setup CLI, the log writer and the dev scripts are what a person reads
+    // in a terminal: a wizard, the log itself, and a gate reporting what it found.
+    files: ["src/setup.ts", "src/edges/log.ts", "scripts/**/*.ts"],
     rules: {
       "no-console": "off",
     },

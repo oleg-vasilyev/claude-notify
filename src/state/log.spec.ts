@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { flattenPayload } from "#edges/log.ts";
+import { flattenPayload } from "#state/log.ts";
 
 
 const KEPT_CHARACTERS = 400;

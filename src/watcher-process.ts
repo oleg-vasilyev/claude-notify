@@ -1,11 +1,10 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { lockedWatcherProcessId } from "#edges/store.ts";
+import { lockedWatcherProcessId } from "#state/watcher-lock.ts";
 
 
-const watcherEntryPoint = (): string =>
-  fileURLToPath(new URL("../watcher.ts", import.meta.url));
+const watcherEntryPoint = (): string => fileURLToPath(new URL("./watcher.ts", import.meta.url));
 
 const isAlive = (processId: number): boolean => {
   try {

@@ -1,12 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { selectPending } from "#domain/pending.ts";
-import { readConfig } from "#edges/config.ts";
-import { deliver } from "#edges/deliver.ts";
-import { log } from "#edges/log.ts";
-import { idleSeconds } from "#edges/presence.ts";
-import { claimWatcherLock, clearPending, readPending, releaseWatcherLock } from "#edges/store.ts";
-import { watcherIsRunning } from "#edges/watcher-process.ts";
+import { idleSeconds } from "#presence/idle-time.ts";
+import { readConfig } from "#state/config.ts";
+import { log } from "#state/log.ts";
+import { clearPending, readPending } from "#state/pending-queue.ts";
+import { claimWatcherLock, releaseWatcherLock } from "#state/watcher-lock.ts";
+import { deliver } from "#app/deliver.ts";
+import { watcherIsRunning } from "#app/watcher-process.ts";
 
 
 const POLL_EVERY_MS = 30_000;

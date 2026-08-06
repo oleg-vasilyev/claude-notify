@@ -31,23 +31,34 @@ source strippable (no enums, no namespaces, `import type` for types), and
 
 `strict: true`, `noUncheckedIndexedAccess`, and **no `any`**.
 
-**There are no relative imports in `src/`** — every specifier is a `#domain/…`
-or `#edges/…` subpath alias declared in `package.json`, so an import reads the
-same wherever it sits, and a layering violation is visible in the line itself.
+**There are no relative imports in `src/`** — every specifier is a `#domain/…`,
+`#state/…`, `#telegram/…` or `#app/…` subpath alias declared in `package.json`,
+so an import reads the same wherever it sits, and a layering violation is
+visible in the line itself.
 
-## Two layers, and the rule between them
+**Settings live in `.env`**, read through `domain/env-file.ts` and mapped in
+`state/config.ts`. `docs:check` fails unless it is gitignored and `.env.example`
+lists every key — the token must never be committed.
+
+## Two kinds of module, and the rule between them
 
 ```
 src/
-  domain/   every decision, pure: state in as arguments, verdict out as a value
-  edges/    every effect: files, HTTP, win32, spawning
-  hook.ts     entry point: Claude Code fires it, one event per invocation
-  notify.ts   entry point: the model or a human sends one ping
-  watcher.ts  entry point: delivers what presence held back
-  setup.ts    entry point: the installer
+  domain/     every decision, pure: state in as arguments, verdict out as a value
+  state/      what is remembered between runs: settings, log, queue, stamps, lock
+  presence/   whether the user is at the keyboard
+  telegram/   talking to Telegram
+  usage/      the account's limit windows
+  deliver.ts  the funnel every ping goes through
+  hook.ts notify.ts watcher.ts setup.ts   entry points
 ```
 
-**`domain/` may not import `node:*`, `koffi`, or anything from `edges/`.** No
+Everything outside `domain/` is impure, and **each folder is named after its
+subject rather than after its position** — an `edges/` or `io/` bucket says what
+its contents are *not*, which is the vagueness the file names were cured of. A
+folder holding one module is fine; a bucket holding nine is not.
+
+**`domain/` may not import `node:*`, `koffi`, or anything impure.** No
 file, no socket, no clock — a function that needs the time takes a `Date` or a
 number of milliseconds. This is what makes a delivery rule testable in
 milliseconds instead of by walking away from the keyboard for three minutes,
@@ -90,38 +101,30 @@ needs judgement:
   holds the usage line, `presence.ts` answers whether you are at the keyboard.
 - **Keep functions pure where you can**, and keep the impure ones small enough
   that what they do fits in their name.
-
-`project/named-states` from the reference project is deliberately **not**
-adopted: it exists there because states are spelled across many features, and
-here one small union lives beside its only consumer.
+- `project/named-states` from the reference project is **not** adopted: it
+  guards states spelled across many features, and here one small union lives
+  beside its only consumer.
 
 ## Tests and gates
 
-Specs sit next to the code as `*.spec.ts`. `domain/` is covered exhaustively —
-every function, every branch that changes a delivery. `edges/deliver.ts` is
-covered with every edge mocked, because it is the funnel where the wiring can
-be wrong. `edges/store.ts` earns an `*.integration.spec.ts` against a real
-temporary directory, since a file that survives a crash is exactly what a mock
-cannot prove.
-
-Some files are outside coverage on purpose; which, and why it is not a fudge,
-is in the `write-a-spec` skill.
+Specs sit next to the code as `*.spec.ts`, and `domain/` is covered
+exhaustively — every branch that changes a delivery. What to mock, what earns an
+integration spec and what is outside coverage are all in the `write-a-spec`
+skill.
 
 ```bash
 npm run check
 ```
 
-Lint, types, docs and tests — the gate to keep at zero. `docs:check` resolves
-every link between the four documents, checks the source tree `README.md` shows
-against the real files, and holds this file to a line budget. Two more gates
-before a release: `npm run test:coverage` (floor 80%) and `npm run test:mutation`
-(breaks below 85%); the numbers go in the phase's commit message, and the
-`finish-phase` skill has the ritual.
+Lint, types, docs and tests — the gate to keep at zero. Two more before a
+release: `npm run test:coverage` (floor 80%) and `npm run test:mutation` (breaks
+below 85%); the numbers go in the commit message and `finish-phase` has the
+ritual.
 
 A `PostToolUse` hook lints each file as it is written, so a violation surfaces
-at the edit instead of at the end of the turn.
+at the edit rather than at the end of the turn.
 
 **Say how big a phase is before starting it**, in a line, so it can be argued
 down. When adding a gate, first commit a deliberate violation to watch it fail.
-And before calling anything done, **send a real ping**: every user-visible bug
-this project has had was found that way, never by a spec.
+And before calling anything done, **send a real ping** — every user-visible bug
+here was found that way, never by a spec.

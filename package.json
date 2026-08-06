@@ -7,8 +7,12 @@
     "node": ">=24"
   },
   "imports": {
+    "#app/*": "./src/*",
     "#domain/*": "./src/domain/*",
-    "#edges/*": "./src/edges/*"
+    "#presence/*": "./src/presence/*",
+    "#state/*": "./src/state/*",
+    "#telegram/*": "./src/telegram/*",
+    "#usage/*": "./src/usage/*"
   },
   "scripts": {
     "setup": "node src/setup.ts",

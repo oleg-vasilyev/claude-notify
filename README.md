@@ -31,12 +31,17 @@ TypeScript directly.
 npm install && npm run setup
 ```
 
-Setup asks for the token and a machine label, resolves your chat id, registers
-the Claude Code hooks (Telegram and sound), adds the ping rule to the global
-`~/.claude/CLAUDE.md`, and sends a test message. The hooks point at this
-checkout, so keep it where it is — moving it means running setup again.
+Setup asks for the token and a machine label, writes them to **`.env`** in the
+checkout, resolves your chat id, registers the Claude Code hooks (Telegram and
+sound), adds the ping rule to the global `~/.claude/CLAUDE.md`, and sends a test
+message. The hooks point at this checkout, so keep it where it is — moving it
+means running setup again.
 
 4. Restart Claude Code so the hooks load.
+
+`.env` is gitignored and `.env.example` is the shareable copy that lists every
+key. You can edit `.env` by hand at any time; setup keeps whatever comments you
+put in it.
 
 Run setup again any time to update; it rewrites only its own hook entries and
 leaves the rest of `settings.json` alone. For a second machine, or a rerun with
@@ -48,20 +53,20 @@ npm run setup -- --token 123:ABC --label work
 
 ## Configuration
 
-`~/.claude/claude-notify/config.json` — the state directory, kept out of the
-checkout so an update never touches your token:
+**`.env`** in this checkout, written by setup and safe to edit by hand:
 
 | Key | Meaning |
 | --- | --- |
-| `token` | the bot token from BotFather |
-| `chat_id` | your chat with the bot, resolved automatically |
-| `machine_label` | the machine name in pings: `[job-finder@work]` |
-| `min_idle_minutes` | minutes without keyboard or mouse that count as "away" (default 3) |
-| `stale_minutes` | minutes after which a queued ping expires undelivered (default 15) |
-| `include_usage` | append the limits line to each ping (default true) |
+| `BOT_TOKEN` | the bot token from BotFather |
+| `CHAT_ID` | your chat with the bot, resolved automatically |
+| `MACHINE_LABEL` | the machine name in pings: `[job-finder@work]` |
+| `MIN_IDLE_MINUTES` | minutes without keyboard or mouse that count as "away" (default 3) |
+| `STALE_MINUTES` | minutes after which a queued ping expires undelivered (default 15) |
+| `INCLUDE_USAGE` | append the limits line to each ping (default true) |
 
 One bot serves any number of machines; the label is what tells their pings
-apart.
+apart. Running state — the log, the queue, the per-project stamps — lives in
+`~/.claude/claude-notify/`, away from the code.
 
 ## When a ping does not arrive
 
@@ -92,22 +97,25 @@ src/domain/     every decision, pure — no files, no network, no clock
   copy.ts           every Russian string the user reads
   delivery.ts       send, queue, or skip
   duration.ts       "1 ч 12 мин"
+  env-file.ts       reading and updating .env without losing your comments
   hook-ping.ts      what each Claude Code event has to say
   hook-registration.ts  merging into settings.json without clobbering it
   memory-rule.ts    the rule setup writes into the global CLAUDE.md
   pending.ts        which queued pings survive, and which one wins per project
   project.ts        the project key and the machine label
   usage.ts          the limits line
-src/edges/      every effect — files, HTTP, win32, spawning
-  deliver.ts        the funnel every ping goes through
-  presence.ts       are you at the keyboard (win32 GetLastInputInfo via koffi)
-  store.ts          the queue, the per-project stamps, the watcher lock
-  usage-api.ts      the account's own usage endpoint
-  telegram.ts       sendMessage, and what setup needs to find your chat
-  config.ts         reading and writing config.json
+src/state/      what this product remembers between runs
+  config.ts         the settings, read from .env
+  file-locations.ts every path it reads or writes, ours and Claude Code's
+  last-sent.ts      one stamp per project, for the rate limit
   log.ts            the one log file every decision lands in
-  paths.ts          where the state directory and Claude Code's own files are
-  watcher-process.ts  is a watcher running, and starting one that outlives us
+  pending-queue.ts  pings held back while you were at the keyboard
+  watcher-lock.ts   who is delivering the queue right now
+src/presence/idle-time.ts   how long since you touched anything (win32 via koffi)
+src/telegram/telegram-api.ts sending a message, and what setup needs to find you
+src/usage/usage-api.ts       the account's own limit windows
+src/deliver.ts          the funnel every ping goes through
+src/watcher-process.ts  is a watcher running, and starting one that outlives us
 src/hook.ts     entry point: one Claude Code event
 src/notify.ts   entry point: one ping, from the model or by hand
 src/watcher.ts  entry point: delivers what presence held back

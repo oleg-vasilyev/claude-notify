@@ -82,11 +82,21 @@ paths module at a temp directory with `vi.hoisted`, and delete the directory in
 - Assert the thing that would break, not the thing that is easy to reach.
 - No comments: the case name is the sentence.
 
+## Where the specs live and what each tier is for
+
+Specs sit next to the code as `*.spec.ts`. `domain/` is covered exhaustively —
+every function, every branch that changes a delivery. `deliver.ts` is covered
+with every impure module mocked, because it is the funnel where the wiring can
+be wrong. `state/` earns an `*.integration.spec.ts` against a real temporary
+directory, since a file that survives a crash is exactly what a mock cannot
+prove.
+
 ## What is deliberately outside coverage
 
-`vitest.config.ts` excludes the four entry points and five edge modules —
-`paths.ts`, `presence.ts`, `telegram.ts`, `usage-api.ts`, `watcher-process.ts`.
-They hold no decisions: each is the seam with somebody else's API, and a unit
+`vitest.config.ts` excludes the four entry points and four modules —
+`file-locations.ts`, `idle-time.ts`, `telegram-api.ts`, `usage-api.ts` — plus
+`watcher-process.ts`. They hold no decisions: each is the seam with somebody
+else's API or the OS, and a unit
 that mocks `fetch` in order to watch `fetch` be called proves nothing about our
 code. What they do is proven by sending a real ping, which the `finish-phase`
 skill makes a gate.

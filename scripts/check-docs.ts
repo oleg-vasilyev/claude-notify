@@ -113,7 +113,23 @@ for (const fence of readme.match(FENCE) ?? []) {
   }
 }
 
-const claudeLines = read("CLAUDE.md").split("\n").length;
+const ignored = read(".gitignore")
+  .split("\n")
+  .map((line) => line.trim());
+
+if (!ignored.includes(".env")) {
+  complain(".gitignore does not ignore .env — the bot token would be committed");
+}
+
+const example = read(".env.example");
+
+for (const [, key] of read("src/state/config.ts").matchAll(/settings\.([A-Z_]+)/g)) {
+  if (key !== undefined && !example.includes(key)) {
+    complain(`.env.example does not list ${key}, which config.ts reads`);
+  }
+}
+
+const claudeLines = read("CLAUDE.md").trimEnd().split("\n").length;
 
 if (claudeLines > CLAUDE_MD_LINE_BUDGET) {
   complain(

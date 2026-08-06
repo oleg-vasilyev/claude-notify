@@ -1,6 +1,6 @@
 import koffi from "koffi";
 
-import { log } from "#edges/log.ts";
+import { log } from "#state/log.ts";
 
 
 const MILLISECONDS_PER_SECOND = 1000;

@@ -184,7 +184,19 @@ const forbid = (bans, message) => {
   };
 };
 
-const IMPURE = ["node:*", "koffi", "#edges/**", "**/edges/**"];
+const IMPURE = [
+  "node:*",
+  "koffi",
+  "#app/**",
+  "#presence/**",
+  "#state/**",
+  "#telegram/**",
+  "#usage/**",
+  "**/presence/**",
+  "**/state/**",
+  "**/telegram/**",
+  "**/usage/**",
+];
 
 export default [
   {
@@ -234,7 +246,7 @@ export default [
   {
     // The setup CLI, the log writer and the dev scripts are what a person reads
     // in a terminal: a wizard, the log itself, and a gate reporting what it found.
-    files: ["src/setup.ts", "src/edges/log.ts", "scripts/**/*.ts"],
+    files: ["src/setup.ts", "src/state/log.ts", "scripts/**/*.ts"],
     rules: {
       "no-console": "off",
     },

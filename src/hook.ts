@@ -1,6 +1,6 @@
 import { isHookEvent, pingFor, type HookPayload } from "#domain/hook-ping.ts";
-import { deliver } from "#edges/deliver.ts";
-import { flattenPayload, log } from "#edges/log.ts";
+import { flattenPayload, log } from "#state/log.ts";
+import { deliver } from "#app/deliver.ts";
 
 
 const readStdin = async (): Promise<string> => {

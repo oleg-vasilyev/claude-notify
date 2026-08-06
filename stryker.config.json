@@ -2,9 +2,10 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "packageManager": "npm",
   "testRunner": "vitest",
-  "reporters": ["progress", "clear-text"],
+  "reporters": ["progress", "clear-text", "json", "html"],
   "tempDirName": "reports/stryker-tmp",
   "htmlReporter": { "fileName": "reports/mutation/index.html" },
+  "jsonReporter": { "fileName": "reports/mutation/mutation.json" },
   "mutate": ["src/domain/**/*.ts", "!src/**/*.spec.ts", "!src/**/*.stub.ts"],
   "thresholds": { "high": 95, "low": 90, "break": 85 }
 }

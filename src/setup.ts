@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -6,15 +6,15 @@ import { parseArgs } from "node:util";
 import type { ClaudeSettings, HookCommand, Registration } from "#domain/hook-registration.ts";
 import { registerHooks } from "#domain/hook-registration.ts";
 import { withMemoryRule } from "#domain/memory-rule.ts";
-import { readConfigFrom, writeConfig, type Config } from "#edges/config.ts";
+import { readConfigFrom, writeConfig, type Config } from "#state/config.ts";
 import {
   claudeMemoryFile,
   claudeSettingsFile,
-  configFile,
+  envFile,
+  legacyConfigFile,
   powershellConfigFile,
-  stateHome,
-} from "#edges/paths.ts";
-import { botName, resolveChatId, sendMessage } from "#edges/telegram.ts";
+} from "#state/file-locations.ts";
+import { botName, resolveChatId, sendMessage } from "#telegram/telegram-api.ts";
 
 
 const HOOK_TIMEOUT_SECONDS = 30;
@@ -81,9 +81,6 @@ const ask = async (question: string): Promise<string> => {
   }
 };
 
-const inheritedConfig = (): Config | null =>
-  readConfigFrom(configFile()) ?? readConfigFrom(powershellConfigFile());
-
 const readJsonFile = <T>(path: string, fallback: T): T => {
   if (!existsSync(path)) {
     return fallback;
@@ -96,7 +93,31 @@ const readJsonFile = <T>(path: string, fallback: T): T => {
   }
 };
 
-const inherited = inheritedConfig();
+const legacyJsonConfig = (path: string): Config | null => {
+  const stored = readJsonFile<Record<string, string | number | boolean>>(path, {});
+
+  if (typeof stored.token !== "string" || typeof stored.chat_id !== "string") {
+    return null;
+  }
+
+  return {
+    token: stored.token,
+    chatId: stored.chat_id,
+    machineLabel: typeof stored.machine_label === "string" ? stored.machine_label : "",
+    minIdleMinutes:
+      typeof stored.min_idle_minutes === "number"
+        ? stored.min_idle_minutes
+        : DEFAULT_MIN_IDLE_MINUTES,
+    staleMinutes:
+      typeof stored.stale_minutes === "number" ? stored.stale_minutes : DEFAULT_STALE_MINUTES,
+    includeUsage: stored.include_usage !== false,
+  };
+};
+
+const inherited =
+  readConfigFrom(envFile()) ??
+  legacyJsonConfig(legacyConfigFile()) ??
+  legacyJsonConfig(powershellConfigFile());
 
 const token = values.token ?? inherited?.token ?? (await ask("Telegram bot token: "));
 
@@ -121,8 +142,6 @@ console.log(`chat id: ${chatId}`);
 const machineLabel =
   values.label ?? inherited?.machineLabel ?? (await ask("Machine label (home / work): "));
 
-mkdirSync(stateHome(), { recursive: true });
-
 writeConfig({
   token,
   chatId,
@@ -132,7 +151,7 @@ writeConfig({
   includeUsage: inherited?.includeUsage ?? true,
 });
 
-console.log(`config written to ${configFile()}`);
+console.log(`settings written to ${envFile()}`);
 
 const settings = readJsonFile<ClaudeSettings>(claudeSettingsFile(), {});
 

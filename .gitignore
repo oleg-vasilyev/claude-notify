@@ -1,5 +1,8 @@
 node_modules/
 
+# The bot token lives here. Never commit it; .env.example is the shareable copy.
+.env
+
 # Everything a check writes: coverage, mutation reports, Stryker's sandbox.
 reports/
 

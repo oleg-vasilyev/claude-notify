@@ -1,30 +1,26 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
+import { appendPending, clearPending, readPending } from "#state/pending-queue.ts";
 import {
-  appendPending,
   claimWatcherLock,
-  clearPending,
   lockedWatcherProcessId,
-  readLastSentAt,
-  readPending,
   releaseWatcherLock,
-  writeLastSentAt,
-} from "#edges/store.ts";
+} from "#state/watcher-lock.ts";
 
 
 const state = vi.hoisted(() => {
-  const { mkdtempSync: makeTemp } = require("node:fs") as typeof import("node:fs");
-  const { tmpdir: temp } = require("node:os") as typeof import("node:os");
+  const { mkdtempSync } = require("node:fs") as typeof import("node:fs");
+  const { tmpdir } = require("node:os") as typeof import("node:os");
   const { join: at } = require("node:path") as typeof import("node:path");
 
-  return makeTemp(at(temp(), "claude-notify-store-"));
+  return mkdtempSync(at(tmpdir(), "claude-notify-state-"));
 });
 
-vi.mock("#edges/paths.ts", () => ({
+vi.mock("#state/file-locations.ts", () => ({
   stateHome: () => state,
   pendingFile: () => join(state, "pending.jsonl"),
   watcherLockFile: () => join(state, "watcher.lock"),
@@ -106,13 +102,5 @@ describe("the state files", () => {
     writeFileSync(join(state, "watcher.lock"), "not a pid", "utf8");
 
     expect(lockedWatcherProcessId()).toBeNull();
-  });
-});
-
-describe("the temporary state directory", () => {
-  it("is a real directory made for this run", () => {
-    expect(state.startsWith(mkdtempSync(join(tmpdir(), "claude-notify-store-")).slice(0, 20))).toBe(
-      true
-    );
   });
 });

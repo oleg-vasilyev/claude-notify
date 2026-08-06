@@ -7,16 +7,18 @@ remembers.
 
 ---
 
-## The mutation score sits at 86.1%, and three files carry the gap
+## The mutation score sits at 85.1%, one point above its own gate
 
-The gate breaks below 85%, so this passes, but `delivery.ts` (81%),
-`memory-rule.ts` (67%) and `usage.ts` (84%) each have survivors. They are
-mostly boundary and string mutants: tests that assert *that* something happened
-rather than exactly what.
+`memory-rule.ts` (67%), `delivery.ts` (81%), `usage.ts` (84%) and `env-file.ts`
+carry the survivors — mostly boundary and string mutants, where a test asserts
+*that* something happened rather than exactly what. A round of killing on
+`env-file.ts` moved the total by nothing, which is the tell that the remaining
+ones are spread thin rather than concentrated.
 
-**Raise them the next time one of those three files changes** — a survivor in a
-file you are already editing is cheap to kill, and chasing all of them today
-would be tuning a number rather than finding a bug.
+The margin is now thin enough that the next new `domain/` file could break the
+gate on its own. **Kill survivors in whichever of those four files a phase
+touches, before adding a fifth** — the report is at `reports/mutation/` and no
+longer needs a re-run to read, since the json reporter is configured.
 
 ---
 

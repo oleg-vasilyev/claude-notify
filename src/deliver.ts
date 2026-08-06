@@ -1,13 +1,14 @@
 import { decideDelivery } from "#domain/delivery.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
 import { usageLine } from "#domain/usage.ts";
-import { readConfig } from "#edges/config.ts";
-import { log } from "#edges/log.ts";
-import { idleSeconds } from "#edges/presence.ts";
-import { appendPending, readLastSentAt, writeLastSentAt } from "#edges/store.ts";
-import { sendMessage } from "#edges/telegram.ts";
-import { fetchUsage } from "#edges/usage-api.ts";
-import { startWatcher, watcherIsRunning } from "#edges/watcher-process.ts";
+import { idleSeconds } from "#presence/idle-time.ts";
+import { readConfig } from "#state/config.ts";
+import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
+import { log } from "#state/log.ts";
+import { appendPending } from "#state/pending-queue.ts";
+import { sendMessage } from "#telegram/telegram-api.ts";
+import { fetchUsage } from "#usage/usage-api.ts";
+import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 
 
 export type PingRequest = {

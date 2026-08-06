@@ -1,11 +1,10 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 
-import { logFile, stateHome } from "#edges/paths.ts";
+import { logFile, stateHome } from "#state/file-locations.ts";
 
 
 const PAYLOAD_KEPT_CHARACTERS = 400;
 const WHITESPACE_RUN = /\s+/g;
-
 const TWO_DIGITS = 2;
 
 const padded = (part: number): string => `${part}`.padStart(TWO_DIGITS, "0");

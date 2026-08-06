@@ -1,26 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readConfig, type Config } from "#edges/config.ts";
-import { deliver } from "#edges/deliver.ts";
-import { log } from "#edges/log.ts";
-import { idleSeconds } from "#edges/presence.ts";
-import { appendPending, readLastSentAt, writeLastSentAt } from "#edges/store.ts";
-import { sendMessage } from "#edges/telegram.ts";
-import { fetchUsage } from "#edges/usage-api.ts";
-import { startWatcher, watcherIsRunning } from "#edges/watcher-process.ts";
+import { idleSeconds } from "#presence/idle-time.ts";
+import { readConfig, type Config } from "#state/config.ts";
+import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
+import { log } from "#state/log.ts";
+import { appendPending } from "#state/pending-queue.ts";
+import { sendMessage } from "#telegram/telegram-api.ts";
+import { fetchUsage } from "#usage/usage-api.ts";
+import { deliver } from "#app/deliver.ts";
+import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 
 
-vi.mock("#edges/config.ts", () => ({ readConfig: vi.fn() }));
-vi.mock("#edges/log.ts", () => ({ log: vi.fn() }));
-vi.mock("#edges/presence.ts", () => ({ idleSeconds: vi.fn() }));
-vi.mock("#edges/store.ts", () => ({
-  appendPending: vi.fn(),
-  readLastSentAt: vi.fn(),
-  writeLastSentAt: vi.fn(),
-}));
-vi.mock("#edges/telegram.ts", () => ({ sendMessage: vi.fn() }));
-vi.mock("#edges/usage-api.ts", () => ({ fetchUsage: vi.fn() }));
-vi.mock("#edges/watcher-process.ts", () => ({
+vi.mock("#state/config.ts", () => ({ readConfig: vi.fn() }));
+vi.mock("#state/log.ts", () => ({ log: vi.fn() }));
+vi.mock("#presence/idle-time.ts", () => ({ idleSeconds: vi.fn() }));
+vi.mock("#state/pending-queue.ts", () => ({ appendPending: vi.fn() }));
+vi.mock("#state/last-sent.ts", () => ({ readLastSentAt: vi.fn(), writeLastSentAt: vi.fn() }));
+vi.mock("#telegram/telegram-api.ts", () => ({ sendMessage: vi.fn() }));
+vi.mock("#usage/usage-api.ts", () => ({ fetchUsage: vi.fn() }));
+vi.mock("#app/watcher-process.ts", () => ({
   startWatcher: vi.fn(),
   watcherIsRunning: vi.fn(),
 }));
@@ -142,7 +140,7 @@ describe("deliver", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("does nothing at all before setup has written a config", async () => {
+  it("does nothing at all before setup has written the settings", async () => {
     vi.mocked(readConfig).mockReturnValue(null);
 
     await deliver(ping);

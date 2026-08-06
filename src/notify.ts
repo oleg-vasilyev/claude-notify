@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-import { deliver } from "#edges/deliver.ts";
+import { deliver } from "#app/deliver.ts";
 
 
 const DECIMAL = 10;

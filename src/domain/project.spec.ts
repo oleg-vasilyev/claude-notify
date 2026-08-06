@@ -1,0 +1,74 @@
+import { describe, expect, it } from "vitest";
+
+import { EVERY_PROJECT, projectKeyOf, projectPrefixOf, withMachineLabel } from "#domain/project.ts";
+
+
+describe("projectKeyOf", () => {
+  it("reads the project from a plain prefix", () => {
+    expect(projectKeyOf("[job-finder] waiting")).toBe("job-finder");
+  });
+
+  it("reads the project from a machine-labelled prefix", () => {
+    expect(projectKeyOf("[FoolProof@home] waiting")).toBe("FoolProof");
+  });
+
+  it("falls back when there is no prefix", () => {
+    expect(projectKeyOf("no prefix here")).toBe(EVERY_PROJECT);
+  });
+
+  it("falls back for an empty message", () => {
+    expect(projectKeyOf("")).toBe(EVERY_PROJECT);
+  });
+
+  it("replaces what cannot live in a file name", () => {
+    expect(projectKeyOf("[my proj!] hello")).toBe("my_proj_");
+  });
+
+  it("keeps a hyphen, which a project name usually has", () => {
+    expect(projectKeyOf("[claude-notify] hello")).toBe("claude-notify");
+  });
+});
+
+describe("withMachineLabel", () => {
+  it("inserts the label into a plain prefix", () => {
+    expect(withMachineLabel("[job-finder] waiting", "home")).toBe("[job-finder@home] waiting");
+  });
+
+  it("prefixes an unlabelled message with the machine alone", () => {
+    expect(withMachineLabel("waiting for you", "work")).toBe("[work] waiting for you");
+  });
+
+  it("leaves an already labelled message alone, so a queued ping is not labelled twice", () => {
+    expect(withMachineLabel("[proj@home] waiting", "home")).toBe("[proj@home] waiting");
+  });
+
+  it("leaves the message alone when no label is configured", () => {
+    expect(withMachineLabel("[proj] waiting", "")).toBe("[proj] waiting");
+  });
+
+  it("keeps the rest of the message untouched", () => {
+    expect(withMachineLabel("[a] b] c", "home")).toBe("[a@home] b] c");
+  });
+});
+
+describe("projectPrefixOf", () => {
+  it("names the project after the last segment of the path", () => {
+    expect(projectPrefixOf("D:\\Temp\\FoolProof")).toBe("[FoolProof] ");
+  });
+
+  it("reads a posix path too", () => {
+    expect(projectPrefixOf("/home/oleg/job-finder")).toBe("[job-finder] ");
+  });
+
+  it("ignores a trailing separator", () => {
+    expect(projectPrefixOf("D:\\Temp\\FoolProof\\")).toBe("[FoolProof] ");
+  });
+
+  it("returns nothing when the payload carried no directory", () => {
+    expect(projectPrefixOf(undefined)).toBe("");
+  });
+
+  it("returns nothing for an empty directory", () => {
+    expect(projectPrefixOf("")).toBe("");
+  });
+});

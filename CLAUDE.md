@@ -1,108 +1,113 @@
 # claude-notify — how the code here is written
 
-Four documents, one job each: `README.md` for arriving and installing,
-`PLAN.md` for behaviour and the reasons behind it, this file for style and
-gates, `TECH-DEBT.md` for what is deliberately unfinished. The dividing
-question: *would the fact survive a rewrite in another language?* Yes →
-`PLAN.md`; no → here. A fact lives where its reason lives; the other file gets
-a pointer, never a retelling.
+Four documents, one job each: `README.md` for arriving and installing, `PLAN.md`
+for behaviour and the reasons behind it, this file for style and gates,
+`TECH-DEBT.md` for what is deliberately unfinished. The dividing question:
+*would the fact survive a rewrite in another language?* Yes → `PLAN.md`; no →
+here. A fact lives where its reason lives; the other file gets a pointer, never
+a retelling.
 
-## The runtime is Windows PowerShell 5.1
+That split earned itself: this product was written twice, in PowerShell and
+then in TypeScript, and `PLAN.md` survived the move almost untouched while this
+file was thrown away and written again.
 
-Not pwsh. The scripts must run on a stock Windows box with nothing installed,
-which buys the constraint list below — each one has already cost a debugging
-session:
+## There is no build step
 
-- **Every `.ps1` is UTF-8 with BOM.** 5.1 reads BOM-less files as ANSI and
-  silently mangles Cyrillic. The Write tool produces BOM-less files, so re-encode
-  after writing.
-- **No PS6+ syntax**: no `&&`/`||` chains, no ternary, no `??`. `ConvertFrom-Json`
-  returns `PSCustomObject` — probe fields with `$obj.PSObject.Properties['name']`,
-  never `-AsHashtable`.
-- **No here-strings in payload scripts** (`src/` files that `build.ps1` embeds).
-  The build wraps each payload in a single-quoted here-string, so a line starting
-  with `'@` inside one would truncate the installer. The build refuses such a
-  file; keep it able to.
-- Telegram bodies are sent as UTF-8 **bytes** with an explicit
-  `charset=utf-8` — handing 5.1 a string re-encodes it wrong.
-- **Hook stdin is read through a UTF-8 `StreamReader`, never `[Console]::In`**,
-  which decodes with the console code page and turned a question's Cyrillic
-  into mojibake in a shipped ping. `Read-HookStdin` in `hook-common.ps1` is the
-  one place that reads it.
+Node 24 runs the TypeScript directly by stripping types, so what a hook
+executes is the file you edit. `tsconfig.json` mirrors that rather than
+describing a compiler: `erasableSyntaxOnly` and `verbatimModuleSyntax` keep the
+source strippable (no enums, no namespaces, `import type` for types), and
+`allowImportingTsExtensions` matches the explicit `.ts` in every import path.
 
-- **A commit message reaches `git` as an argument, and 5.1 encodes arguments
-  with the console code page** — a non-ASCII character in `-m` corrupts the
-  message and can break argument parsing outright. Write the message to a
-  UTF-8 file and `git commit -F`, which is why commit messages here stay
-  English even when quoting a Russian ping.
+`strict: true`, `noUncheckedIndexedAccess`, and **no `any`**.
 
-The pattern behind all five: 5.1 assumes a code page wherever an encoding is
-not stated, and every boundary this product has — file, stdin, HTTP body,
-process arguments — has now cost a bug for it. State the encoding at every new
-boundary.
+**There are no relative imports in `src/`** — every specifier is a `#domain/…`
+or `#edges/…` subpath alias declared in `package.json`, so an import reads the
+same wherever it sits, and a layering violation is visible in the line itself.
 
-## Layout and the one build rule
+## Two layers, and the rule between them
 
-`src/` holds two kinds of file and the distinction drives everything:
+```
+src/
+  domain/   every decision, pure: state in as arguments, verdict out as a value
+  edges/    every effect: files, HTTP, win32, spawning
+  hook.ts     entry point: Claude Code fires it, one event per invocation
+  notify.ts   entry point: the model or a human sends one ping
+  watcher.ts  entry point: delivers what presence held back
+  setup.ts    entry point: the installer
+```
 
-- **Payload** (`notify-core`, `notify`, `watcher`, `hook-*`) — embedded by
-  `build.ps1` into `dist/setup.ps1` and run headless by hooks. Full lint rules;
-  no `Write-Host`; logs are the only output.
-- **CLI** (`installer.ps1`, plus root `build.ps1` / `check.ps1`) — talk to a
-  human; `Write-Host` with color is correct there and is the one excluded lint
-  rule.
+**`domain/` may not import `node:*`, `koffi`, or anything from `edges/`.** No
+file, no socket, no clock — a function that needs the time takes a `Date` or a
+number of milliseconds. This is what makes a delivery rule testable in
+milliseconds instead of by walking away from the keyboard for three minutes,
+and it is a **lint zone, not an aspiration**: `eslint.config.js` fails the
+build. The zone was proven by committing a deliberate `import { readFileSync }`
+into `domain/` and watching it fail — a zone that never fires looks exactly
+like a zone with nothing to report.
 
-**Edit only `src/`. `dist/setup.ps1` is a build artifact** — `check.ps1` fails
-if it is stale, so the rule is enforced, not aspirational.
+Entry points are composition roots: they read argv or stdin, call one domain
+function, hand the verdict to one edge. When an entry point grows a branch
+worth naming, that branch belongs in `domain/`.
 
-## The pure core
+**Everything the user reads in Telegram lives in `domain/copy.ts`** and nothing
+else contains a Russian string. There is no locale table: the product has one
+reader and one language, and a `copyIn(locale)` switch would be ceremony. A
+copy function interpolates and never decides — choosing between `1 ч` and
+`1 ч 12 мин` is `duration.ts`'s job, not the table's.
 
-Every *decision* lives in `src/notify-core.ps1` as a pure function: state in as
-arguments — including the clock — verdict out as a value. No file, HTTP, win32
-or `Get-Date` inside. The edges (`notify.ps1`, `watcher.ps1`) gather the state,
-call the core, act on the verdict. A new behaviour therefore lands as: a core
-function plus its Pester spec, then the edge wiring.
-
-This is what makes the product testable at all — a delivery rule is exercised
-in milliseconds instead of by stepping away from the keyboard for three
-minutes.
+Code, comments, commits and docs are English. Only what reaches Telegram is
+Russian.
 
 ## Style
 
-- PSScriptAnalyzer is the arbiter of everything mechanical: approved verbs,
-  singular nouns, no empty catch with silence. `check.ps1` runs it; a finding
-  is a failure, not a warning.
-- **Comments are allowed but must earn their line**: a hook's contract with
-  Claude Code, or a 5.1 trap that naming cannot carry. A comment restating the
-  code is deleted on sight. (A deliberate deviation from the reference
-  project's no-comments rule — PowerShell 5.1's quirks are too obscure for
-  names alone.)
-- **Everything the user reads in Telegram is Russian; everything else —**
-  **code, comments, commits, docs — is English.** The Russian strings sit in
-  the hook scripts and stay under ~200 characters; a copy table would be
-  ceremony at this size and is deliberately absent.
-- State files (`last-sent-*`, `watcher.lock`) are written ASCII; timestamps are
-  ISO round-trip (`'o'`) parsed with invariant culture, so a locale change
-  cannot corrupt a stamp.
+Anything a machine can check is a lint rule, not a paragraph. What is left
+needs judgement:
+
+- **No comments in `src/`** — `project/no-comments` enforces it. A name carries
+  the intent, and an explanation that will not fit in a name belongs in
+  `PLAN.md`. The PowerShell version allowed comments because its traps were too
+  obscure to name; that excuse left with PowerShell.
+- **A number must be named by a `const`** — `project/named-numbers`. This
+  product is a pile of thresholds, and an unnamed one reads as intent while
+  behaving as an accident.
+- **Prefer a discriminated union over a nullable plus a separate reason.**
+  `decideDelivery` returns `{ kind: "queue"; idleSeconds }` rather than a
+  boolean and an out-parameter, so the caller's `switch` is exhaustive and
+  adding an outcome becomes a compile error everywhere obliged to handle it.
+- **A file name has to survive being read on its own.** An editor tab shows
+  `pending.ts`, not its folder, so the name says what is inside: `usage.ts`
+  holds the usage line, `presence.ts` answers whether you are at the keyboard.
+- **Keep functions pure where you can**, and keep the impure ones small enough
+  that what they do fits in their name.
+
+`project/named-states` from the reference project is deliberately **not**
+adopted: it exists there because states are spelled across many features, and
+here one small union lives beside its only consumer.
 
 ## Tests and gates
 
-Pester specs live in `tests/` and cover the pure core exhaustively — every
-function, every branch that decides a delivery. The impure edges are proven by
-pipe-tests (`README.md` shows the manual send; hooks are tested by piping a
-synthetic payload), not by units — mocking `Invoke-RestMethod` to watch it be
-called is theatre.
+Specs sit next to the code as `*.spec.ts`. `domain/` is covered exhaustively —
+every function, every branch that changes a delivery. `edges/deliver.ts` is
+covered with every edge mocked, because it is the funnel where the wiring can
+be wrong. `edges/store.ts` earns an `*.integration.spec.ts` against a real
+temporary directory, since a file that survives a crash is exactly what a mock
+cannot prove.
 
-Before any commit:
+Four files are outside coverage on purpose, and it is not a fudge: `paths.ts`,
+`presence.ts`, `telegram.ts`, `usage-api.ts`, `watcher-process.ts` and the
+entry points hold no decisions — they are the seam with somebody else's API. A
+unit that mocks `fetch` to watch `fetch` be called proves nothing; what they do
+is proven by sending a real ping.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File check.ps1
+```bash
+npm run check
 ```
 
-Three gates — lint clean, tests green, dist fresh — and a release commit states
-its numbers. Say how big a phase is before starting it, in a line, so it can be
-argued down.
+Lint, types, tests — the gate to keep at zero. Two more before a release:
+`npm run test:coverage` (floor 80%) and `npm run test:mutation` (breaks below
+85%), and the numbers go in the phase's commit message.
 
-A check that never fired is indistinguishable from one with nothing to report:
-when adding a gate, first commit a deliberate violation to see it fail. The
-build's here-string guard and the dist-drift gate were both proven this way.
+**Say how big a phase is before starting it**, in a line, so it can be argued
+down. And when adding a gate, first commit a deliberate violation to watch it
+fail.

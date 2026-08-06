@@ -6,8 +6,10 @@ and the design dead ends already paid for. How the code is written lives in
 
 The dividing question is whether a fact would survive a rewrite in another
 language. The Telegram Bot API's behaviour, the decision pipeline and the hook
-events would — so they are here. PowerShell encodings and file layout would not
-— so they are not.
+events would — so they are here. The runtime's encodings and the file layout
+would not — so they are not. That claim has been tested: the product was
+rewritten from PowerShell to TypeScript and five lines of this document
+changed.
 
 ## Purpose
 
@@ -27,7 +29,7 @@ Two sources, deliberately redundant:
 
 1. **The model itself.** A rule in the global `~/.claude/CLAUDE.md` (installed
    by setup) tells the agent: before ending a turn that waits on the user, call
-   `notify.ps1` with a short Russian message naming the project and what is
+   `notify.ts` with a short Russian message naming the project and what is
    needed. This is the high-value path — the ping says *why* — but it is model
    behaviour, so it is probabilistic by nature.
 2. **Hooks**, the mechanical fallback for turns where the model did not call:
@@ -49,8 +51,7 @@ pings pass none and are never rate-limited.
 
 ## The delivery pipeline
 
-Every message, from either source, goes through the same funnel in
-`notify.ps1`:
+Every message, from either source, goes through the same funnel:
 
 ```
 message
@@ -170,11 +171,19 @@ threshold is the knob if it ever is not.
 - **"The power outage restarted everything" is false on a laptop.** The battery
   carried the sessions through; the stale config kept running. Reload is only
   ever explicit — restart the app, `--continue` in a terminal.
-- **A hook payload is UTF-8 and was being read as the console code page.** The
-  first live question ping said `вопрос: ╨Ü╨░╨║╨╕╨╝…`. Pipe-tests had not caught
-  it because they were driven from a PowerShell string rather than raw bytes —
-  a test of an encoding boundary has to cross the boundary the same way the
-  real caller does.
+- **A hook payload is UTF-8, and a runtime that guesses otherwise mangles the
+  one thing worth sending.** The first live question ping said
+  `вопрос: ╨Ü╨░╨║╨╕╨╝…`. The tests had not caught it because they fed the hook a
+  string built inside the test rather than the bytes a real caller writes: a
+  test of an encoding boundary has to cross that boundary the way the caller
+  does.
+- **Identifying your own configuration by a substring of its path is not
+  identifying it.** The installer recognised its own hook entries by looking for
+  the product name in the command path, which silently stopped matching when the
+  checkout was named something else — so a second run added duplicates instead of
+  replacing. The specs passed because their fixture path happened to contain the
+  name. An entry now carries an explicit marker argument, and moving the
+  checkout is covered by a spec.
 
 ## Telegram Bot API facts this design leans on
 
@@ -191,9 +200,11 @@ threshold is the knob if it ever is not.
 
 ## Roadmap
 
-Phases 0-3 — sound, Telegram with presence filtering, the single-file
-installer, and the limits line — are what this document describes; they are
-done.
+Phases 0-3 — sound, Telegram with presence filtering, the installer, and the
+limits line — are what this document describes; they are done, and the product
+has since been rewritten from PowerShell to TypeScript with no change in
+behaviour. The rewrite bought what the old runtime could not offer at any
+price: types, a layering rule the build enforces, and mutation testing.
 
 **Phase 4 — answering from the phone.** An inline button under a question
 ping: «делай как рекомендуешь». Two hard sub-problems, named now so the phase
@@ -215,7 +226,8 @@ until phase 4 exists.
 - **Detecting presence by audio playback.** Watching a video without touching
   anything reads as absence; the `min_idle_minutes` knob is the accepted
   answer. Reconsider only if a real ping-during-video annoys in practice.
-- **Anything but Windows.** Presence is win32, sound is `Media.SoundPlayer`,
-  the runtime is PowerShell 5.1. A macOS port is a rewrite of the edges around
-  the same core and the same PLAN.
+- **Anything but Windows.** Presence is win32 `GetLastInputInfo` and the sound
+  hook is a PowerShell one-liner in `settings.json`. A macOS port is two files
+  in `edges/` — the domain and this document already carry over, which the
+  rewrite from PowerShell demonstrated.
 - **Multiple users or chats.** One person, their machines, one bot.

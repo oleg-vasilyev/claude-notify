@@ -7,40 +7,61 @@ remembers.
 
 ---
 
-## A failed send is lost
+## The mutation score sits at 86.1%, and three files carry the gap
 
-`notify.ps1` logs `ERROR send failed` and exits 1 — no retry, no re-queue. A
-flaky wifi moment at the exact second of a ping loses it, and the fallback
-hooks may be rate-limited when the next event fires. The honest fix is to
-re-queue the message with its timestamp so the watcher retries it, reusing the
-staleness rule as the give-up rule.
+The gate breaks below 85%, so this passes, but `delivery.ts` (81%),
+`memory-rule.ts` (67%) and `usage.ts` (84%) each have survivors. They are
+mostly boundary and string mutants: tests that assert *that* something happened
+rather than exactly what.
 
-**Pick it up when `ERROR send failed` appears in a real log** — until a real
-network blip eats a real ping, the machinery is speculative.
+**Raise them the next time one of those three files changes** — a survivor in a
+file you are already editing is cheap to kill, and chasing all of them today
+would be tuning a number rather than finding a bug.
 
 ---
 
-## `hook-notification.ps1` ships although its event has never fired
+## A failed send is lost
+
+`deliver.ts` logs `ERROR send failed`, sets a non-zero exit code, and drops the
+ping. A flaky moment at the exact second of a send loses it, and the fallback
+hooks may be rate-limited when the next event fires. The honest fix is to
+re-queue the message with its original timestamp so the watcher retries it,
+reusing the staleness rule as the give-up rule.
+
+**Pick it up when `ERROR send failed` appears in a real log.**
+
+---
+
+## `hook-notification.ts` ships although its event has never fired
 
 A full day of real use produced zero `HOOK Notification` lines in the desktop
 app (see the tombstone in `PLAN.md`). The hook stays registered because it is
 harmless and the event is documented to cover permission prompts and idle
 waits — in some other host it may simply work.
 
-**Delete the hook and its registration if a month of terminal-CLI sessions
-also never logs `HOOK Notification`; keep it and delete this entry the first
-time one appears.**
+**Delete the registration if a month of terminal-CLI sessions also never logs
+`HOOK Notification`; delete this entry the first time one appears.**
+
+---
+
+## Mocked modules have no stub files
+
+`deliver.spec.ts` mocks six edge modules with inline `vi.fn()` factories. The
+reference project insists on a `*.stub.ts` beside each mockable module, because
+a hand-rolled fake keeps compiling after the real signature changes.
+
+**Write the stubs when a second spec mocks the same module**, or the first time
+a factory is caught disagreeing with a real signature.
 
 ---
 
 ## `log.txt` grows forever
 
-Every decision appends; nothing rotates or trims. The first day of real use
-reached 180 KB in 73 lines — hook payloads, not decisions, were the whole
-weight, so they are now truncated to 400 characters and the honest rate is
-unknown again.
+Every decision appends; nothing rotates. Payloads are truncated to 400
+characters, which was the whole weight when the log reached 180 KB on its first
+day, so the honest rate is unknown again.
 
-**Rotate (or truncate to the last N lines on watcher start) when a real
+**Rotate, or truncate to the last N lines on watcher start, when a real
 `log.txt` passes 1 MB.**
 
 ---
@@ -49,58 +70,49 @@ unknown again.
 
 Every send makes its own `GET /api/oauth/usage`. Pings are rare enough that
 this is a handful of calls an hour, and a cache would have to reason about
-staleness against a number that moves — the whole point is that it is current.
+staleness against a number whose whole value is being current.
 
-**Add a short-lived cache when a queue flush ever delivers several pings at
-once often enough to notice**, or if the endpoint starts rate-limiting.
+**Add a short-lived cache when a queue flush delivers several pings at once
+often enough to notice**, or if the endpoint starts rate-limiting.
 
 ---
 
 ## A machine using Windows Credential Manager gets no limits line
 
-`Get-UsageSnapshot` reads `~/.claude/.credentials.json`. Claude Code can
-instead keep the token in Windows Credential Manager, in which case the file is
-absent, the reader returns nothing, and every ping is missing its second line —
-correct behaviour, but silent beyond one `WARN usage unavailable` per send.
+`usage-api.ts` reads `~/.claude/.credentials.json`. Claude Code can instead keep
+the token in Windows Credential Manager, in which case the file is absent and
+every ping is missing its second line — correct behaviour, but visible only as
+one `WARN usage unavailable` per send.
 
 **Read the credential manager too when a machine actually turns up without the
-file** — the work is a `CredRead` P/Invoke, and doing it speculatively means
-writing it against a configuration nobody has.
+file.**
 
 ---
 
 ## There is no uninstaller
 
-Setup adds hook entries, scripts and a CLAUDE.md section; removing them is a
-by-hand exercise today. The installer already knows how to find its own hook
-entries (it rewrites them on every run), so `-Uninstall` is mostly written.
+Setup adds hook entries, a config directory and a `CLAUDE.md` section; removing
+them is a by-hand exercise. The installer already knows how to find its own hook
+entries, so `--uninstall` is mostly written.
 
 **Write it the first time the hooks actually need to come off a machine.**
 
 ---
 
-## The HTTP edge has no test seam
-
-`notify.ps1` calls `api.telegram.org` directly; nothing can exercise the send
-path, the stamp write and the log line together without a real token. A fake
-Bot API (a local HTTP listener) would make the edge testable end to end.
-
-**Build it when phase 4 starts** — a two-way bot needs the fake anyway to test
-callbacks, and building it twice would be the real waste.
-
----
-
 ## Not debt, deliberately
 
-- **The installer embeds no token.** Copying `dist/setup.ps1` anywhere is safe
-  by construction; the price is retyping the token per machine, and it is paid
-  on purpose (invariant 5 in `PLAN.md`).
-- **Hook scripts log their full stdin payload.** Verbose, but the payloads are
-  the only documentation of what Claude Code actually sends each event, and
-  they have already falsified the docs once.
-- **`check.ps1` installs its own dev dependencies** into the user profile on
-  first run. A gate that fails with "install Pester yourself" on a fresh
-  machine would just be this behaviour with extra steps.
-- **The queue dedupes to one message per project, even across sources.** A
-  model ping and a hook ping about the same wait are one fact; the longest
-  message wins because context beats boilerplate.
+- **The hooks point at the checkout rather than at a copy.** One place to edit,
+  one place to update, and `git pull` is the upgrade. The price is that moving
+  the checkout means running setup again, which is one command and is stated in
+  `README.md`.
+- **The token lives outside the repository**, in `~/.claude/claude-notify/`, so
+  no `.gitignore` mistake can publish it and an update cannot overwrite it.
+- **Hook scripts log their whole payload (truncated).** Verbose, but the
+  payloads are the only documentation of what Claude Code actually sends each
+  event, and they have already falsified the documentation once.
+- **The entry points and the third-party seams are outside coverage.** They hold
+  no decisions; a unit that mocks `fetch` to watch `fetch` be called proves
+  nothing. What they do is proven by sending a real ping.
+- **`koffi` is a dependency with a native binary.** It ships prebuilt, so
+  `npm install` needs no compiler, and it buys a presence probe that costs
+  microseconds instead of spawning a shell every 30 seconds while a ping waits.

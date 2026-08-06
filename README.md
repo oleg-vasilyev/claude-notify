@@ -14,39 +14,42 @@ sits idle until you happen to come back.
 
 A ping carries the project, the machine it came from, what is needed, and where
 your limit windows stand — so you can tell whether coming back is even worth
-it. While you are at the keyboard nothing is sent — the sound is enough; the
-ping is queued and delivered a minute or two after you actually leave.
-[PLAN.md](PLAN.md) explains the machinery and why it is shaped this way.
+it. While you are at the keyboard nothing is sent: the sound is enough, and the
+ping waits in a queue until you actually leave. [PLAN.md](PLAN.md) explains the
+machinery and why it is shaped this way.
 
 ## Installing
 
+Windows, and Node 24 or newer. There is no build step — Node runs the
+TypeScript directly.
+
 1. Create a bot: open **@BotFather** in Telegram → `/newbot` → keep the token.
 2. Write `/start` to your new bot (a bot cannot message you first).
-3. Copy the one file [`dist/setup.ps1`](dist/setup.ps1) to the target machine
-   and run:
+3. Clone this repository wherever you keep your projects, then:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1
+```bash
+npm install && npm run setup
 ```
 
-It asks for the token and a machine label, resolves your chat id, writes the
-scripts to `~/.claude/scripts/telegram-notify/`, registers the Claude Code hooks
-(Telegram and sound), adds the ping rule to the global `~/.claude/CLAUDE.md`,
-and sends a test message.
+Setup asks for the token and a machine label, resolves your chat id, registers
+the Claude Code hooks (Telegram and sound), adds the ping rule to the global
+`~/.claude/CLAUDE.md`, and sends a test message. The hooks point at this
+checkout, so keep it where it is — moving it means running setup again.
 
 4. Restart Claude Code so the hooks load.
 
-The installer is idempotent — run it again to update. It rewrites only its own
-hook entries and leaves everything else in `settings.json` alone. For
-automation:
+Run setup again any time to update; it rewrites only its own hook entries and
+leaves the rest of `settings.json` alone. For a second machine, or a rerun with
+no questions:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -Token "123:ABC" -MachineLabel work -NonInteractive
+```bash
+npm run setup -- --token 123:ABC --label work
 ```
 
 ## Configuration
 
-`~/.claude/scripts/telegram-notify/config.json`:
+`~/.claude/claude-notify/config.json` — the state directory, kept out of the
+checkout so an update never touches your token:
 
 | Key | Meaning |
 | --- | --- |
@@ -58,13 +61,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -Token "123:ABC" -
 | `include_usage` | append the limits line to each ping (default true) |
 
 One bot serves any number of machines; the label is what tells their pings
-apart. The token lives only in this file, which never leaves the machine — the
-installer does not embed it and the repository ignores it.
+apart.
 
 ## When a ping does not arrive
 
 Everything the notifier decides is one line in
-`~/.claude/scripts/telegram-notify/log.txt`:
+`~/.claude/claude-notify/log.txt`:
 
 | Line | Meaning |
 | --- | --- |
@@ -73,61 +75,55 @@ Everything the notifier decides is one line in
 | `DROP stale` | it sat queued longer than `stale_minutes` — you were here all along |
 | `SKIP rate-limit [proj]` | that project pinged too recently |
 | `HOOK <event>` | a Claude Code hook fired, with its payload |
-| `ERROR send failed` | the Telegram API refused — the reason follows |
 | `WARN usage unavailable` | the limits line was skipped; the ping itself went out |
-| `WATCHER started/exit` | the background deliverer of queued pings |
+| `ERROR send failed` | the Telegram API refused — the reason follows |
 
-No line at all means the script was never called: the model did not ping and no
-hook fired. To prove the pipe end to end, bypassing the presence filter:
+No line at all means nothing called it: the model did not ping and no hook
+fired. To prove the pipe end to end, bypassing the presence filter:
 
-```powershell
-powershell -NoProfile -File "$env:USERPROFILE\.claude\scripts\telegram-notify\notify.ps1" -Message "[test] проверка" -MinIdleMinutes 0
+```bash
+node src/notify.ts --message "[test] проверка" --now
 ```
 
 ## Development
 
-Windows PowerShell 5.1 is the target runtime — the scripts run on any Windows
-box with nothing installed. The two dev dependencies (PSScriptAnalyzer, Pester)
-are fetched by `check.ps1` on first run.
-
 ```
-src/notify-core.ps1              every delivery decision, pure - state in, verdict out
-src/notify.ps1                   the impure edge: config, win32 idle probe, HTTP, queue
-src/usage.ps1                    reads the limit windows from the account's usage endpoint
-src/hook-common.ps1              shared hook plumbing: UTF-8 stdin, logging, payload parsing
-src/watcher.ps1                  delivers queued pings once you go idle
-src/hook-stop.ps1                turn ended - the ball is in your court
-src/hook-ask.ps1                 a question dialog or a plan approval, mid-turn
-src/hook-permission-request.ps1  a permission prompt, mid-turn
-src/hook-notification.ps1        the event that has never been seen to fire
-src/installer.ps1                setup logic; #__PAYLOAD__ marks where scripts embed
-build.ps1                        assembles src/ into dist/setup.ps1
-check.ps1                        the gate: lint, tests, build, dist drift
-tests/                           Pester specs for the pure core
-```
-
-Edit **only `src/`**; `dist/setup.ps1` is a build artifact:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
+src/domain/     every decision, pure — no files, no network, no clock
+  copy.ts           every Russian string the user reads
+  delivery.ts       send, queue, or skip
+  duration.ts       "1 ч 12 мин"
+  hook-ping.ts      what each Claude Code event has to say
+  hook-registration.ts  merging into settings.json without clobbering it
+  memory-rule.ts    the rule setup writes into the global CLAUDE.md
+  pending.ts        which queued pings survive, and which one wins per project
+  project.ts        the project key and the machine label
+  usage.ts          the limits line
+src/edges/      every effect — files, HTTP, win32, spawning
+  deliver.ts        the funnel every ping goes through
+  presence.ts       are you at the keyboard (win32 GetLastInputInfo via koffi)
+  store.ts          the queue, the per-project stamps, the watcher lock
+  usage-api.ts      the account's own usage endpoint
+src/hook.ts     entry point: one Claude Code event
+src/notify.ts   entry point: one ping, from the model or by hand
+src/watcher.ts  entry point: delivers what presence held back
+src/setup.ts    entry point: the installer
 ```
 
-Before any commit:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File check.ps1
+```bash
+npm run check            # lint, types, tests — the gate to keep at zero
+npm run test:coverage    # floor 80%
+npm run test:mutation    # Stryker over domain/, breaks below 85%
 ```
 
-Three gates: PSScriptAnalyzer clean, Pester green, and freshly built output
-byte-identical to the committed `dist/setup.ps1` — so editing `src/` and
-forgetting to rebuild cannot land.
+`domain/` may not import `node:*`, `koffi` or anything from `edges/`, and
+ESLint fails the build if it does. [CLAUDE.md](CLAUDE.md) has the rest.
 
 ## The other three documents
 
 - **[PLAN.md](PLAN.md)** — what the notifier does and why: the two sources of a
   ping, the delivery pipeline, the invariants, and the dead ends already paid
   for. Read it before changing behaviour.
-- **[CLAUDE.md](CLAUDE.md)** — how the code here is written: PowerShell 5.1
-  constraints, the pure core rule, and the gates. Read it before writing code.
+- **[CLAUDE.md](CLAUDE.md)** — how the code here is written: the two layers, the
+  lint zone between them, and the gates. Read it before writing code.
 - **[TECH-DEBT.md](TECH-DEBT.md)** — what is deliberately unfinished, each entry
   with the trigger that would make it worth doing.

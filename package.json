@@ -1,0 +1,39 @@
+{
+  "name": "claude-notify",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "imports": {
+    "#domain/*": "./src/domain/*",
+    "#edges/*": "./src/edges/*"
+  },
+  "scripts": {
+    "setup": "node src/setup.ts",
+    "ping": "node src/notify.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:mutation": "stryker run",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "lint": "eslint src",
+    "lint:fix": "eslint --fix src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "koffi": "^2.15.1"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
+    "@types/node": "^26.1.2",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.0",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

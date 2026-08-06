@@ -35,6 +35,35 @@ Describe 'Add-MachineLabel' {
   }
 }
 
+Describe 'Get-ProjectPrefix' {
+  It 'names the project after the last segment of the working directory' {
+    Get-ProjectPrefix 'D:\Temp\FoolProof' | Should -Be '[FoolProof] '
+  }
+  It 'returns nothing when the payload carried no cwd' {
+    Get-ProjectPrefix $null | Should -Be ''
+  }
+  It 'returns nothing for an empty cwd' {
+    Get-ProjectPrefix '' | Should -Be ''
+  }
+}
+
+Describe 'Format-LogPayload' {
+  It 'flattens a multi-line payload onto one line' {
+    Format-LogPayload "{`n  `"a`": 1`n}" | Should -Be '{ "a": 1 }'
+  }
+  It 'keeps a short payload whole' {
+    Format-LogPayload '{"a":1}' | Should -Be '{"a":1}'
+  }
+  It 'truncates a long payload and says how long it was' {
+    $long = 'x' * 500
+    $out = Format-LogPayload $long -MaxChars 100
+    $out | Should -BeLike ('x' * 100 + '... (500 chars)')
+  }
+  It 'handles an empty payload' {
+    Format-LogPayload '' | Should -Be ''
+  }
+}
+
 Describe 'Get-DeliveryDecision' {
   BeforeAll {
     $script:now = [datetime]'2026-08-06 12:00:00'

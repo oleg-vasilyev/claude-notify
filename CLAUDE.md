@@ -25,6 +25,21 @@ session:
   file; keep it able to.
 - Telegram bodies are sent as UTF-8 **bytes** with an explicit
   `charset=utf-8` — handing 5.1 a string re-encodes it wrong.
+- **Hook stdin is read through a UTF-8 `StreamReader`, never `[Console]::In`**,
+  which decodes with the console code page and turned a question's Cyrillic
+  into mojibake in a shipped ping. `Read-HookStdin` in `hook-common.ps1` is the
+  one place that reads it.
+
+- **A commit message reaches `git` as an argument, and 5.1 encodes arguments
+  with the console code page** — a non-ASCII character in `-m` corrupts the
+  message and can break argument parsing outright. Write the message to a
+  UTF-8 file and `git commit -F`, which is why commit messages here stay
+  English even when quoting a Russian ping.
+
+The pattern behind all five: 5.1 assumes a code page wherever an encoding is
+not stated, and every boundary this product has — file, stdin, HTTP body,
+process arguments — has now cost a bug for it. State the encoding at every new
+boundary.
 
 ## Layout and the one build rule
 

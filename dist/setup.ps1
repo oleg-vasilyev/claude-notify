@@ -54,6 +54,23 @@ function Add-MachineLabel {
   return $Message
 }
 
+function Get-ProjectPrefix {
+  param([AllowEmptyString()][AllowNull()][string]$Cwd)
+  if (-not $Cwd) { return '' }
+  return '[' + (Split-Path -Leaf $Cwd) + '] '
+}
+
+function Format-LogPayload {
+  param(
+    [AllowEmptyString()][AllowNull()][string]$Raw,
+    [int]$MaxChars = 400
+  )
+  if (-not $Raw) { return '' }
+  $flat = ($Raw -replace '\s+', ' ').Trim()
+  if ($flat.Length -le $MaxChars) { return $flat }
+  return $flat.Substring(0, $MaxChars) + '... (' + $flat.Length + ' chars)'
+}
+
 function Get-DeliveryDecision {
   param(
     [Parameter(Mandatory = $true)][int]$IdleSeconds,
@@ -104,6 +121,44 @@ function Select-PendingDelivery {
   return [pscustomobject]@{
     Deliver = @($best.Values)
     Dropped = @($dropped)
+  }
+}
+'@
+
+Write-Script 'hook-common.ps1' @'
+# Shared plumbing for the hook scripts: read the payload, log it, name the project.
+. (Join-Path $PSScriptRoot 'notify-core.ps1')
+
+# Reading stdin needs a helper of its own. [Console]::In decodes with the console
+# code page, so a payload carrying Cyrillic - a question's own text - arrives as
+# mojibake; Claude Code writes UTF-8, so the stream is read as UTF-8 explicitly.
+function Read-HookStdin {
+  $stream = [Console]::OpenStandardInput()
+  $reader = New-Object IO.StreamReader($stream, (New-Object Text.UTF8Encoding($false)))
+  try {
+    return $reader.ReadToEnd()
+  } finally {
+    $reader.Dispose()
+  }
+}
+
+function Write-HookLog {
+  param(
+    [Parameter(Mandatory = $true)][string]$EventName,
+    [AllowEmptyString()][AllowNull()][string]$Raw
+  )
+  $line = "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK $EventName | $(Format-LogPayload $Raw)"
+  $line | Add-Content (Join-Path $PSScriptRoot 'log.txt') -Encoding utf8
+}
+
+function Read-HookPayload {
+  param([Parameter(Mandatory = $true)][string]$EventName)
+  $raw = Read-HookStdin
+  Write-HookLog -EventName $EventName -Raw $raw
+  try {
+    return $raw | ConvertFrom-Json
+  } catch {
+    return $null
   }
 }
 '@
@@ -266,16 +321,14 @@ try {
 '@
 
 Write-Script 'hook-notification.ps1' @'
-# Claude Code "Notification" hook: permission prompts and idle waiting.
-$raw = [Console]::In.ReadToEnd()
-$logPath = Join-Path $PSScriptRoot 'log.txt'
-"$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK Notification | $($raw -replace '\s+', ' ')" | Add-Content $logPath -Encoding utf8
+# Claude Code "Notification" hook: permission prompts and idle waiting, per the
+# docs. It has never been observed to fire - see the tombstone in PLAN.md.
+. (Join-Path $PSScriptRoot 'hook-common.ps1')
 
-try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
-$msg = $data.message
-if (-not $msg) { $msg = 'ждёт твоего ввода' }
-$proj = ''
-if ($data.cwd) { $proj = '[' + (Split-Path -Leaf $data.cwd) + '] ' }
+$data = Read-HookPayload -EventName 'Notification'
+if (-not $data) { exit 0 }
+$proj = Get-ProjectPrefix $data.cwd
+$msg = if ($data.message) { $data.message } else { 'ждёт твоего ввода' }
 
 & (Join-Path $PSScriptRoot 'notify.ps1') -Message ($proj + $msg) -RateLimitMinutes 10
 exit 0
@@ -284,13 +337,10 @@ exit 0
 Write-Script 'hook-stop.ps1' @'
 # Claude Code "Stop" hook: fires when Claude finishes a turn, i.e. the ball is
 # back in the user's court. Fallback for turns where the model did not ping itself.
-$raw = [Console]::In.ReadToEnd()
-$logPath = Join-Path $PSScriptRoot 'log.txt'
-"$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK Stop | $($raw -replace '\s+', ' ')" | Add-Content $logPath -Encoding utf8
+. (Join-Path $PSScriptRoot 'hook-common.ps1')
 
-try { $data = $raw | ConvertFrom-Json } catch { $data = $null }
-$proj = ''
-if ($data -and $data.cwd) { $proj = '[' + (Split-Path -Leaf $data.cwd) + '] ' }
+$data = Read-HookPayload -EventName 'Stop'
+$proj = if ($data) { Get-ProjectPrefix $data.cwd } else { '' }
 
 & (Join-Path $PSScriptRoot 'notify.ps1') -Message ($proj + 'закончил ход, ждёт тебя') -RateLimitMinutes 10
 exit 0
@@ -300,13 +350,11 @@ Write-Script 'hook-ask.ps1' @'
 # Claude Code "PreToolUse" hook for the tools that hand control back to the user
 # mid-turn: AskUserQuestion (interactive question) and ExitPlanMode (plan approval).
 # The Stop hook cannot cover these - the turn has not ended when they run.
-$raw = [Console]::In.ReadToEnd()
-$logPath = Join-Path $PSScriptRoot 'log.txt'
-"$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK PreToolUse | $($raw -replace '\s+', ' ')" | Add-Content $logPath -Encoding utf8
+. (Join-Path $PSScriptRoot 'hook-common.ps1')
 
-try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
-$proj = ''
-if ($data.cwd) { $proj = '[' + (Split-Path -Leaf $data.cwd) + '] ' }
+$data = Read-HookPayload -EventName 'PreToolUse'
+if (-not $data) { exit 0 }
+$proj = Get-ProjectPrefix $data.cwd
 
 $text = 'ждёт твоего ответа'
 if ($data.tool_name -eq 'ExitPlanMode') {
@@ -326,13 +374,11 @@ Write-Script 'hook-permission-request.ps1' @'
 # Claude Code "PermissionRequest" hook: fires when a tool call is about to show
 # a permission prompt - the one mid-turn wait neither Stop nor hook-ask can see.
 # Passive on purpose: it prints no JSON, so the prompt itself is untouched.
-$raw = [Console]::In.ReadToEnd()
-$logPath = Join-Path $PSScriptRoot 'log.txt'
-"$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK PermissionRequest | $($raw -replace '\s+', ' ')" | Add-Content $logPath -Encoding utf8
+. (Join-Path $PSScriptRoot 'hook-common.ps1')
 
-try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
-$proj = ''
-if ($data.cwd) { $proj = '[' + (Split-Path -Leaf $data.cwd) + '] ' }
+$data = Read-HookPayload -EventName 'PermissionRequest'
+if (-not $data) { exit 0 }
+$proj = Get-ProjectPrefix $data.cwd
 $tool = if ($data.tool_name) { $data.tool_name } else { 'tool' }
 
 & (Join-Path $PSScriptRoot 'notify.ps1') -Message ($proj + 'просит разрешение: ' + $tool) -RateLimitMinutes 10

@@ -1,13 +1,11 @@
-﻿# Claude Code "Notification" hook: permission prompts and idle waiting.
-$raw = [Console]::In.ReadToEnd()
-$logPath = Join-Path $PSScriptRoot 'log.txt'
-"$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK Notification | $($raw -replace '\s+', ' ')" | Add-Content $logPath -Encoding utf8
+﻿# Claude Code "Notification" hook: permission prompts and idle waiting, per the
+# docs. It has never been observed to fire - see the tombstone in PLAN.md.
+. (Join-Path $PSScriptRoot 'hook-common.ps1')
 
-try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
-$msg = $data.message
-if (-not $msg) { $msg = 'ждёт твоего ввода' }
-$proj = ''
-if ($data.cwd) { $proj = '[' + (Split-Path -Leaf $data.cwd) + '] ' }
+$data = Read-HookPayload -EventName 'Notification'
+if (-not $data) { exit 0 }
+$proj = Get-ProjectPrefix $data.cwd
+$msg = if ($data.message) { $data.message } else { 'ждёт твоего ввода' }
 
 & (Join-Path $PSScriptRoot 'notify.ps1') -Message ($proj + $msg) -RateLimitMinutes 10
 exit 0

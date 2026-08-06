@@ -41,9 +41,8 @@ Two sources, deliberately redundant:
 | `Notification` | permission prompts and idle waiting, per the docs | never observed to fire — see tombstones |
 
 The mid-turn events matter because `Stop` cannot see them: a question dialog or
-a permission prompt suspends the turn without ending it. `PermissionRequest`
-is registered but has not yet been observed live — pipe-tests prove the script,
-only a real prompt proves the event.
+a permission prompt suspends the turn without ending it. All four have now been
+observed firing in the desktop app; `Notification` alone never has.
 
 Hook pings pass `-RateLimitMinutes` so a burst collapses; deliberate model
 pings pass none and are never rate-limited.
@@ -134,6 +133,11 @@ threshold is the knob if it ever is not.
 - **"The power outage restarted everything" is false on a laptop.** The battery
   carried the sessions through; the stale config kept running. Reload is only
   ever explicit — restart the app, `--continue` in a terminal.
+- **A hook payload is UTF-8 and was being read as the console code page.** The
+  first live question ping said `вопрос: ╨Ü╨░╨║╨╕╨╝…`. Pipe-tests had not caught
+  it because they were driven from a PowerShell string rather than raw bytes —
+  a test of an encoding boundary has to cross the boundary the same way the
+  real caller does.
 
 ## Telegram Bot API facts this design leans on
 

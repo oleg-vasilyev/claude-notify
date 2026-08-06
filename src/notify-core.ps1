@@ -27,6 +27,23 @@ function Add-MachineLabel {
   return $Message
 }
 
+function Get-ProjectPrefix {
+  param([AllowEmptyString()][AllowNull()][string]$Cwd)
+  if (-not $Cwd) { return '' }
+  return '[' + (Split-Path -Leaf $Cwd) + '] '
+}
+
+function Format-LogPayload {
+  param(
+    [AllowEmptyString()][AllowNull()][string]$Raw,
+    [int]$MaxChars = 400
+  )
+  if (-not $Raw) { return '' }
+  $flat = ($Raw -replace '\s+', ' ').Trim()
+  if ($flat.Length -le $MaxChars) { return $flat }
+  return $flat.Substring(0, $MaxChars) + '... (' + $flat.Length + ' chars)'
+}
+
 function Get-DeliveryDecision {
   param(
     [Parameter(Mandatory = $true)][int]$IdleSeconds,

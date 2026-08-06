@@ -33,23 +33,12 @@ time one appears.**
 
 ---
 
-## `PermissionRequest` coverage is proven by pipe-test only
-
-The script works and the registration is in place, but no live permission
-prompt has fired it yet — and `Notification`, which the docs also promise for
-permission prompts, taught us that a documented event is not an observed one.
-
-**Watch the log after the next restart: the first real `HOOK
-PermissionRequest` line closes this entry. If a week of real prompts passes
-without one, the mid-turn permission gap re-opens — record it in `PLAN.md` and
-remove the dead hook.**
-
----
-
 ## `log.txt` grows forever
 
-Every decision appends; nothing rotates or trims. At the current rate that is
-years to a megabyte, so any machinery today would be speculative.
+Every decision appends; nothing rotates or trims. The first day of real use
+reached 180 KB in 73 lines — hook payloads, not decisions, were the whole
+weight, so they are now truncated to 400 characters and the honest rate is
+unknown again.
 
 **Rotate (or truncate to the last N lines on watcher start) when a real
 `log.txt` passes 1 MB.**

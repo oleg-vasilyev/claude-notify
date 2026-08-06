@@ -1,13 +1,11 @@
 ﻿# Claude Code "PreToolUse" hook for the tools that hand control back to the user
 # mid-turn: AskUserQuestion (interactive question) and ExitPlanMode (plan approval).
 # The Stop hook cannot cover these - the turn has not ended when they run.
-$raw = [Console]::In.ReadToEnd()
-$logPath = Join-Path $PSScriptRoot 'log.txt'
-"$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) HOOK PreToolUse | $($raw -replace '\s+', ' ')" | Add-Content $logPath -Encoding utf8
+. (Join-Path $PSScriptRoot 'hook-common.ps1')
 
-try { $data = $raw | ConvertFrom-Json } catch { exit 0 }
-$proj = ''
-if ($data.cwd) { $proj = '[' + (Split-Path -Leaf $data.cwd) + '] ' }
+$data = Read-HookPayload -EventName 'PreToolUse'
+if (-not $data) { exit 0 }
+$proj = Get-ProjectPrefix $data.cwd
 
 $text = 'ждёт твоего ответа'
 if ($data.tool_name -eq 'ExitPlanMode') {

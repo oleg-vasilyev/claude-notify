@@ -1,0 +1,13 @@
+# Runtime state and secrets produced on the machine where the notifier is installed.
+# config.json holds the bot token - never commit it.
+config.json
+log.txt
+pending.txt
+watcher.lock
+last-sent*.txt
+
+# Local Claude Code overrides
+.claude/settings.local.json
+
+# Backups
+*.bak

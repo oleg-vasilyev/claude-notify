@@ -71,6 +71,72 @@ function Format-LogPayload {
   return $flat.Substring(0, $MaxChars) + '... (' + $flat.Length + ' chars)'
 }
 
+function Format-Duration {
+  param([Parameter(Mandatory = $true)][timespan]$Span)
+  if ($Span.TotalMinutes -lt 1) { return 'меньше минуты' }
+  $hours = [int][Math]::Floor($Span.TotalHours)
+  $minutes = $Span.Minutes
+  if ($hours -lt 1) { return ('' + $minutes + ' мин') }
+  if ($minutes -eq 0) { return ('' + $hours + ' ч') }
+  return ('' + $hours + ' ч ' + $minutes + ' мин')
+}
+
+function Select-UsageWindow {
+  param($Usage)
+  $session = $null
+  $weekly = $null
+  foreach ($limit in @($Usage.limits)) {
+    if (-not $limit) { continue }
+    if ($limit.group -eq 'session') {
+      if ($null -eq $session -or $limit.percent -gt $session.percent) { $session = $limit }
+    } elseif ($limit.group -eq 'weekly') {
+      if ($null -eq $weekly -or $limit.percent -gt $weekly.percent) { $weekly = $limit }
+    }
+  }
+  # Older shape, and the fallback if limits[] ever disappears.
+  if ($null -eq $session -and $Usage.five_hour) {
+    $session = [pscustomobject]@{ percent = $Usage.five_hour.utilization; resets_at = $Usage.five_hour.resets_at; scope = $null }
+  }
+  if ($null -eq $weekly -and $Usage.seven_day) {
+    $weekly = [pscustomobject]@{ percent = $Usage.seven_day.utilization; resets_at = $Usage.seven_day.resets_at; scope = $null }
+  }
+  return [pscustomobject]@{ Session = $session; Weekly = $weekly }
+}
+
+function Format-UsageLine {
+  param(
+    $Usage,
+    [Parameter(Mandatory = $true)][datetime]$Now,
+    # Below this a reset time is noise; above it, it is the whole point.
+    [int]$WarnAtPercent = 80
+  )
+  if ($null -eq $Usage) { return '' }
+  $windows = Select-UsageWindow -Usage $Usage
+
+  $parts = @()
+  foreach ($pair in @(@{ Label = '5ч'; Window = $windows.Session }, @{ Label = 'нед'; Window = $windows.Weekly })) {
+    $window = $pair.Window
+    if ($null -eq $window -or $null -eq $window.percent) { continue }
+    $label = $pair.Label
+    if ($window.scope -and $window.scope.model -and $window.scope.model.display_name) {
+      $label = $label + '/' + $window.scope.model.display_name
+    }
+    $percent = [int][Math]::Round([double]$window.percent)
+    $text = $label + ' ' + $percent + '%'
+    if ($percent -ge $WarnAtPercent -and $window.resets_at) {
+      try {
+        $resetsAt = [datetimeoffset]::Parse($window.resets_at, [Globalization.CultureInfo]::InvariantCulture)
+        $left = $resetsAt.UtcDateTime - $Now.ToUniversalTime()
+        if ($left.Ticks -gt 0) { $text = $text + ' (сброс через ' + (Format-Duration $left) + ')' }
+      } catch {
+        $null = $_
+      }
+    }
+    $parts += $text
+  }
+  return ($parts -join ' · ')
+}
+
 function Get-DeliveryDecision {
   param(
     [Parameter(Mandatory = $true)][int]$IdleSeconds,
@@ -163,6 +229,49 @@ function Read-HookPayload {
 }
 '@
 
+Write-Script 'usage.ps1' @'
+# Reads the current limit windows from the account Claude Code is signed into.
+#
+# The only source that exists: the CLI itself calls GET /api/oauth/usage with the
+# OAuth token it maintains, and neither the status line nor any local file carries
+# consumption. Three rules make borrowing that token acceptable:
+#   - it is read at send time, never logged, never written anywhere;
+#   - the request is a GET to the token's own issuer and changes nothing;
+#   - the token is never refreshed - that is the CLI's job, and racing it could
+#     break the session that owns it. An expired token simply yields no line.
+# A failure here must never fail a ping, so every path returns $null instead.
+
+function Get-UsageSnapshot {
+  param([int]$TimeoutSec = 6)
+
+  $credentialsPath = Join-Path $env:USERPROFILE '.claude\.credentials.json'
+  if (-not (Test-Path $credentialsPath)) { return $null }
+
+  $token = $null
+  try {
+    $credentials = Get-Content $credentialsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($property in $credentials.PSObject.Properties) {
+      if ($property.Value -is [pscustomobject] -and $property.Value.PSObject.Properties['accessToken']) {
+        $token = $property.Value.accessToken
+        break
+      }
+    }
+  } catch {
+    return $null
+  }
+  if (-not $token) { return $null }
+
+  try {
+    return Invoke-RestMethod -Uri 'https://api.anthropic.com/api/oauth/usage' `
+      -Headers @{ Authorization = "Bearer $token" } -TimeoutSec $TimeoutSec
+  } catch {
+    return $null
+  } finally {
+    $token = $null
+  }
+}
+'@
+
 Write-Script 'notify.ps1' @'
 param(
   [Parameter(Mandatory = $true)][string]$Message,
@@ -244,6 +353,20 @@ if ($decision -eq 'queue') {
 if ($decision -eq 'skip-rate-limit') {
   Write-Log ("SKIP rate-limit [" + $stampKey + "] | " + $Message)
   exit 0
+}
+
+# Limits are read at send time, so a ping delivered from the queue carries
+# current numbers rather than the ones from when it was suppressed.
+$includeUsage = $true
+if ($cfg.PSObject.Properties['include_usage']) { $includeUsage = [bool]$cfg.include_usage }
+if ($includeUsage) {
+  . (Join-Path $PSScriptRoot 'usage.ps1')
+  $usageLine = Format-UsageLine -Usage (Get-UsageSnapshot) -Now (Get-Date)
+  if ($usageLine) {
+    $Message = $Message + "`n" + $usageLine
+  } else {
+    Write-Log 'WARN usage unavailable'
+  }
 }
 
 try {
@@ -428,12 +551,16 @@ if (-not $MachineLabel -and -not $NonInteractive) {
 
 $idle = if ($MinIdleMinutes -gt 0) { $MinIdleMinutes } else { $v = Get-Field $cfg 'min_idle_minutes'; if ($v) { [int]$v } else { 3 } }
 
+$includeUsage = $true
+if ($cfg.PSObject.Properties['include_usage']) { $includeUsage = [bool]$cfg.include_usage }
+
 [IO.File]::WriteAllText($cfgPath, ([pscustomobject]@{
   token            = $Token
   chat_id          = "$chatId"
   machine_label    = $MachineLabel
   min_idle_minutes = $idle
   stale_minutes    = 15
+  include_usage    = $includeUsage
 } | ConvertTo-Json), $utf8NoBom)
 Write-Host "config written to $cfgPath" -ForegroundColor Green
 

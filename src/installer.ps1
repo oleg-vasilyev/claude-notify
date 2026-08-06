@@ -69,12 +69,16 @@ if (-not $MachineLabel -and -not $NonInteractive) {
 
 $idle = if ($MinIdleMinutes -gt 0) { $MinIdleMinutes } else { $v = Get-Field $cfg 'min_idle_minutes'; if ($v) { [int]$v } else { 3 } }
 
+$includeUsage = $true
+if ($cfg.PSObject.Properties['include_usage']) { $includeUsage = [bool]$cfg.include_usage }
+
 [IO.File]::WriteAllText($cfgPath, ([pscustomobject]@{
   token            = $Token
   chat_id          = "$chatId"
   machine_label    = $MachineLabel
   min_idle_minutes = $idle
   stale_minutes    = 15
+  include_usage    = $includeUsage
 } | ConvertTo-Json), $utf8NoBom)
 Write-Host "config written to $cfgPath" -ForegroundColor Green
 

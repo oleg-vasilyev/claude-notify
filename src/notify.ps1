@@ -80,6 +80,20 @@ if ($decision -eq 'skip-rate-limit') {
   exit 0
 }
 
+# Limits are read at send time, so a ping delivered from the queue carries
+# current numbers rather than the ones from when it was suppressed.
+$includeUsage = $true
+if ($cfg.PSObject.Properties['include_usage']) { $includeUsage = [bool]$cfg.include_usage }
+if ($includeUsage) {
+  . (Join-Path $PSScriptRoot 'usage.ps1')
+  $usageLine = Format-UsageLine -Usage (Get-UsageSnapshot) -Now (Get-Date)
+  if ($usageLine) {
+    $Message = $Message + "`n" + $usageLine
+  } else {
+    Write-Log 'WARN usage unavailable'
+  }
+}
+
 try {
   $body = @{ chat_id = $cfg.chat_id; text = $Message } | ConvertTo-Json
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)

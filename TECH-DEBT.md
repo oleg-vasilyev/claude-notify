@@ -45,6 +45,30 @@ unknown again.
 
 ---
 
+## The usage snapshot is fetched per ping, with no cache
+
+Every send makes its own `GET /api/oauth/usage`. Pings are rare enough that
+this is a handful of calls an hour, and a cache would have to reason about
+staleness against a number that moves — the whole point is that it is current.
+
+**Add a short-lived cache when a queue flush ever delivers several pings at
+once often enough to notice**, or if the endpoint starts rate-limiting.
+
+---
+
+## A machine using Windows Credential Manager gets no limits line
+
+`Get-UsageSnapshot` reads `~/.claude/.credentials.json`. Claude Code can
+instead keep the token in Windows Credential Manager, in which case the file is
+absent, the reader returns nothing, and every ping is missing its second line —
+correct behaviour, but silent beyond one `WARN usage unavailable` per send.
+
+**Read the credential manager too when a machine actually turns up without the
+file** — the work is a `CredRead` P/Invoke, and doing it speculatively means
+writing it against a configuration nobody has.
+
+---
+
 ## There is no uninstaller
 
 Setup adds hook entries, scripts and a CLAUDE.md section; removing them is a

@@ -64,6 +64,83 @@ Describe 'Format-LogPayload' {
   }
 }
 
+Describe 'Format-Duration' {
+  It 'reports minutes under an hour' {
+    Format-Duration ([timespan]::FromMinutes(12)) | Should -Be '12 мин'
+  }
+  It 'reports hours and minutes' {
+    Format-Duration ([timespan]::FromMinutes(72)) | Should -Be '1 ч 12 мин'
+  }
+  It 'drops a zero minute part' {
+    Format-Duration ([timespan]::FromHours(2)) | Should -Be '2 ч'
+  }
+  It 'has a floor below one minute' {
+    Format-Duration ([timespan]::FromSeconds(20)) | Should -Be 'меньше минуты'
+  }
+}
+
+Describe 'Format-UsageLine' {
+  BeforeAll {
+    $script:now = [datetime]::Parse('2026-08-06T23:48:00Z').ToUniversalTime()
+    function UsageWith([int]$SessionPercent, [int]$WeeklyPercent, [string]$WeeklyModel, [string]$SessionResetsAt) {
+      $session = [pscustomobject]@{ kind = 'session'; group = 'session'; percent = $SessionPercent; resets_at = $SessionResetsAt; scope = $null }
+      $scope = if ($WeeklyModel) { [pscustomobject]@{ model = [pscustomobject]@{ display_name = $WeeklyModel } } } else { $null }
+      $weekly = [pscustomobject]@{ kind = 'weekly_all'; group = 'weekly'; percent = $WeeklyPercent; resets_at = '2026-08-07T01:00:00+00:00'; scope = $scope }
+      return [pscustomobject]@{ limits = @($session, $weekly); five_hour = $null; seven_day = $null }
+    }
+  }
+
+  It 'reports both windows' {
+    Format-UsageLine -Usage (UsageWith 33 53 $null '2026-08-06T23:50:00+00:00') -Now $now |
+      Should -Be '5ч 33% · нед 53%'
+  }
+  It 'names the model of a scoped weekly window' {
+    Format-UsageLine -Usage (UsageWith 33 54 'Fable' '2026-08-06T23:50:00+00:00') -Now $now |
+      Should -Be '5ч 33% · нед/Fable 54%'
+  }
+  It 'adds the reset countdown only once a window is nearly spent' {
+    Format-UsageLine -Usage (UsageWith 92 53 $null '2026-08-07T00:48:00+00:00') -Now $now |
+      Should -Be '5ч 92% (сброс через 1 ч) · нед 53%'
+  }
+  It 'keeps a spent window without a countdown when the reset time is unparseable' {
+    Format-UsageLine -Usage (UsageWith 92 53 $null 'not a date') -Now $now |
+      Should -Be '5ч 92% · нед 53%'
+  }
+  It 'omits the countdown for a reset already in the past' {
+    Format-UsageLine -Usage (UsageWith 92 53 $null '2026-08-06T23:00:00+00:00') -Now $now |
+      Should -Be '5ч 92% · нед 53%'
+  }
+  It 'picks the highest of several weekly windows' {
+    $usage = [pscustomobject]@{
+      limits = @(
+        [pscustomobject]@{ group = 'session'; percent = 10; resets_at = $null; scope = $null },
+        [pscustomobject]@{ group = 'weekly'; percent = 53; resets_at = $null; scope = $null },
+        [pscustomobject]@{ group = 'weekly'; percent = 54; resets_at = $null; scope = [pscustomobject]@{ model = [pscustomobject]@{ display_name = 'Fable' } } }
+      )
+    }
+    Format-UsageLine -Usage $usage -Now $now | Should -Be '5ч 10% · нед/Fable 54%'
+  }
+  It 'falls back to the flat five_hour and seven_day shape' {
+    $usage = [pscustomobject]@{
+      limits    = @()
+      five_hour = [pscustomobject]@{ utilization = 33.0; resets_at = $null }
+      seven_day = [pscustomobject]@{ utilization = 53.0; resets_at = $null }
+    }
+    Format-UsageLine -Usage $usage -Now $now | Should -Be '5ч 33% · нед 53%'
+  }
+  It 'reports what it has when only one window is known' {
+    $usage = [pscustomobject]@{ limits = @([pscustomobject]@{ group = 'session'; percent = 33; resets_at = $null; scope = $null }) }
+    Format-UsageLine -Usage $usage -Now $now | Should -Be '5ч 33%'
+  }
+  It 'returns nothing when the snapshot could not be fetched' {
+    Format-UsageLine -Usage $null -Now $now | Should -Be ''
+  }
+  It 'returns nothing when every window is empty' {
+    Format-UsageLine -Usage ([pscustomobject]@{ limits = @(); five_hour = $null; seven_day = $null }) -Now $now |
+      Should -Be ''
+  }
+}
+
 Describe 'Get-DeliveryDecision' {
   BeforeAll {
     $script:now = [datetime]'2026-08-06 12:00:00'

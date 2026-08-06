@@ -9,11 +9,13 @@ sits idle until you happen to come back.
 
 ```
 [job-finder@home] Закончил фазу 2, жду апрув на миграцию БД
+5ч 35% · нед/Fable 54%
 ```
 
-A ping carries the project, the machine it came from, and what is needed. While
-you are at the keyboard nothing is sent — the sound is enough; the ping is
-queued and delivered a minute or two after you actually leave.
+A ping carries the project, the machine it came from, what is needed, and where
+your limit windows stand — so you can tell whether coming back is even worth
+it. While you are at the keyboard nothing is sent — the sound is enough; the
+ping is queued and delivered a minute or two after you actually leave.
 [PLAN.md](PLAN.md) explains the machinery and why it is shaped this way.
 
 ## Installing
@@ -53,6 +55,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1 -Token "123:ABC" -
 | `machine_label` | the machine name in pings: `[job-finder@work]` |
 | `min_idle_minutes` | minutes without keyboard or mouse that count as "away" (default 3) |
 | `stale_minutes` | minutes after which a queued ping expires undelivered (default 15) |
+| `include_usage` | append the limits line to each ping (default true) |
 
 One bot serves any number of machines; the label is what tells their pings
 apart. The token lives only in this file, which never leaves the machine — the
@@ -71,6 +74,7 @@ Everything the notifier decides is one line in
 | `SKIP rate-limit [proj]` | that project pinged too recently |
 | `HOOK <event>` | a Claude Code hook fired, with its payload |
 | `ERROR send failed` | the Telegram API refused — the reason follows |
+| `WARN usage unavailable` | the limits line was skipped; the ping itself went out |
 | `WATCHER started/exit` | the background deliverer of queued pings |
 
 No line at all means the script was never called: the model did not ping and no
@@ -89,6 +93,8 @@ are fetched by `check.ps1` on first run.
 ```
 src/notify-core.ps1              every delivery decision, pure - state in, verdict out
 src/notify.ps1                   the impure edge: config, win32 idle probe, HTTP, queue
+src/usage.ps1                    reads the limit windows from the account's usage endpoint
+src/hook-common.ps1              shared hook plumbing: UTF-8 stdin, logging, payload parsing
 src/watcher.ps1                  delivers queued pings once you go idle
 src/hook-stop.ps1                turn ended - the ball is in your court
 src/hook-ask.ps1                 a question dialog or a plan approval, mid-turn

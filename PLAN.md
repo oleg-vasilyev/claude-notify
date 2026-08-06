@@ -77,6 +77,37 @@ and sent. The watcher then exits; it is spawned again by the next suppressed
 ping. An 8-hour deadline bounds a watcher outliving an all-day session; by then
 every entry is stale anyway.
 
+**Limits ride along with the message.** Before a send — never before a queue —
+the current windows are read and appended as a second line, so a ping delivered
+from the queue carries fresh numbers rather than the ones from when it was
+suppressed:
+
+```
+[job-finder@home] Закончил фазу 2, жду апрув на миграцию БД
+5ч 35% · нед/Fable 54%
+```
+
+The point is deciding whether coming back is worth it. A window under 80% shows
+only its percentage; at or above 80% it also shows when it resets, because that
+is the moment the number stops being trivia — `5ч 92% (сброс через 12 мин)`
+says wait, not hurry. Of several weekly windows the highest is shown, named
+after the model it is scoped to, since that is the one that will actually stop
+the work.
+
+**The source is the account's own usage endpoint.** `GET /api/oauth/usage` with
+the OAuth token Claude Code maintains — the same call the CLI's own usage
+display makes. There is no alternative: the status line's payload carries
+`context_window` and `exceeds_200k_tokens` but no limit windows, and no local
+file holds consumption. Three properties make borrowing the token acceptable,
+and all three are load-bearing: it is read at send time and never logged or
+copied; the request is a GET to the token's own issuer; and it is never
+refreshed, because refreshing is the CLI's job and racing it could break the
+session that owns it. An expired token, a missing credential file or an
+endpoint that changed all produce the same outcome — no second line, one
+`WARN usage unavailable` in the log, and the ping itself unaffected. This is an
+internal endpoint, not a public API, so that degradation is the design, not a
+fallback.
+
 **Presence** is the system-wide time since the last keystroke or mouse move
 (win32 `GetLastInputInfo`) — activity in any application counts. Passively
 watching a video therefore counts as absence after `min_idle_minutes`; for the
@@ -103,6 +134,12 @@ threshold is the knob if it ever is not.
 7. **Every outcome is one log line** — `SENT`, `QUEUED`, `SKIP`, `DROP`,
    `ERROR`, `HOOK`, `WATCHER` — because the first real debugging session was
    blind without it.
+8. **The OAuth token is read, never written, never logged, never refreshed.**
+   It appears in exactly one function, lives in one local variable, and leaves
+   the machine only as an `Authorization` header to its own issuer.
+9. **Usage never fails a ping.** Every path through the usage reader returns
+   nothing rather than throwing; the limits line is an enrichment, and the ping
+   is the product.
 
 ## What survives what
 
@@ -154,14 +191,9 @@ threshold is the knob if it ever is not.
 
 ## Roadmap
 
-Phases 0-2 — sound, Telegram with presence filtering, the single-file
-installer — are what this document describes; they are done.
-
-**Phase 3 — usage limits in the ping.** `жду апрув | 5ч: 62% | неделя: 41%`,
-so a ping can also say "не спеши, лимит почти кончился". Starts with a spike:
-find where the 5-hour and weekly windows can be read (candidates: whatever
-feeds the CLI's usage display, an OAuth-authenticated usage endpoint, the
-statusline JSON). Until a source is confirmed the phase has no design.
+Phases 0-3 — sound, Telegram with presence filtering, the single-file
+installer, and the limits line — are what this document describes; they are
+done.
 
 **Phase 4 — answering from the phone.** An inline button under a question
 ping: «делай как рекомендуешь». Two hard sub-problems, named now so the phase

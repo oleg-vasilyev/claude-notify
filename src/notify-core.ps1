@@ -44,6 +44,72 @@ function Format-LogPayload {
   return $flat.Substring(0, $MaxChars) + '... (' + $flat.Length + ' chars)'
 }
 
+function Format-Duration {
+  param([Parameter(Mandatory = $true)][timespan]$Span)
+  if ($Span.TotalMinutes -lt 1) { return 'меньше минуты' }
+  $hours = [int][Math]::Floor($Span.TotalHours)
+  $minutes = $Span.Minutes
+  if ($hours -lt 1) { return ('' + $minutes + ' мин') }
+  if ($minutes -eq 0) { return ('' + $hours + ' ч') }
+  return ('' + $hours + ' ч ' + $minutes + ' мин')
+}
+
+function Select-UsageWindow {
+  param($Usage)
+  $session = $null
+  $weekly = $null
+  foreach ($limit in @($Usage.limits)) {
+    if (-not $limit) { continue }
+    if ($limit.group -eq 'session') {
+      if ($null -eq $session -or $limit.percent -gt $session.percent) { $session = $limit }
+    } elseif ($limit.group -eq 'weekly') {
+      if ($null -eq $weekly -or $limit.percent -gt $weekly.percent) { $weekly = $limit }
+    }
+  }
+  # Older shape, and the fallback if limits[] ever disappears.
+  if ($null -eq $session -and $Usage.five_hour) {
+    $session = [pscustomobject]@{ percent = $Usage.five_hour.utilization; resets_at = $Usage.five_hour.resets_at; scope = $null }
+  }
+  if ($null -eq $weekly -and $Usage.seven_day) {
+    $weekly = [pscustomobject]@{ percent = $Usage.seven_day.utilization; resets_at = $Usage.seven_day.resets_at; scope = $null }
+  }
+  return [pscustomobject]@{ Session = $session; Weekly = $weekly }
+}
+
+function Format-UsageLine {
+  param(
+    $Usage,
+    [Parameter(Mandatory = $true)][datetime]$Now,
+    # Below this a reset time is noise; above it, it is the whole point.
+    [int]$WarnAtPercent = 80
+  )
+  if ($null -eq $Usage) { return '' }
+  $windows = Select-UsageWindow -Usage $Usage
+
+  $parts = @()
+  foreach ($pair in @(@{ Label = '5ч'; Window = $windows.Session }, @{ Label = 'нед'; Window = $windows.Weekly })) {
+    $window = $pair.Window
+    if ($null -eq $window -or $null -eq $window.percent) { continue }
+    $label = $pair.Label
+    if ($window.scope -and $window.scope.model -and $window.scope.model.display_name) {
+      $label = $label + '/' + $window.scope.model.display_name
+    }
+    $percent = [int][Math]::Round([double]$window.percent)
+    $text = $label + ' ' + $percent + '%'
+    if ($percent -ge $WarnAtPercent -and $window.resets_at) {
+      try {
+        $resetsAt = [datetimeoffset]::Parse($window.resets_at, [Globalization.CultureInfo]::InvariantCulture)
+        $left = $resetsAt.UtcDateTime - $Now.ToUniversalTime()
+        if ($left.Ticks -gt 0) { $text = $text + ' (сброс через ' + (Format-Duration $left) + ')' }
+      } catch {
+        $null = $_
+      }
+    }
+    $parts += $text
+  }
+  return ($parts -join ' · ')
+}
+
 function Get-DeliveryDecision {
   param(
     [Parameter(Mandatory = $true)][int]$IdleSeconds,

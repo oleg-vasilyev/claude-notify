@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $src = Join-Path $PSScriptRoot 'src'
-$payloadFiles = @('notify-core.ps1', 'hook-common.ps1', 'notify.ps1', 'watcher.ps1', 'hook-notification.ps1', 'hook-stop.ps1', 'hook-ask.ps1', 'hook-permission-request.ps1')
+$payloadFiles = @('notify-core.ps1', 'hook-common.ps1', 'usage.ps1', 'notify.ps1', 'watcher.ps1', 'hook-notification.ps1', 'hook-stop.ps1', 'hook-ask.ps1', 'hook-permission-request.ps1')
 
 $sb = New-Object System.Text.StringBuilder
 foreach ($name in $payloadFiles) {

@@ -49,6 +49,14 @@ observed firing in the desktop app; `Notification` alone never has.
 Hook pings pass `-RateLimitMinutes` so a burst collapses; deliberate model
 pings pass none and are never rate-limited.
 
+**`Stop` says nothing while background work is still running.** The event fires
+every time the agent hands the turn back, including the hand-backs it makes
+while a long task keeps going in the background — and «закончил ход, ждёт тебя»
+is then a lie that costs a walk to the machine. The payload carries
+`background_tasks`, and an empty array is what actually means the turn is
+waiting on the user. Found by a real ping arriving during a build, not by a
+test.
+
 **`PreToolUse` and `PermissionRequest` both fire for `AskUserQuestion`, in the
 same second.** Left alone that is two messages for one question and two hooks
 waiting on one answer, so ownership is assigned rather than discovered:
@@ -116,21 +124,33 @@ ping. An 8-hour deadline bounds a watcher outliving an all-day session; by then
 every entry is stale anyway.
 
 **Limits ride along with the message.** Before a send — never before a queue —
-the current windows are read and appended as a second line, so a ping delivered
-from the queue carries fresh numbers rather than the ones from when it was
-suppressed:
+the current windows are read and appended, so a ping delivered from the queue
+carries fresh numbers rather than the ones from when it was suppressed:
 
 ```
 [job-finder@home] Закончил фазу 2, жду апрув на миграцию БД
-5ч 35% · нед/Fable 54%
+
+▰▰▰▱▱▱▱▱▱▱ 35% · 5 часов
+▰▰▰▰▰▱▱▱▱▱ 54% · неделя/Fable
 ```
 
+**The bar starts the line, and that is the whole trick.** Telegram renders with
+a proportional font, so a line beginning with a label (`5ч` against `нед`) puts
+the bars at different places and the pair reads as ragged. Beginning with the
+bar costs nothing and aligns them exactly, without `parse_mode` and the
+escaping it would drag in.
+
+Two things the bar refuses to do, both so it cannot lie at the ends: it never
+shows empty while anything at all has been spent, and never shows full until the
+window really is. A rounded 97% drawn as a full bar would say *stop* at the
+moment the honest answer is *nearly*.
+
 The point is deciding whether coming back is worth it. A window under 80% shows
-only its percentage; at or above 80% it also shows when it resets, because that
-is the moment the number stops being trivia — `5ч 92% (сброс через 12 мин)`
-says wait, not hurry. Of several weekly windows the highest is shown, named
-after the model it is scoped to, since that is the one that will actually stop
-the work.
+only its share; at or above 80% it also shows when it resets, because that is
+the moment the number stops being trivia — `▰▰▰▰▰▰▰▰▰▱ 92% · 5 часов · сброс
+через 12 мин` says wait, not hurry. Of several weekly windows the highest is
+shown, named after the model it is scoped to, since that is the one that will
+actually stop the work.
 
 **The source is the account's own usage endpoint.** `GET /api/oauth/usage` with
 the OAuth token Claude Code maintains — the same call the CLI's own usage

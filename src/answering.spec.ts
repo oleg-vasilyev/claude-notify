@@ -4,7 +4,7 @@ import { readAskedQuestions, writeAnswer } from "#state/asked-question.ts";
 import type { Config } from "#state/config.ts";
 import { log } from "#state/log.ts";
 import { readUpdateOffset, writeUpdateOffset } from "#state/update-offset.ts";
-import { answerCallback, fetchUpdates } from "#telegram/telegram-api.ts";
+import { answerCallback, closeQuestion, fetchUpdates } from "#telegram/telegram-api.ts";
 import { collectAnswers } from "#app/answering.ts";
 
 
@@ -20,6 +20,7 @@ vi.mock("#state/update-offset.ts", () => ({
 vi.mock("#telegram/telegram-api.ts", () => ({
   fetchUpdates: vi.fn(),
   answerCallback: vi.fn(),
+  closeQuestion: vi.fn(),
 }));
 
 const LONG_POLL_SECONDS = 25;
@@ -36,11 +37,15 @@ const config: Config = {
   askMinutes: 10,
 };
 
+const A_MESSAGE = 77;
+
 const question = {
   id: "abc12345",
   kind: "choice" as const,
   text: "Чем продолжим?",
   options: [{ value: "0", label: "Форк", recommended: true }],
+  messageId: A_MESSAGE,
+  headline: "[job-finder@home] Чем продолжим?",
 };
 
 const press = {
@@ -54,6 +59,34 @@ describe("collectAnswers", () => {
     vi.mocked(readUpdateOffset).mockReturnValue(LAST_SEEN);
     vi.mocked(fetchUpdates).mockResolvedValue([press]);
     vi.mocked(answerCallback).mockResolvedValue(undefined);
+    vi.mocked(closeQuestion).mockResolvedValue(undefined);
+  });
+
+  it("takes the keyboard away once the question is answered", async () => {
+    await collectAnswers(config, LONG_POLL_SECONDS);
+
+    expect(closeQuestion).toHaveBeenCalledWith(
+      "T",
+      "42",
+      A_MESSAGE,
+      "[job-finder@home] Чем продолжим?\n\n✓ Ответ: Форк"
+    );
+  });
+
+  it("leaves the message alone when it never learned which message it was", async () => {
+    vi.mocked(readAskedQuestions).mockReturnValue([{ ...question, messageId: null }]);
+
+    await collectAnswers(config, LONG_POLL_SECONDS);
+
+    expect(closeQuestion).not.toHaveBeenCalled();
+  });
+
+  it("closes nothing while nothing has been answered", async () => {
+    vi.mocked(fetchUpdates).mockResolvedValue([]);
+
+    await collectAnswers(config, LONG_POLL_SECONDS);
+
+    expect(closeQuestion).not.toHaveBeenCalled();
   });
 
   it("does not touch Telegram while nothing has been asked", async () => {

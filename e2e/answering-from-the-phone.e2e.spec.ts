@@ -132,6 +132,29 @@ describe("a question answered from the phone", () => {
     expect(telegram.sentText()).not.toContain("╨");
   });
 
+  it("takes the keyboard away once answered, so it cannot be pressed again", async () => {
+    const running = runHook("PreToolUse", askedPayload, world);
+
+    await telegram.whenAsked();
+    telegram.press(`${telegram.keyboard()[1]?.callback_data}`, CHAT);
+
+    await running;
+    await telegram.whenClosed();
+
+    expect(telegram.stillCarriesAKeyboard()).toBe(false);
+    expect(telegram.closedText()).toContain("✓ Ответ: Та же сессия");
+  });
+
+  it("takes the keyboard away when nobody answered either", async () => {
+    const running = runHook("PreToolUse", askedPayload, world);
+
+    await telegram.whenAsked();
+    await running;
+
+    expect(telegram.stillCarriesAKeyboard()).toBe(false);
+    expect(telegram.closedText()).toContain("вернулся в приложение");
+  }, 90_000);
+
   it("acknowledges the press so the button stops spinning", async () => {
     const running = runHook("PreToolUse", askedPayload, world);
 

@@ -6,6 +6,7 @@ const ANY_FREE_PORT = 0;
 const A_MOMENT_MS = 50;
 const LONGEST_HOLD_MS = 500;
 const FIRST_UPDATE_ID = 100;
+const FIRST_MESSAGE_ID = 500;
 
 export interface Call {
   readonly method: string;
@@ -19,6 +20,9 @@ export interface FakeTelegram {
   whenAcknowledged(): Promise<void>;
   sentText(): string;
   keyboard(): { text: string; callback_data: string }[];
+  whenClosed(): Promise<void>;
+  closedText(): string;
+  stillCarriesAKeyboard(): boolean;
   press(data: string, chatId: number): void;
   write(text: string, chatId: number): void;
   answered(): boolean;
@@ -49,6 +53,7 @@ export const startFakeTelegram = async (): Promise<FakeTelegram> => {
   const calls: Call[] = [];
   const waiting: Record<string, unknown>[] = [];
   let nextUpdateId = FIRST_UPDATE_ID;
+  let nextMessageId = FIRST_MESSAGE_ID;
 
   const arrivals = new Map<string, (() => void)[]>();
 
@@ -93,6 +98,13 @@ export const startFakeTelegram = async (): Promise<FakeTelegram> => {
         return;
       }
 
+      if (method === "sendMessage") {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ ok: true, result: { message_id: nextMessageId++ } }));
+
+        return;
+      }
+
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ ok: true, result: {} }));
     })();
@@ -116,6 +128,22 @@ export const startFakeTelegram = async (): Promise<FakeTelegram> => {
     whenAsked: () => when("sendMessage"),
 
     whenAcknowledged: () => when("answerCallbackQuery"),
+
+    whenClosed: () => when("editMessageText"),
+
+    closedText: () =>
+      `${calls.find((call) => call.method === "editMessageText")?.body.text ?? ""}`,
+
+    stillCarriesAKeyboard: () => {
+      const edits = calls.filter((call) => call.method === "editMessageText");
+      const last = edits[edits.length - 1];
+
+      if (last === undefined) {
+        return sentMessages().length > 0;
+      }
+
+      return last.body.reply_markup !== undefined;
+    },
 
     sentText: () => `${sentMessages()[0]?.text ?? ""}`,
 

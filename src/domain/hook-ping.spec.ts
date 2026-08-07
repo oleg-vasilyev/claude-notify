@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isHookEvent, pingFor, type HookPayload } from "#domain/hook-ping.ts";
+import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/hook-ping.ts";
 
 
 const inProject: HookPayload = { cwd: "D:\\Temp\\FoolProof" };
@@ -93,5 +93,31 @@ describe("pingFor", () => {
 
   it("works without a working directory, which is all a payload really guarantees", () => {
     expect(pingFor("Stop", {}).message).toBe("закончил ход, ждёт тебя");
+  });
+});
+
+describe("stillWorking", () => {
+  it("is true when the turn ended while a background task is still running", () => {
+    expect(stillWorking("Stop", { background_tasks: [{}] })).toBe(true);
+  });
+
+  it("is false once nothing is running, which is the turn that really waits on the user", () => {
+    expect(stillWorking("Stop", { background_tasks: [] })).toBe(false);
+  });
+
+  it("is false for a payload that never mentioned background work", () => {
+    expect(stillWorking("Stop", {})).toBe(false);
+  });
+
+  it("counts every running task, not just the first", () => {
+    expect(stillWorking("Stop", { background_tasks: [{}, {}, {}] })).toBe(true);
+  });
+
+  it("says nothing about a question, which waits on the user whatever else is running", () => {
+    expect(stillWorking("PreToolUse", { background_tasks: [{}] })).toBe(false);
+  });
+
+  it("says nothing about a permission, for the same reason", () => {
+    expect(stillWorking("PermissionRequest", { background_tasks: [{}] })).toBe(false);
   });
 });

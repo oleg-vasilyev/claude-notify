@@ -113,7 +113,11 @@ describe("deliver", () => {
 
     await deliver(ping);
 
-    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[job-finder@home] жду апрув\n5ч 33%");
+    expect(sendMessage).toHaveBeenCalledWith(
+      "T",
+      "42",
+      "[job-finder@home] жду апрув\n\n▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов"
+    );
   });
 
   it("still sends the ping when the limits could not be read", async () => {

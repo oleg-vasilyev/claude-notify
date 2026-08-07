@@ -3,6 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { callbackDataFor } from "#domain/answer.ts";
 import { decideAsk } from "#domain/asking.ts";
+import { copy } from "#domain/copy.ts";
 import { hookAnswerOutput } from "#domain/hook-answer.ts";
 import type { HookEvent, HookPayload } from "#domain/hook-ping.ts";
 import { projectPrefixOf, withMachineLabel } from "#domain/project.ts";
@@ -11,13 +12,14 @@ import { idleSeconds } from "#presence/idle-time.ts";
 import { forgetQuestion, readAnswer, writeAskedQuestion } from "#state/asked-question.ts";
 import { readConfig } from "#state/config.ts";
 import { log } from "#state/log.ts";
-import { sendQuestion } from "#telegram/telegram-api.ts";
+import { closeQuestion, sendQuestion } from "#telegram/telegram-api.ts";
 import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 
 
 const ID_LENGTH = 8;
 const CHECK_EVERY_MS = 1000;
 const MILLISECONDS_PER_MINUTE = 60_000;
+const HEADLINE = 0;
 
 export const ask = async (
   event: HookEvent,
@@ -56,11 +58,12 @@ export const ask = async (
     questionText(question, projectPrefixOf(payload.cwd)),
     config.machineLabel
   );
+  const headline = text.split("\n")[HEADLINE] ?? text;
 
-  writeAskedQuestion(question);
+  let messageId: number | null;
 
   try {
-    await sendQuestion(
+    messageId = await sendQuestion(
       config.token,
       config.chatId,
       text,
@@ -70,12 +73,12 @@ export const ask = async (
       }))
     );
   } catch (failure) {
-    forgetQuestion(question.id);
     log(`ERROR ask send failed: ${String(failure)}`);
 
     return null;
   }
 
+  writeAskedQuestion(question, messageId, headline);
   log(`ASKED ${question.id} ${question.kind} | ${text.replaceAll("\n", " | ")}`);
 
   if (!watcherIsRunning()) {
@@ -99,6 +102,10 @@ export const ask = async (
 
   forgetQuestion(question.id);
   log(`ASK timed out ${question.id}, handing the question back to the app`);
+
+  if (messageId !== null) {
+    await closeQuestion(config.token, config.chatId, messageId, copy.questionExpired(headline));
+  }
 
   return hookAnswerOutput(event, question, null);
 };

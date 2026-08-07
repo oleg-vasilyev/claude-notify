@@ -3,6 +3,32 @@ import { humanizeDuration } from "#domain/duration.ts";
 
 
 const RESET_TIME_MATTERS_ABOVE_PERCENT = 80;
+const BAR_SEGMENTS = 10;
+const WHOLE = 100;
+const FILLED = "▰";
+const EMPTY = "▱";
+const AT_LEAST_A_SLIVER = 1;
+const NOTHING_SPENT = 0;
+
+const segmentsFor = (percent: number): number => {
+  if (percent <= NOTHING_SPENT) {
+    return NOTHING_SPENT;
+  }
+
+  if (percent >= WHOLE) {
+    return BAR_SEGMENTS;
+  }
+
+  const exact = Math.round((percent / WHOLE) * BAR_SEGMENTS);
+
+  return Math.min(BAR_SEGMENTS - AT_LEAST_A_SLIVER, Math.max(AT_LEAST_A_SLIVER, exact));
+};
+
+const bar = (percent: number): string => {
+  const filled = segmentsFor(percent);
+
+  return FILLED.repeat(filled) + EMPTY.repeat(BAR_SEGMENTS - filled);
+};
 
 export type UsageScope = {
   model?: { display_name?: string | null } | null;
@@ -100,8 +126,9 @@ const describe = (window: Window | null, label: string, now: Date): string | nul
   }
 
   const named = window.model === null ? label : copy.windowScopedTo(label, window.model);
+  const percent = Math.round(window.percent);
 
-  return copy.windowShare(named, Math.round(window.percent)) + resetCountdown(window, now);
+  return copy.windowShare(bar(percent), percent, named) + resetCountdown(window, now);
 };
 
 export const usageLine = (snapshot: UsageSnapshot | null, now: Date): string => {

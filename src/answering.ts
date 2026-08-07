@@ -1,9 +1,10 @@
 import { answersIn, highestUpdateId } from "#domain/answer.ts";
+import { copy } from "#domain/copy.ts";
 import type { Config } from "#state/config.ts";
 import { readAskedQuestions, writeAnswer } from "#state/asked-question.ts";
 import { log } from "#state/log.ts";
 import { readUpdateOffset, writeUpdateOffset } from "#state/update-offset.ts";
-import { answerCallback, fetchUpdates } from "#telegram/telegram-api.ts";
+import { answerCallback, closeQuestion, fetchUpdates } from "#telegram/telegram-api.ts";
 
 
 const NOTHING = 0;
@@ -42,6 +43,17 @@ export const collectAnswers = async (
 
     if (matched.answer.callbackId !== null) {
       await answerCallback(config.token, matched.answer.callbackId);
+    }
+
+    const asked = questions.find((question) => question.id === matched.id);
+
+    if (asked?.messageId !== null && asked?.messageId !== undefined) {
+      await closeQuestion(
+        config.token,
+        config.chatId,
+        asked.messageId,
+        copy.questionClosedWith(asked.headline, matched.answer.said)
+      );
     }
   }
 

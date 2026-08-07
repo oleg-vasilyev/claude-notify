@@ -9,13 +9,14 @@ remembers.
 
 ## Four domain files carry almost every surviving mutant
 
-The total is 86.7% against a break threshold of 85, up from 85.1% before phase
-4 — the four new files came in at 86–100%, so the fear recorded here last time,
-that the next `domain/` file would break the gate on its own, was wrong. The
+The total is 87.3% against a break threshold of 85, up from 85.1% before phase
+4 — the new files came in at 86–100%, so the fear recorded here last time, that
+the next `domain/` file would break the gate on its own, was wrong. The
 survivors are concentrated in the files that were already lagging and that
-phase 4 never touched: `memory-rule.ts` (67%), `env-file.ts` (80%),
-`delivery.ts` (81%), `usage.ts` (84%). Mostly boundary and string mutants, where
-a test asserts *that* something happened rather than exactly what.
+phase 4 barely touched: `memory-rule.ts` (67%), `env-file.ts` (80%),
+`delivery.ts` (81%). Mostly boundary and string mutants, where a test asserts
+*that* something happened rather than exactly what. `usage.ts` left the list on
+its own when the bars arrived with tests for both ends of the scale.
 
 **Kill survivors in whichever of those four a phase touches, before adding
 anything to it** — the report is at `reports/mutation/` and needs no re-run to

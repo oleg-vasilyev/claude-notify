@@ -6,6 +6,7 @@ const TURN_END_RATE_LIMIT_MINUTES = 10;
 const QUESTION_RATE_LIMIT_MINUTES = 2;
 const LONGEST_QUOTED_QUESTION = 180;
 const ELLIPSIS = "…";
+const NOTHING_RUNNING = 0;
 
 export const HOOK_EVENTS = ["Stop", "PreToolUse", "PermissionRequest", "Notification"] as const;
 
@@ -15,6 +16,7 @@ export type HookPayload = {
   cwd?: string;
   tool_name?: string;
   message?: string;
+  background_tasks?: unknown[];
   tool_input?: {
     questions?: {
       question?: string;
@@ -30,6 +32,9 @@ export type HookPing = {
 
 export const isHookEvent = (candidate: string): candidate is HookEvent =>
   (HOOK_EVENTS as readonly string[]).includes(candidate);
+
+export const stillWorking = (event: HookEvent, payload: HookPayload): boolean =>
+  event === "Stop" && (payload.background_tasks ?? []).length > NOTHING_RUNNING;
 
 const shortened = (text: string): string => {
   if (text.length <= LONGEST_QUOTED_QUESTION) {

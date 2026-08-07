@@ -30,6 +30,8 @@ vi.mock("#state/file-locations.ts", () => ({
 }));
 
 const AN_OFFSET = 51;
+const A_MESSAGE = 77;
+const HEADLINE = "[job-finder@home] Чем продолжим?";
 
 const question: AskedQuestion = {
   id: "abc12345",
@@ -37,6 +39,8 @@ const question: AskedQuestion = {
   text: "Чем продолжим?",
   options: [{ value: "0", label: "Форк", recommended: true }],
 };
+
+const stored = { ...question, messageId: A_MESSAGE, headline: HEADLINE };
 
 const answer = { said: "Форк", chosenValue: "0", callbackId: "cb1" };
 
@@ -52,14 +56,14 @@ describe("the question a hook is waiting on", () => {
   });
 
   it("is readable by the other process that has to match it", () => {
-    writeAskedQuestion(question);
+    writeAskedQuestion(question, A_MESSAGE, HEADLINE);
 
-    expect(readAskedQuestions()).toEqual([question]);
+    expect(readAskedQuestions()).toEqual([stored]);
   });
 
   it("lists every question waiting at once, since two projects can ask together", () => {
-    writeAskedQuestion(question);
-    writeAskedQuestion({ ...question, id: "other999" });
+    writeAskedQuestion(question, A_MESSAGE, HEADLINE);
+    writeAskedQuestion({ ...question, id: "other999" }, A_MESSAGE, HEADLINE);
 
     expect(readAskedQuestions()).toHaveLength(2);
   });
@@ -79,7 +83,7 @@ describe("the question a hook is waiting on", () => {
   });
 
   it("forgets both halves, so a stale answer cannot resolve a later question", () => {
-    writeAskedQuestion(question);
+    writeAskedQuestion(question, A_MESSAGE, HEADLINE);
     writeAnswer(question.id, answer);
 
     forgetQuestion(question.id);
@@ -89,10 +93,10 @@ describe("the question a hook is waiting on", () => {
   });
 
   it("skips a half-written question rather than losing the others", () => {
-    writeAskedQuestion(question);
+    writeAskedQuestion(question, A_MESSAGE, HEADLINE);
     writeFileSync(join(state, "question-broken1.json"), '{"id":', "utf8");
 
-    expect(readAskedQuestions()).toEqual([question]);
+    expect(readAskedQuestions()).toEqual([stored]);
   });
 
   it("treats a half-written answer as no answer at all", () => {
@@ -102,11 +106,11 @@ describe("the question a hook is waiting on", () => {
   });
 
   it("ignores the other files sharing the state directory", () => {
-    writeAskedQuestion(question);
+    writeAskedQuestion(question, A_MESSAGE, HEADLINE);
     writeFileSync(join(state, "pending.jsonl"), "{}", "utf8");
     writeFileSync(join(state, "last-sent-job-finder.txt"), "1", "utf8");
 
-    expect(readAskedQuestions()).toEqual([question]);
+    expect(readAskedQuestions()).toEqual([stored]);
   });
 
   it("remembers how far it has read Telegram", () => {

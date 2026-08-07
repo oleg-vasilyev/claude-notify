@@ -26,7 +26,7 @@ const withUsage = async (message: string): Promise<string> => {
     return message;
   }
 
-  return `${message}\n${line}`;
+  return `${message}\n\n${line}`;
 };
 
 export const deliver = async (request: PingRequest): Promise<void> => {
@@ -72,7 +72,7 @@ export const deliver = async (request: PingRequest): Promise<void> => {
   try {
     await sendMessage(config.token, config.chatId, text);
     writeLastSentAt(project, Date.now());
-    log(`SENT | ${text.replace("\n", " | ")}`);
+    log(`SENT | ${text.replaceAll("\n", " | ")}`);
   } catch (failure) {
     log(`ERROR send failed: ${String(failure)} | ${message}`);
     process.exitCode = 1;

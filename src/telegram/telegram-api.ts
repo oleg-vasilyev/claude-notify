@@ -9,6 +9,14 @@ const NEXT_UPDATE = 1;
 
 const apiRoot = (): string => process.env.BOT_API_ROOT ?? TELEGRAM;
 
+const drain = async (response: Response): Promise<void> => {
+  try {
+    await response.arrayBuffer();
+  } catch {
+    return;
+  }
+};
+
 export const sendMessage = async (
   token: string,
   chatId: string,
@@ -31,7 +39,7 @@ export const sendQuestion = async (
   chatId: string,
   text: string,
   buttons: readonly { text: string; data: string }[]
-): Promise<void> => {
+): Promise<number | null> => {
   const response = await fetch(`${apiRoot()}/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -50,6 +58,26 @@ export const sendQuestion = async (
   if (!response.ok) {
     throw new Error(`Telegram refused with ${response.status}: ${await response.text()}`);
   }
+
+  const body = (await response.json()) as { result?: { message_id?: number } };
+
+  return body.result?.message_id ?? null;
+};
+
+export const closeQuestion = async (
+  token: string,
+  chatId: string,
+  messageId: number,
+  text: string
+): Promise<void> => {
+  const response = await fetch(`${apiRoot()}/bot${token}/editMessageText`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text }),
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+  });
+
+  await drain(response);
 };
 
 export const fetchUpdates = async (
@@ -80,12 +108,14 @@ export const fetchUpdates = async (
 };
 
 export const answerCallback = async (token: string, callbackId: string): Promise<void> => {
-  await fetch(`${apiRoot()}/bot${token}/answerCallbackQuery`, {
+  const response = await fetch(`${apiRoot()}/bot${token}/answerCallbackQuery`, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({ callback_query_id: callbackId }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
+
+  await drain(response);
 };
 
 export const resolveChatId = async (token: string): Promise<string | null> => {

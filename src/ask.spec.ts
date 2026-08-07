@@ -4,7 +4,7 @@ import { idleSeconds } from "#presence/idle-time.ts";
 import { forgetQuestion, readAnswer, writeAskedQuestion } from "#state/asked-question.ts";
 import { readConfig, type Config } from "#state/config.ts";
 import { log } from "#state/log.ts";
-import { sendQuestion } from "#telegram/telegram-api.ts";
+import { closeQuestion, sendQuestion } from "#telegram/telegram-api.ts";
 import { ask } from "#app/ask.ts";
 import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 
@@ -19,13 +19,17 @@ vi.mock("#state/asked-question.ts", () => ({
   readAnswer: vi.fn(),
   forgetQuestion: vi.fn(),
 }));
-vi.mock("#telegram/telegram-api.ts", () => ({ sendQuestion: vi.fn() }));
+vi.mock("#telegram/telegram-api.ts", () => ({
+  sendQuestion: vi.fn(),
+  closeQuestion: vi.fn(),
+}));
 vi.mock("#app/watcher-process.ts", () => ({ startWatcher: vi.fn(), watcherIsRunning: vi.fn() }));
 
 const AWAY_SECONDS = 600;
 const PRESENT_SECONDS = 5;
 const ID = "abc12345";
 const A_STEP_MS = 30_000;
+const A_MESSAGE = 77;
 
 const config: Config = {
   token: "T",
@@ -65,8 +69,29 @@ describe("ask", () => {
     vi.mocked(readConfig).mockReturnValue(config);
     vi.mocked(idleSeconds).mockReturnValue(AWAY_SECONDS);
     vi.mocked(watcherIsRunning).mockReturnValue(false);
-    vi.mocked(sendQuestion).mockResolvedValue(undefined);
+    vi.mocked(sendQuestion).mockResolvedValue(A_MESSAGE);
+    vi.mocked(closeQuestion).mockResolvedValue(undefined);
     vi.mocked(readAnswer).mockReturnValue({ said: "Форк", chosenValue: "0", callbackId: null });
+  });
+
+  it("takes the keyboard away when the window closes unanswered", async () => {
+    vi.mocked(readAnswer).mockReturnValue(null);
+    runsOutOfTime();
+
+    await ask("PreToolUse", payload);
+
+    expect(closeQuestion).toHaveBeenCalledWith(
+      "T",
+      "42",
+      A_MESSAGE,
+      expect.stringContaining("вернулся в приложение")
+    );
+  });
+
+  it("leaves an answered question for the watcher to close, so it is not closed twice", async () => {
+    await ask("PreToolUse", payload);
+
+    expect(closeQuestion).not.toHaveBeenCalled();
   });
 
   it("sends the question to Telegram with a button per option", async () => {
@@ -87,7 +112,17 @@ describe("ask", () => {
   it("writes the question down before sending, so the watcher can match an answer", async () => {
     await ask("PreToolUse", payload);
 
-    expect(writeAskedQuestion).toHaveBeenCalledWith(expect.objectContaining({ id: ID }));
+    expect(writeAskedQuestion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ID }),
+      A_MESSAGE,
+      "[job-finder@home] Чем продолжим?"
+    );
+  });
+
+  it("remembers which message carried the question, so its keyboard can be taken away", async () => {
+    await ask("PreToolUse", payload);
+
+    expect(vi.mocked(writeAskedQuestion).mock.calls[0]?.[1]).toBe(A_MESSAGE);
   });
 
   it("returns the answer as a decision the hook can print", async () => {
@@ -157,12 +192,12 @@ describe("ask", () => {
     expect(output).toBeNull();
   });
 
-  it("does not leave a question behind that was never delivered", async () => {
+  it("writes nothing down for a question that was never delivered", async () => {
     vi.mocked(sendQuestion).mockRejectedValue(new Error("429"));
 
     await ask("PreToolUse", payload);
 
-    expect(forgetQuestion).toHaveBeenCalledWith(ID);
+    expect(writeAskedQuestion).not.toHaveBeenCalled();
   });
 
   it("hands the question back to the app when the window closes unanswered", async () => {

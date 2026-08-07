@@ -1,4 +1,4 @@
-import { isHookEvent, pingFor, type HookPayload } from "#domain/hook-ping.ts";
+import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/hook-ping.ts";
 import { flattenPayload, log } from "#state/log.ts";
 import { ask } from "#app/ask.ts";
 import { deliver } from "#app/deliver.ts";
@@ -36,14 +36,15 @@ const raw = await readStdin();
 log(`HOOK ${event} | ${flattenPayload(raw)}`);
 
 const payload = parsed(raw);
-const answered = await ask(event, payload);
 
-if (answered !== null) {
-  if (Object.keys(answered).length > NOTHING_TO_SAY) {
+if (stillWorking(event, payload)) {
+  log(`SKIP the turn ended but background work is still running | ${event}`);
+} else {
+  const answered = await ask(event, payload);
+
+  if (answered === null) {
+    await deliver(pingFor(event, payload));
+  } else if (Object.keys(answered).length > NOTHING_TO_SAY) {
     process.stdout.write(JSON.stringify(answered));
   }
-
-  process.exit(0);
 }
-
-await deliver(pingFor(event, payload));

@@ -9,14 +9,20 @@ sits idle until you happen to come back.
 
 ```
 [job-finder@home] Закончил фазу 2, жду апрув на миграцию БД
-5ч 35% · нед/Fable 54%
+
+▰▰▰▱▱▱▱▱▱▱ 35% · 5 часов
+▰▰▰▰▰▱▱▱▱▱ 54% · неделя/Fable
 ```
 
 A ping carries the project, the machine it came from, what is needed, and where
 your limit windows stand — so you can tell whether coming back is even worth
 it. While you are at the keyboard nothing is sent: the sound is enough, and the
-ping waits in a queue until you actually leave. [PLAN.md](PLAN.md) explains the
-machinery and why it is shaped this way.
+ping waits in a queue until you actually leave.
+
+And when you are away, a question is not merely announced — it is **asked**,
+with a button per option, and an answer typed in your own words accepted just
+as well. [PLAN.md](PLAN.md) explains the machinery and why it is shaped this
+way.
 
 ## Installing
 

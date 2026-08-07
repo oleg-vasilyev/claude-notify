@@ -21,12 +21,22 @@ const readJson = <T>(path: string): T | null => {
   }
 };
 
-export const writeAskedQuestion = (question: AskedQuestion): void => {
+export type PendingQuestion = AskedQuestion & { messageId: number | null; headline: string };
+
+export const writeAskedQuestion = (
+  question: AskedQuestion,
+  messageId: number | null,
+  headline: string
+): void => {
   mkdirSync(stateHome(), { recursive: true });
-  writeFileSync(askedQuestionFile(question.id), JSON.stringify(question), "utf8");
+  writeFileSync(
+    askedQuestionFile(question.id),
+    JSON.stringify({ ...question, messageId, headline }),
+    "utf8"
+  );
 };
 
-export const readAskedQuestions = (): AskedQuestion[] => {
+export const readAskedQuestions = (): PendingQuestion[] => {
   if (!existsSync(stateHome())) {
     return [];
   }
@@ -34,7 +44,7 @@ export const readAskedQuestions = (): AskedQuestion[] => {
   return readdirSync(stateHome())
     .filter((name) => name.startsWith(QUESTION_PREFIX) && name.endsWith(QUESTION_SUFFIX))
     .flatMap((name) => {
-      const question = readJson<AskedQuestion>(join(stateHome(), name));
+      const question = readJson<PendingQuestion>(join(stateHome(), name));
 
       return question === null ? [] : [question];
     });

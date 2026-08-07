@@ -39,6 +39,7 @@ const config: Config = {
   staleMinutes: 15,
   includeUsage: false,
   askMinutes: 10,
+  quoteQuestions: true,
 };
 
 const payload = {

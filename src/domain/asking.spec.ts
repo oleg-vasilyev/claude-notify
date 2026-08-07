@@ -19,8 +19,14 @@ const facts = (over: Partial<AskFacts> = {}): AskFacts => ({
   idleSeconds: AWAY_SECONDS,
   minIdleMinutes: MIN_IDLE_MINUTES,
   askEnabled: true,
+  quoting: true,
   ...over,
 });
+
+const permissionWanted: Partial<AskFacts> = {
+  event: "PermissionRequest",
+  payload: { tool_name: "Bash" },
+};
 
 describe("decideAsk", () => {
   it("asks when the user is away and the question can be put in a message", () => {
@@ -69,4 +75,21 @@ describe("decideAsk", () => {
     expect(verdict).toEqual({ kind: "unaskable" });
   });
 
+  it("never asks a question on a machine that does not quote, since asking means sending it", () => {
+    const verdict = decideAsk(facts({ quoting: false }));
+
+    expect(verdict).toEqual({ kind: "unaskable" });
+  });
+
+  it("still asks for a permission there, which names a tool and no work of its own", () => {
+    const verdict = decideAsk(facts({ ...permissionWanted, quoting: false }));
+
+    expect(verdict.kind).toBe("ask");
+  });
+
+  it("asks for a permission the same way when quoting is on", () => {
+    const verdict = decideAsk(facts(permissionWanted));
+
+    expect(verdict.kind).toBe("ask");
+  });
 });

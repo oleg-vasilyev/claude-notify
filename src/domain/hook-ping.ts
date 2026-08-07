@@ -44,9 +44,13 @@ const shortened = (text: string): string => {
   return `${text.slice(0, LONGEST_QUOTED_QUESTION - ELLIPSIS.length)}${ELLIPSIS}`;
 };
 
-const whatIsBeingAsked = (payload: HookPayload): string | undefined => {
+const whatIsBeingAsked = (payload: HookPayload, quoting: boolean): string | undefined => {
   if (payload.tool_name === "ExitPlanMode") {
     return copy.planReady;
+  }
+
+  if (!quoting) {
+    return undefined;
   }
 
   const asked = payload.tool_input?.questions?.[0]?.question;
@@ -58,7 +62,11 @@ const whatIsBeingAsked = (payload: HookPayload): string | undefined => {
   return shortened(copy.question(asked));
 };
 
-export const pingFor = (event: HookEvent, payload: HookPayload): HookPing => {
+export const pingFor = (
+  event: HookEvent,
+  payload: HookPayload,
+  quoting: boolean
+): HookPing => {
   const project = projectPrefixOf(payload.cwd);
 
   switch (event) {
@@ -70,7 +78,7 @@ export const pingFor = (event: HookEvent, payload: HookPayload): HookPing => {
 
     case "PreToolUse":
       return {
-        message: project + (whatIsBeingAsked(payload) ?? copy.awaitingAnswer),
+        message: project + (whatIsBeingAsked(payload, quoting) ?? copy.awaitingAnswer),
         rateLimitMinutes: QUESTION_RATE_LIMIT_MINUTES,
       };
 

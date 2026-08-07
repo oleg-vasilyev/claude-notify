@@ -121,6 +121,7 @@ const legacyJsonConfig = (path: string): Config | null => {
       typeof stored.stale_minutes === "number" ? stored.stale_minutes : DEFAULT_STALE_MINUTES,
     includeUsage: stored.include_usage !== false,
     askMinutes: DEFAULT_ASK_MINUTES,
+    quoteQuestions: true,
   };
 };
 
@@ -160,6 +161,7 @@ writeConfig({
   staleMinutes: inherited?.staleMinutes ?? DEFAULT_STALE_MINUTES,
   includeUsage: inherited?.includeUsage ?? true,
   askMinutes: inherited?.askMinutes ?? DEFAULT_ASK_MINUTES,
+  quoteQuestions: inherited?.quoteQuestions ?? true,
 });
 
 console.log(`settings written to ${envFile()}`);

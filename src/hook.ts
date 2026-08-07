@@ -1,4 +1,5 @@
 import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/hook-ping.ts";
+import { readConfig } from "#state/config.ts";
 import { flattenPayload, log } from "#state/log.ts";
 import { ask } from "#app/ask.ts";
 import { deliver } from "#app/deliver.ts";
@@ -43,7 +44,7 @@ if (stillWorking(event, payload)) {
   const answered = await ask(event, payload);
 
   if (answered === null) {
-    await deliver(pingFor(event, payload));
+    await deliver(pingFor(event, payload, readConfig()?.quoteQuestions === true));
   } else if (Object.keys(answered).length > NOTHING_TO_SAY) {
     process.stdout.write(JSON.stringify(answered));
   }

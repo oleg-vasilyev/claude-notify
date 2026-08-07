@@ -25,6 +25,7 @@ const config: Config = {
   staleMinutes: 20,
   includeUsage: false,
   askMinutes: 7,
+  quoteQuestions: true,
 };
 
 afterAll(() => {
@@ -51,7 +52,14 @@ describe("readConfigFrom", () => {
       staleMinutes: 15,
       includeUsage: true,
       askMinutes: 10,
+      quoteQuestions: true,
     });
+  });
+
+  it("keeps the question to itself once the machine says not to quote", () => {
+    const path = envWith("BOT_TOKEN=T\nCHAT_ID=42\nQUOTE_QUESTIONS=false\n");
+
+    expect(readConfigFrom(path)?.quoteQuestions).toBe(false);
   });
 
   it("reads zero ask minutes rather than falling back to the default, since zero turns answering off", () => {

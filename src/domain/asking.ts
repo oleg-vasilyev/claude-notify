@@ -11,6 +11,7 @@ export type AskFacts = {
   idleSeconds: number;
   minIdleMinutes: number;
   askEnabled: boolean;
+  quoting: boolean;
 };
 
 export type AskVerdict =
@@ -30,6 +31,10 @@ export const decideAsk = (facts: AskFacts): AskVerdict => {
   const question = questionFrom(facts.event, facts.payload, facts.id);
 
   if (question === null) {
+    return { kind: "unaskable" };
+  }
+
+  if (!facts.quoting && question.kind === "choice") {
     return { kind: "unaskable" };
   }
 

@@ -38,6 +38,7 @@ export const ask = async (
     idleSeconds: idleSeconds(),
     minIdleMinutes: config.minIdleMinutes,
     askEnabled: config.askMinutes > 0,
+    quoting: config.quoteQuestions,
   });
 
   switch (verdict.kind) {

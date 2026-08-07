@@ -34,6 +34,7 @@ const config: Config = {
   staleMinutes: 15,
   includeUsage: false,
   askMinutes: 10,
+  quoteQuestions: true,
 };
 
 const ping = { message: "[job-finder] жду апрув", rateLimitMinutes: 0 };

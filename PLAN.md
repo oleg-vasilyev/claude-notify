@@ -77,6 +77,17 @@ until an answer arrives or the window closes.
 | If nobody answers | the question is handed back and appears in the app as before |
 | While at the keyboard | nothing is asked at all — the app is the better place |
 
+**A machine may refuse to quote.** `QUOTE_QUESTIONS=false` keeps the text of a
+question on the machine that asked it: the ping says only that an answer is
+wanted, and a question with options is never put on the phone at all — asking
+one means sending it, so the two cannot be configured apart. A permission still
+names its tool, which carries no work of its own. Everything else is unchanged,
+and the setting is per machine, since `.env` is.
+
+The case that earned it: a work laptop, whose project names are dull but whose
+question text is not, feeding the same personal bot as a home machine that
+quotes freely.
+
 Two rules exist because a wrong answer is worse than a late one:
 
 - **Words may only answer when exactly one question is waiting.** With two open,

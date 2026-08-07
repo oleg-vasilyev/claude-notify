@@ -17,6 +17,7 @@ export type Config = {
   staleMinutes: number;
   includeUsage: boolean;
   askMinutes: number;
+  quoteQuestions: boolean;
 };
 
 const numberOr = (written: string | undefined, fallback: number): number => {
@@ -44,6 +45,7 @@ export const readConfigFrom = (path: string): Config | null => {
     staleMinutes: numberOr(settings.STALE_MINUTES, DEFAULT_STALE_MINUTES),
     includeUsage: settings.INCLUDE_USAGE !== "false",
     askMinutes: numberOr(settings.ASK_MINUTES, DEFAULT_ASK_MINUTES),
+    quoteQuestions: settings.QUOTE_QUESTIONS !== "false",
   };
 };
 
@@ -62,6 +64,7 @@ export const writeConfigTo = (path: string, config: Config): void => {
       STALE_MINUTES: `${config.staleMinutes}`,
       INCLUDE_USAGE: `${config.includeUsage}`,
       ASK_MINUTES: `${config.askMinutes}`,
+      QUOTE_QUESTIONS: `${config.quoteQuestions}`,
     }),
     "utf8"
   );

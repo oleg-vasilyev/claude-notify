@@ -24,6 +24,7 @@ const config: Config = {
   minIdleMinutes: 5,
   staleMinutes: 20,
   includeUsage: false,
+  askMinutes: 7,
 };
 
 afterAll(() => {
@@ -33,7 +34,7 @@ afterAll(() => {
 describe("readConfigFrom", () => {
   it("reads a full .env", () => {
     const path = envWith(
-      "BOT_TOKEN=7968:AAF-9\nCHAT_ID=42\nMACHINE_LABEL=work\nMIN_IDLE_MINUTES=5\nSTALE_MINUTES=20\nINCLUDE_USAGE=false\n"
+      "BOT_TOKEN=7968:AAF-9\nCHAT_ID=42\nMACHINE_LABEL=work\nMIN_IDLE_MINUTES=5\nSTALE_MINUTES=20\nINCLUDE_USAGE=false\nASK_MINUTES=7\n"
     );
 
     expect(readConfigFrom(path)).toEqual(config);
@@ -49,7 +50,14 @@ describe("readConfigFrom", () => {
       minIdleMinutes: 3,
       staleMinutes: 15,
       includeUsage: true,
+      askMinutes: 10,
     });
+  });
+
+  it("reads zero ask minutes rather than falling back to the default, since zero turns answering off", () => {
+    const path = envWith("BOT_TOKEN=T\nCHAT_ID=42\nASK_MINUTES=0\n");
+
+    expect(readConfigFrom(path)?.askMinutes).toBe(0);
   });
 
   it("treats a number it cannot read as absent rather than as zero", () => {

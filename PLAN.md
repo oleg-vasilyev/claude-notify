@@ -49,6 +49,43 @@ observed firing in the desktop app; `Notification` alone never has.
 Hook pings pass `-RateLimitMinutes` so a burst collapses; deliberate model
 pings pass none and are never rate-limited.
 
+**`PreToolUse` and `PermissionRequest` both fire for `AskUserQuestion`, in the
+same second.** Left alone that is two messages for one question and two hooks
+waiting on one answer, so ownership is assigned rather than discovered:
+`AskUserQuestion` belongs to `PreToolUse`, and `PermissionRequest` handles every
+tool *except* it.
+
+## Answering from the phone
+
+When the user is away, a question does not merely get announced — it gets asked,
+with a button per option and the recommended one starred. The hook then blocks
+until an answer arrives or the window closes.
+
+| | |
+| --- | --- |
+| What can be answered | a question with options, and a tool asking permission |
+| How | tap a button, or reply in your own words |
+| Who may answer | only the configured chat; anything else is ignored |
+| If nobody answers | the question is handed back and appears in the app as before |
+| While at the keyboard | nothing is asked at all — the app is the better place |
+
+Two rules exist because a wrong answer is worse than a late one:
+
+- **Words may only answer when exactly one question is waiting.** With two open,
+  a bare "да" cannot be attributed, so it is refused rather than guessed.
+- **A permission may only be pressed, never written.** "ну давай" is not a
+  decision the product is willing to read as consent.
+
+The answer reaches Claude as the hook's decision. For a question that is a
+`deny` whose reason carries the user's words — the model treats the reason as
+the answer and continues, and the reason says so in as many words, because a
+bare denial invites it to simply ask again. For a permission it is the `allow`
+or `deny` the button named.
+
+Two processes are involved, because `getUpdates` tolerates one reader: the hook
+writes the question to a file and waits, the watcher is the only one polling
+Telegram, and it writes the answer back beside the question.
+
 ## The delivery pipeline
 
 Every message, from either source, goes through the same funnel:
@@ -126,9 +163,10 @@ threshold is the knob if it ever is not.
    another's fallback. Paid for once — see tombstones.
 4. **At most one watcher.** A lock file holds the watcher's PID; a dead PID is
    taken over, a live one defers. The lock is removed on every exit path.
-5. **The token exists only in `config.json` on the installed machine.** The
-   repository ignores it and the installer does not embed it — moving to a new
-   machine means typing it again, by design.
+5. **The token exists only in `.env` on the installed machine.** The repository
+   ignores it, `docs:check` fails if that ever stops being true, and the
+   installer does not embed it — moving to a new machine means typing it again,
+   by design.
 6. **A broken presence probe counts as away.** If `GetLastInputInfo` fails the
    ping is sent rather than swallowed — a false ping costs a glance, a
    swallowed one costs hours.
@@ -141,6 +179,13 @@ threshold is the knob if it ever is not.
 9. **Usage never fails a ping.** Every path through the usage reader returns
    nothing rather than throwing; the limits line is an enrichment, and the ping
    is the product.
+10. **Only the configured chat can answer.** Every update is checked against
+    `CHAT_ID` before it can decide anything, because an answer is an
+    instruction to an agent and not merely a message.
+11. **An unanswered question is handed back, never guessed.** The window closing
+    leaves Claude Code exactly where it would have been without the bot.
+12. **A question is forgotten on every exit path** — answered, timed out, or
+    never delivered — so yesterday's answer cannot resolve today's question.
 
 ## What survives what
 
@@ -148,7 +193,10 @@ threshold is the knob if it ever is not.
   is a file; the watcher lock names a PID that no longer exists and is taken
   over. Nothing needs restarting except Claude Code itself.
 - **Telegram unreachable.** The send fails, the failure is logged with the
-  reason, exit code 1. There is no retry — see TECH-DEBT for the trigger.
+  reason, exit code 1. There is no retry — see TECH-DEBT for the trigger. A
+  question that cannot be delivered falls back to a plain ping, and a poll that
+  fails leaves the watcher alive to try again: a dead poller and a quiet one
+  look identical from the outside, which is the failure worth preventing.
 - **Two machines, one bot.** Stamps, queue and watcher are all per-machine
   state; the only shared resource is the chat itself, and the machine label
   keeps the streams readable.
@@ -191,10 +239,14 @@ threshold is the knob if it ever is not.
   plain text with no `parse_mode`, so a hook payload or a question text cannot
   break markup — nothing needs escaping.
 - **`getUpdates` has one consumer per token.** Two pollers split the stream
-  randomly. Today the installer polls only during setup (to resolve `chat_id`),
-  so the constraint is dormant — but it is the constraint that shapes phase 4:
-  anything that *listens* must either be the single resident poller or not
-  poll at all.
+  randomly, so exactly one process listens: the watcher. Hooks never poll — they
+  wait on a file. `offset` is remembered on disk so a press is never read twice.
+- **A hook may block for as long as its `timeout` says.** Measured, not assumed:
+  a hook configured for 900 seconds ran all 900 and was killed on the second,
+  which is what makes waiting for a human viable at all.
+- **An inline keyboard's `callback_data` is the correlation.** It carries the
+  question id and the option, which is how a press finds the hook waiting for
+  it among several.
 - A bot cannot message a user first; `/start` from the user is what creates the
   chat and makes its id visible in `getUpdates`.
 
@@ -206,20 +258,24 @@ has since been rewritten from PowerShell to TypeScript with no change in
 behaviour. The rewrite bought what the old runtime could not offer at any
 price: types, a layering rule the build enforces, and mutation testing.
 
-**Phase 4 — answering from the phone.** An inline button under a question
-ping: «делай как рекомендуешь». Two hard sub-problems, named now so the phase
-starts honest: *receiving* the tap collides with the single-`getUpdates`
-consumer rule — either a blocking hook polls while it waits (simple, but holds
-the turn and the polling slot) or a resident bridge process becomes the one
-poller and hooks talk to it through files; and *delivering* the answer into the
-session — the candidate mechanism is the `AskUserQuestion` hook returning a
-deny decision whose reason carries the user's words, which the model then acts
-on. Correlation between a tap and a waiting session rides in `callback_data`.
+**Phase 4 — answering from the phone** — done; it is the section above. Both
+guesses made when it was a sketch turned out right: the answer does ride back as
+a deny decision carrying the user's words, and correlation does ride in
+`callback_data`. The choice left open — a blocking hook that polls, or a
+resident poller talking to hooks through files — resolved to the second, because
+the first would have put every waiting hook in the single `getUpdates` slot.
+
+**Phase 3.5 — restarting a loop after the limit resets** — investigated and
+parked. Detecting the reset is solved (`five_hour.resets_at`) and resuming a
+conversation works (`claude -r`), but everything that writes into a live session
+from outside collides with the desktop app: its view hydrates only when it loads
+a session, and typing into a stale window forks the conversation so the outside
+work is silently dropped. Picking it up again starts with deciding whether a
+loop may live in an app session at all, not with code.
 
 **Phase 5 — TBD: task intake.** `/idea` in the bot lands a ticket on a board;
 a headless `claude -p` run picks it up. This is a different product (a
-dispatcher, not a notifier) and inherits phase 4's bridge; it stays a sketch
-until phase 4 exists.
+dispatcher, not a notifier) and now inherits phase 4's watcher as its poller.
 
 ## Out of scope
 

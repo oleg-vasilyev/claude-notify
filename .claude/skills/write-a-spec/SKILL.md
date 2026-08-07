@@ -73,6 +73,29 @@ Name it `*.integration.spec.ts` so nobody mistakes it for the default, point the
 paths module at a temp directory with `vi.hoisted`, and delete the directory in
 `afterAll`.
 
+## E2E scenarios
+
+`e2e/` plays the **real `hook.ts` process** against a fake Telegram HTTP server,
+pointed at a throwaway state directory by `CLAUDE_NOTIFY_HOME`,
+`CLAUDE_NOTIFY_ENV` and `BOT_API_ROOT`. It is the slowest thing here and runs as
+a release gate, not in `check`, so one is owed only for what no unit can reach:
+
+- **An inline keyboard.** Whether a tap finds the hook waiting for it is a fact
+  about two processes and a real socket, and the answering flow is the only
+  feature that has them.
+- **A bug that got past the units.** That is evidence the seam is real.
+
+Nothing in `e2e/` may import from `src/` except the entry point it spawns — no
+types, no `copy.ts`. A harness that imported the copy table would assert a
+constant against itself, so expected Russian is written out in full.
+
+A scenario never sleeps and never polls: the fake server exposes `whenAsked()`
+and `whenAcknowledged()`, and if you reach for a timer the verb you want is
+missing from the harness and belongs there.
+
+Presence is real win32 in a spawned process, so a scenario sets
+`MIN_IDLE_MINUTES=0` rather than trying to fake being away.
+
 ## Shape of the file
 
 - Name every number: `const AWAY_SECONDS = 600`.

@@ -94,31 +94,39 @@ node src/notify.ts --message "[test] проверка" --now
 
 ```
 src/domain/     every decision, pure — no files, no network, no clock
+  answer.ts         which Telegram update answers which question
+  asking.ts         ask on the phone, or leave it to the app
   copy.ts           every Russian string the user reads
   delivery.ts       send, queue, or skip
   duration.ts       "1 ч 12 мин"
   env-file.ts       reading and updating .env without losing your comments
+  hook-answer.ts    the answer, shaped as a decision Claude Code accepts
   hook-ping.ts      what each Claude Code event has to say
   hook-registration.ts  merging into settings.json without clobbering it
   memory-rule.ts    the rule setup writes into the global CLAUDE.md
   pending.ts        which queued pings survive, and which one wins per project
   project.ts        the project key and the machine label
+  question.ts       a hook payload turned into something answerable by phone
   usage.ts          the limits line
 src/state/      what this product remembers between runs
+  asked-question.ts the question a hook waits on, and the answer it waits for
   config.ts         the settings, read from .env
   file-locations.ts every path it reads or writes, ours and Claude Code's
   last-sent.ts      one stamp per project, for the rate limit
   log.ts            the one log file every decision lands in
   pending-queue.ts  pings held back while you were at the keyboard
+  update-offset.ts  how far the watcher has read Telegram
   watcher-lock.ts   who is delivering the queue right now
 src/presence/idle-time.ts   how long since you touched anything (win32 via koffi)
 src/telegram/telegram-api.ts sending a message, and what setup needs to find you
 src/usage/usage-api.ts       the account's own limit windows
 src/deliver.ts          the funnel every ping goes through
+src/ask.ts              the funnel a question goes through, and waits in
+src/answering.ts        reading Telegram for answers, for the watcher
 src/watcher-process.ts  is a watcher running, and starting one that outlives us
 src/hook.ts     entry point: one Claude Code event
 src/notify.ts   entry point: one ping, from the model or by hand
-src/watcher.ts  entry point: delivers what presence held back
+src/watcher.ts  entry point: delivers what presence held back, and collects answers
 src/setup.ts    entry point: the installer
 ```
 
@@ -126,7 +134,12 @@ src/setup.ts    entry point: the installer
 npm run check            # lint, types, docs, tests — the gate to keep at zero
 npm run test:coverage    # floor 80%
 npm run test:mutation    # Stryker over domain/, breaks below 85%
+npm run e2e              # the real hook process against a fake Telegram
 ```
+
+`e2e/` is not part of `check` on purpose: it spawns real processes and waits out
+real timeouts, so it is a release gate next to coverage and mutation rather than
+something to pay for on every edit.
 
 `.claude/` carries the conventions as tooling rather than as advice: a
 `PostToolUse` hook lints each file the moment it is written, `phase-reviewer`
@@ -134,8 +147,8 @@ reviews a whole phase against `CLAUDE.md`, and four skills hold the procedures
 that would otherwise bloat it — `add-a-hook-event`, `write-a-spec`,
 `write-a-doc`, `finish-phase` (plus `retrospective`, which it runs last).
 
-`domain/` may not import `node:*`, `koffi` or anything from `edges/`, and
-ESLint fails the build if it does. [CLAUDE.md](CLAUDE.md) has the rest.
+`domain/` may not import `node:*`, `koffi` or anything impure, and ESLint fails
+the build if it does. [CLAUDE.md](CLAUDE.md) has the rest.
 
 ## The other three documents
 

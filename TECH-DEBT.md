@@ -7,20 +7,33 @@ remembers.
 
 ---
 
-## The mutation score sits at 85.1%, one point above its own gate
+## Four domain files carry almost every surviving mutant
 
-`memory-rule.ts` (67%), `delivery.ts` (81%), `usage.ts` (84%) and `env-file.ts`
-carry the survivors — mostly boundary and string mutants, where a test asserts
-*that* something happened rather than exactly what. A round of killing on
-`env-file.ts` moved the total by nothing, which is the tell that the remaining
-ones are spread thin rather than concentrated.
+The total is 86.7% against a break threshold of 85, up from 85.1% before phase
+4 — the four new files came in at 86–100%, so the fear recorded here last time,
+that the next `domain/` file would break the gate on its own, was wrong. The
+survivors are concentrated in the files that were already lagging and that
+phase 4 never touched: `memory-rule.ts` (67%), `env-file.ts` (80%),
+`delivery.ts` (81%), `usage.ts` (84%). Mostly boundary and string mutants, where
+a test asserts *that* something happened rather than exactly what.
 
-The margin is now thin enough that the next new `domain/` file could break the
-gate on its own. **Kill survivors in whichever of those four files a phase
-touches, before adding a fifth** — the report is at `reports/mutation/` and no
-longer needs a re-run to read, since the json reporter is configured.
+**Kill survivors in whichever of those four a phase touches, before adding
+anything to it** — the report is at `reports/mutation/` and needs no re-run to
+read, since the json reporter is configured.
 
 ---
+
+## The recommended option is found by looking for a word
+
+`AskUserQuestion` has no field saying which option is recommended — the
+convention is a `(Рекомендую)` or `(Recommended)` note inside the option's
+description, so `question.ts` finds the star by substring. Write `— советую`
+instead one day and the star silently stops appearing. Nothing fails, nothing
+is logged; the phone just shows three equal options.
+
+**Fix it if the payload ever grows a real field for this, or the first time a
+question arrives on the phone with no star where one was meant.** Matching more
+spellings is not the fix — that is the same guess with more branches.
 
 ## A failed send is lost
 

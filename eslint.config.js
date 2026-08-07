@@ -203,7 +203,7 @@ export default [
     ignores: ["node_modules/**", "reports/**"],
   },
   {
-    files: ["src/**/*.ts", "scripts/**/*.ts"],
+    files: ["src/**/*.ts", "scripts/**/*.ts", "e2e/**/*.ts"],
     languageOptions: {
       parser: tsParser,
       ecmaVersion: "latest",

@@ -22,10 +22,11 @@
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
     "check": "npm run lint && npm run typecheck && npm run docs:check && npm run test",
-    "lint": "eslint src scripts",
-    "lint:fix": "eslint --fix src scripts",
+    "lint": "eslint src scripts e2e",
+    "lint:fix": "eslint --fix src scripts e2e",
     "typecheck": "tsc --noEmit",
-    "docs:check": "node scripts/check-docs.ts"
+    "docs:check": "node scripts/check-docs.ts",
+    "e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "koffi": "^2.15.1"

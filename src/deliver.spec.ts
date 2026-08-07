@@ -33,6 +33,7 @@ const config: Config = {
   minIdleMinutes: 3,
   staleMinutes: 15,
   includeUsage: false,
+  askMinutes: 10,
 };
 
 const ping = { message: "[job-finder] жду апрув", rateLimitMinutes: 0 };

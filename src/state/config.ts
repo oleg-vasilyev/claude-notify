@@ -6,6 +6,7 @@ import { envFile } from "#state/file-locations.ts";
 
 const DEFAULT_MIN_IDLE_MINUTES = 3;
 const DEFAULT_STALE_MINUTES = 15;
+const DEFAULT_ASK_MINUTES = 10;
 const DECIMAL = 10;
 
 export type Config = {
@@ -15,6 +16,7 @@ export type Config = {
   minIdleMinutes: number;
   staleMinutes: number;
   includeUsage: boolean;
+  askMinutes: number;
 };
 
 const numberOr = (written: string | undefined, fallback: number): number => {
@@ -41,6 +43,7 @@ export const readConfigFrom = (path: string): Config | null => {
     minIdleMinutes: numberOr(settings.MIN_IDLE_MINUTES, DEFAULT_MIN_IDLE_MINUTES),
     staleMinutes: numberOr(settings.STALE_MINUTES, DEFAULT_STALE_MINUTES),
     includeUsage: settings.INCLUDE_USAGE !== "false",
+    askMinutes: numberOr(settings.ASK_MINUTES, DEFAULT_ASK_MINUTES),
   };
 };
 
@@ -58,6 +61,7 @@ export const writeConfigTo = (path: string, config: Config): void => {
       MIN_IDLE_MINUTES: `${config.minIdleMinutes}`,
       STALE_MINUTES: `${config.staleMinutes}`,
       INCLUDE_USAGE: `${config.includeUsage}`,
+      ASK_MINUTES: `${config.askMinutes}`,
     }),
     "utf8"
   );

@@ -1,11 +1,11 @@
 ---
 name: finish-phase
-description: Run the release ritual that closes a development phase in claude-notify — the five gates (check, coverage, mutation, diff review, retrospective), the live proof, and the format of the phase's final commit message. Use when a phase is being wrapped up or the user asks whether the code is releasable.
+description: Run the release ritual that closes a development phase in claude-notify — the gates (check, coverage, mutation, e2e when answering changed, diff review, retrospective), the live proof, and the format of the phase's final commit message. Use when a phase is being wrapped up or the user asks whether the code is releasable.
 ---
 
 # Finishing a phase
 
-A phase is done when the code is *releasable*, not when it works. Run all five
+A phase is done when the code is *releasable*, not when it works. Run all the
 gates before the final commit and act on what they say. None is advisory.
 
 ## 1. `npm run check`
@@ -45,6 +45,16 @@ Three rules about running it, and the first is the one that costs money:
   sentence in the commit message, not another round.
 - **Moving code moves its mutants** — re-run after a split or a rename.
   Assertions do not always survive being ported.
+
+## 3b. `npm run e2e`
+
+Only when the phase touched answering — the hook's stdout contract, the
+question/answer files, or anything in `telegram/`. It spawns the real `hook.ts`
+against a fake Telegram, so it is minutes, not seconds, and it is the only gate
+that proves two processes still meet.
+
+A failure here is rarely in the harness. Read which scenario broke before
+touching `e2e/`.
 
 ## 4. A review pass over the phase's whole diff
 
@@ -94,7 +104,7 @@ one file and says how to add it without creating the second copy that will drift
 
 ## Scaling the ritual
 
-The five gates are not negotiable; what the phase produces around them is. A
+The gates are not negotiable; what the phase produces around them is. A
 phase that stays inside `domain/`, adds no edge and changes no message the user
 reads owes a `PLAN.md` line at most. A phase that changes what a ping says, or
 what the installer writes into somebody's `settings.json`, owes a section.

@@ -16,7 +16,10 @@ export type HookPayload = {
   tool_name?: string;
   message?: string;
   tool_input?: {
-    questions?: { question?: string }[];
+    questions?: {
+      question?: string;
+      options?: { label?: string; description?: string }[];
+    }[];
   };
 };
 

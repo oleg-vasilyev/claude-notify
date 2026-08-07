@@ -5,11 +5,12 @@ import { fileURLToPath } from "node:url";
 
 export const projectHome = (): string => fileURLToPath(new URL("../..", import.meta.url));
 
-export const envFile = (): string => join(projectHome(), ".env");
+export const envFile = (): string => process.env.CLAUDE_NOTIFY_ENV ?? join(projectHome(), ".env");
 
 export const claudeHome = (): string => join(homedir(), ".claude");
 
-export const stateHome = (): string => join(claudeHome(), "claude-notify");
+export const stateHome = (): string =>
+  process.env.CLAUDE_NOTIFY_HOME ?? join(claudeHome(), "claude-notify");
 
 export const legacyConfigFile = (): string => join(stateHome(), "config.json");
 
@@ -21,6 +22,13 @@ export const watcherLockFile = (): string => join(stateHome(), "watcher.lock");
 
 export const lastSentFile = (project: string): string =>
   join(stateHome(), `last-sent-${project}.txt`);
+
+export const askedQuestionFile = (id: string): string =>
+  join(stateHome(), `question-${id}.json`);
+
+export const answerFile = (id: string): string => join(stateHome(), `answer-${id}.json`);
+
+export const updateOffsetFile = (): string => join(stateHome(), "update-offset.txt");
 
 export const claudeSettingsFile = (): string => join(claudeHome(), "settings.json");
 

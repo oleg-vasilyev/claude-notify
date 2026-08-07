@@ -109,17 +109,17 @@ needs judgement:
 
 Specs sit next to the code as `*.spec.ts`, and `domain/` is covered
 exhaustively — every branch that changes a delivery. What to mock, what earns an
-integration spec and what is outside coverage are all in the `write-a-spec`
-skill.
+integration spec or an e2e scenario, and what is outside coverage are in the
+`write-a-spec` skill.
 
 ```bash
 npm run check
 ```
 
-Lint, types, docs and tests — the gate to keep at zero. Two more before a
-release: `npm run test:coverage` (floor 80%) and `npm run test:mutation` (breaks
-below 85%); the numbers go in the commit message and `finish-phase` has the
-ritual.
+Lint, types, docs and tests — the gate to keep at zero. Three more before a
+release: `npm run test:coverage` (floor 80%), `npm run test:mutation` (breaks
+below 85%) and `npm run e2e`, the real hook process against a fake Telegram.
+The numbers go in the commit message; `finish-phase` has the ritual.
 
 A `PostToolUse` hook lints each file as it is written, so a violation surfaces
 at the edit rather than at the end of the turn.

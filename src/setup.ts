@@ -18,9 +18,11 @@ import { botName, resolveChatId, sendMessage } from "#telegram/telegram-api.ts";
 
 
 const HOOK_TIMEOUT_SECONDS = 30;
+const ASK_HOOK_TIMEOUT_SECONDS = 900;
 const SOUND_TIMEOUT_SECONDS = 15;
 const DEFAULT_MIN_IDLE_MINUTES = 3;
 const DEFAULT_STALE_MINUTES = 15;
+const DEFAULT_ASK_MINUTES = 10;
 const OWNED_MARKER = "claude-notify";
 const OWNED_MARKERS = [OWNED_MARKER, "telegram-notify"];
 const JSON_INDENT = 2;
@@ -42,6 +44,13 @@ const pingCommand = (event: string): HookCommand => ({
   args: [hookEntry, event, OWNED_MARKER],
   timeout: HOOK_TIMEOUT_SECONDS,
   async: true,
+});
+
+const askCommand = (event: string): HookCommand => ({
+  type: "command",
+  command: process.execPath,
+  args: [hookEntry, event, OWNED_MARKER],
+  timeout: ASK_HOOK_TIMEOUT_SECONDS,
 });
 
 const soundOf = (wav: string): HookCommand => ({
@@ -66,9 +75,9 @@ const REGISTRATIONS: Registration[] = [
   {
     event: "PreToolUse",
     matcher: "AskUserQuestion|ExitPlanMode",
-    command: pingCommand("PreToolUse"),
+    command: askCommand("PreToolUse"),
   },
-  { event: "PermissionRequest", command: pingCommand("PermissionRequest") },
+  { event: "PermissionRequest", command: askCommand("PermissionRequest") },
 ];
 
 const ask = async (question: string): Promise<string> => {
@@ -111,6 +120,7 @@ const legacyJsonConfig = (path: string): Config | null => {
     staleMinutes:
       typeof stored.stale_minutes === "number" ? stored.stale_minutes : DEFAULT_STALE_MINUTES,
     includeUsage: stored.include_usage !== false,
+    askMinutes: DEFAULT_ASK_MINUTES,
   };
 };
 
@@ -149,6 +159,7 @@ writeConfig({
   minIdleMinutes: inherited?.minIdleMinutes ?? DEFAULT_MIN_IDLE_MINUTES,
   staleMinutes: inherited?.staleMinutes ?? DEFAULT_STALE_MINUTES,
   includeUsage: inherited?.includeUsage ?? true,
+  askMinutes: inherited?.askMinutes ?? DEFAULT_ASK_MINUTES,
 });
 
 console.log(`settings written to ${envFile()}`);

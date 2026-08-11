@@ -59,6 +59,11 @@ Three rules about running it, and the first is the one that costs money:
 
 - **Never re-run a gate to re-read its output.** Every run writes
   `reports/mutation/`. Read the report.
+- **Never pipe a gate through `Select-Object -First`.** It closes the pipe, npm
+  dies at exit 255 partway through, and the summary you were filtering for never
+  prints — so the run is lost and the only way to see the number is to run it
+  again. That is the rule above, broken by the command meant to save reading.
+  Let a gate print in full, or read its report file.
 - **One round of survivor-killing per phase**, and only for mutants whose death
   would prevent a bug the user could see. Above roughly 95% the survivors are
   mostly equivalent mutants. A survivor left alive on purpose is worth a
@@ -106,6 +111,14 @@ rather than only against the rules.
 first.** A new rule is at its least believed by the person who just wrote it,
 because they are still holding the reasoning that made it obvious.
 
+**A measured threshold is only licensed over the population it was measured
+on.** The moved-on rule's five seconds came from 46 real `Stop` events, and the
+code then applied it to all four hook events — where the premise is false,
+because a mid-turn session keeps writing while the wait is genuinely open. The
+measurement was right, the number was right, and the scope was invented. When a
+phase justifies a constant with evidence, **say out loud what the evidence
+covers, and let that be the guard in the code.**
+
 **When you break something on purpose to watch a check fail, confirm the break
 landed.** Files here are CRLF, so a `node -e` replacement written with `\n`
 silently matches nothing — three times in one phase, and once the tests then
@@ -149,6 +162,21 @@ the check rather than borrowing somebody's real project.
 **Read the line, not the exit code.** It has to name the project and the tool:
 `[live-check@…] просит разрешение: Bash`. A bare `[<label>] просит разрешение:
 инструмент` means the payload never arrived.
+
+**That second command blocks for `ASK_MINUTES` when you are away.**
+`PermissionRequest` goes through the ask path, so if the machine reads as idle
+it puts a real question on the phone with real buttons and waits ten minutes for
+a tap. Expect `ASKED`, not `просит разрешение`, and kill it — then delete the
+stranded `question-<id>.json` from the state directory, or the watcher keeps
+polling for an answer to a question nobody will send, and the message sits on the
+phone forever because the process that would have closed it is gone.
+
+**A live check in a sandbox spawns a watcher that will block the next one.** Any
+hook run that queues a ping starts a detached watcher, which claims the lock in
+`CLAUDE_NOTIFY_HOME` and holds the config it started with. A watcher run by hand
+afterwards exits silently at once. Kill the pid in `watcher.lock` and delete the
+lock between the queueing step and the flushing step — and do not delete
+`log.txt` while wondering why nothing was logged.
 
 If the phase touched the installer, run `npm run setup -- --label home
 --skip-test` **twice** and confirm `~/.claude/settings.json` gained exactly one

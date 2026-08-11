@@ -4,23 +4,42 @@ import type { PendingPing } from "#domain/ping/pending.ts";
 import { pendingFile, stateHome } from "#state/file-locations.ts";
 
 
+const pendingFrom = (line: string): PendingPing | null => {
+  let parsed: Partial<PendingPing>;
+
+  try {
+    parsed = JSON.parse(line) as Partial<PendingPing>;
+  } catch {
+    return null;
+  }
+
+  if (parsed === null || typeof parsed !== "object") {
+    return null;
+  }
+
+  if (typeof parsed.queuedAt !== "number" || typeof parsed.message !== "string") {
+    return null;
+  }
+
+  return {
+    queuedAt: parsed.queuedAt,
+    message: parsed.message,
+    transcriptPath: typeof parsed.transcriptPath === "string" ? parsed.transcriptPath : null,
+  };
+};
+
 export const readPending = (): PendingPing[] => {
   if (!existsSync(pendingFile())) {
     return [];
   }
 
-  const lines = readFileSync(pendingFile(), "utf8").split("\n");
   const pending: PendingPing[] = [];
 
-  for (const line of lines) {
-    if (line.trim() === "") {
-      continue;
-    }
+  for (const line of readFileSync(pendingFile(), "utf8").split("\n")) {
+    const ping = pendingFrom(line);
 
-    try {
-      pending.push(JSON.parse(line) as PendingPing);
-    } catch {
-      continue;
+    if (ping !== null) {
+      pending.push(ping);
     }
   }
 

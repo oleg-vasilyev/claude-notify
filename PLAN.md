@@ -173,15 +173,58 @@ The order is the design. Presence outranks the rate limit because a suppressed
 ping is *queued*, never lost; the rate limit drops, and may only drop the
 generic fallback pings that have a better sibling.
 
-**The queue.** Suppressed pings append to `pending.txt` as
-`<iso-timestamp>|<message>`. A single background watcher polls idleness every
-30 seconds; once the user has been away `min_idle_minutes`, it flushes: entries
-older than `stale_minutes` are dropped (the user sat through them — they saw
-the screen), the rest are deduplicated to **one message per project, keeping
-the longest** — so the model's contextual ping beats the hook's generic one —
-and sent. The watcher then exits; it is spawned again by the next suppressed
-ping. An 8-hour deadline bounds a watcher outliving an all-day session; by then
-every entry is stale anyway.
+**The queue.** Suppressed pings append to `pending.jsonl`, one JSON object per
+line, each carrying the moment it was queued, the message, and — when a hook put
+it there — the path of the session's transcript. A single background watcher
+polls idleness every 30 seconds; once the user has been away
+`min_idle_minutes`, it flushes: entries older than `stale_minutes` are dropped,
+entries whose session has moved on are dropped, and the rest are deduplicated to
+**one message per project, keeping the longest** — so the model's contextual
+ping beats the hook's generic one — and sent. The watcher then exits; it is
+spawned again by the next suppressed ping. An 8-hour deadline bounds a watcher
+outliving an all-day session; by then every entry is stale anyway.
+
+**A queued ping describes a moment, and the moment can end before it is
+delivered.** "Закончил ход, ждёт тебя" is queued because the user is at the
+keyboard — and a user at the keyboard is exactly the one who answers, so the
+agent goes back to work while the ping waits. Delivered ten minutes later it
+sends somebody to a screen where nothing is waiting, which is worse than no ping
+at all: the notifier is only worth having if arriving means arriving to
+something.
+
+`stale_minutes` cannot catch this. It was written for the opposite case — the
+user sat through the ping, so they saw the screen — and its premise fails the
+moment the user *acts*: the ping that started this rule was nine minutes old,
+well inside a fifteen-minute window, and false for eight of them.
+
+So the flush asks the session itself. A hook payload carries `transcript_path`,
+the file Claude Code appends every message of that session to; the queued ping
+remembers it, and at flush time its modification date answers the only question
+that matters — **has anything happened in that session since we queued this?**
+If it has, the session is not waiting and the ping is dropped as `moved on`.
+
+Three things make this a fact rather than a guess. It is the session's own
+record, not an inference from timing; it fails safe — a transcript that cannot
+be read, or a ping that carries none, is delivered exactly as before; and **only
+a finished turn carries a transcript at all.**
+
+That last one is the whole scope of the rule. A quiet transcript means "nothing
+is happening here" only once the turn is over. A ping raised mid-turn — a
+permission wall, a question the app is holding — is raised while the session is
+still writing: another tool in the same turn returns, its result is appended, and
+the transcript moves although the wall is still standing. Checking those pings
+would drop true ones, which costs hours, to avoid false ones, which cost a
+glance. So they are queued exactly as before and only `stale_minutes` reaches
+them.
+
+**The five seconds of silence it waits for are measured, not chosen.** The hook
+fires at the end of a turn, and the transcript is still being written as it
+does: across 46 real `Stop` events, four were followed by a write within
+0.4–0.7 s, so "the file changed at all" would have dropped nearly one ping in
+ten. The fastest a real reply ever arrived was 10.8 s. Five seconds sits between
+the two with room on both sides, and the asymmetry is deliberate — the check
+only ever refuses to fire, never fires wrongly, because the transcript's date is
+the *last* write and a session that resumed keeps writing long past any window.
 
 **Limits ride along with the message.** Before a send — never before a queue —
 the current windows are read and appended, so a ping delivered from the queue
@@ -237,8 +280,9 @@ threshold is the knob if it ever is not.
 1. **A deliberate ping is never rate-limited.** Only hook fallbacks pass a
    rate-limit window; the model's contextual pings always go through the
    presence filter and nothing else.
-2. **Presence suppression never discards.** It queues, and the only thing that
-   discards a queued ping is staleness — logged, never silent.
+2. **Presence suppression never discards while the ping is still true.** It
+   queues; a queued ping is discarded only when it has gone stale or its session
+   has moved on — both logged, never silent.
 3. **Rate-limit stamps are per project.** One project's ping must not silence
    another's fallback. Paid for once — see tombstones.
 4. **At most one watcher.** A lock file holds the watcher's PID; a dead PID is

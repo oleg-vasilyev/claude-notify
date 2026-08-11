@@ -155,3 +155,11 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    code claims not to care about.
 5. Does any assertion stand on a `filter` or a `find` that could match nothing?
    Assert the selection is non-empty before asserting anything about it.
+6. **When the subject hardens a parser, does the fixture list include the input
+   that parses and *then* explodes?** The queue reader was written to survive
+   broken lines and tested against three of them — a truncated object, a missing
+   field, an empty line — all of which fail at `JSON.parse`. `null` is a valid
+   JSON document, so it sails through the `try` and throws on the first property
+   access, and one such line in `pending.jsonl` strands the whole queue with no
+   log line at all. Malformed is two categories, not one: **what will not parse,
+   and what parses into something that is not the shape.**

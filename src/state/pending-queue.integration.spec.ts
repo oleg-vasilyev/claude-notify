@@ -27,7 +27,11 @@ vi.mock("#state/file-locations.ts", () => ({
   lastSentFile: (project: string) => join(state, `last-sent-${project}.txt`),
 }));
 
-const A_PING = { queuedAt: 1_700_000_000_000, message: "[a] hello" };
+const A_PING = {
+  queuedAt: 1_700_000_000_000,
+  message: "[a] hello",
+  transcriptPath: "C:\\sessions\\one.jsonl",
+};
 
 describe("the state files", () => {
   beforeEach(() => {
@@ -46,7 +50,7 @@ describe("the state files", () => {
   });
 
   it("keeps queued pings in the order they arrived", () => {
-    const second = { queuedAt: A_PING.queuedAt + 1, message: "[b] later" };
+    const second = { ...A_PING, queuedAt: A_PING.queuedAt + 1, message: "[b] later" };
 
     appendPending(A_PING);
     appendPending(second);
@@ -61,6 +65,32 @@ describe("the state files", () => {
   it("survives a half-written line rather than losing the whole queue", () => {
     appendPending(A_PING);
     writeFileSync(join(state, "pending.jsonl"), `${JSON.stringify(A_PING)}\n{"queuedAt":`, "utf8");
+
+    expect(readPending()).toEqual([A_PING]);
+  });
+
+  it("reads a queue left by a version that knew nothing of transcripts", () => {
+    writeFileSync(
+      join(state, "pending.jsonl"),
+      `{"queuedAt":${A_PING.queuedAt},"message":"[a] hello"}\n`,
+      "utf8"
+    );
+
+    expect(readPending()).toEqual([{ ...A_PING, transcriptPath: null }]);
+  });
+
+  it("survives a line that parses to nothing at all, rather than stranding the whole queue", () => {
+    writeFileSync(join(state, "pending.jsonl"), `null\n${JSON.stringify(A_PING)}\n`, "utf8");
+
+    expect(readPending()).toEqual([A_PING]);
+  });
+
+  it("drops a queued line that lost its message rather than delivering a broken ping", () => {
+    writeFileSync(
+      join(state, "pending.jsonl"),
+      `{"queuedAt":${A_PING.queuedAt}}\n${JSON.stringify(A_PING)}\n`,
+      "utf8"
+    );
 
     expect(readPending()).toEqual([A_PING]);
   });

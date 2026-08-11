@@ -83,7 +83,18 @@ describe("deliver", () => {
     expect(appendPending).toHaveBeenCalledWith({
       queuedAt: expect.any(Number),
       message: "[a-project@home] жду апрув",
+      transcriptPath: null,
     });
+  });
+
+  it("queues the session's transcript with the ping, so the flush can ask whether it moved on", async () => {
+    vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
+
+    await deliver({ ...ping, transcriptPath: "C:\\sessions\\one.jsonl" });
+
+    expect(appendPending).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptPath: "C:\\sessions\\one.jsonl" })
+    );
   });
 
   it("starts a watcher for the queued ping", async () => {

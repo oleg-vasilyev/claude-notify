@@ -17,6 +17,9 @@ export type HookPing = {
 export const stillWorking = (event: HookEvent, payload: HookPayload): boolean =>
   event === HOOK_EVENT.stop && (payload.background_tasks ?? []).length > NOTHING_RUNNING;
 
+export const transcriptToWatch = (event: HookEvent, payload: HookPayload): string | null =>
+  event === HOOK_EVENT.stop ? (payload.transcript_path ?? null) : null;
+
 const shortened = (text: string): string => {
   if (text.length <= LONGEST_QUOTED_QUESTION) {
     return text;

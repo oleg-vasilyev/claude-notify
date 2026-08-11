@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
+import { pingFor, stillWorking, transcriptToWatch } from "#domain/ping/hook-ping.ts";
 
 
 const inProject: HookPayload = { cwd: "D:\\Temp\\another-project" };
@@ -21,6 +21,25 @@ describe("isHookEvent", () => {
 
   it("rejects anything else, so a typo in a hook registration cannot ping nonsense", () => {
     expect(isHookEvent("Whatever")).toBe(false);
+  });
+});
+
+describe("transcriptToWatch", () => {
+  const TRANSCRIPT = "C:\\sessions\\one.jsonl";
+  const withTranscript: HookPayload = { ...inProject, transcript_path: TRANSCRIPT };
+
+  it("watches the session a finished turn belongs to", () => {
+    expect(transcriptToWatch("Stop", withTranscript)).toBe(TRANSCRIPT);
+  });
+
+  it("watches nothing when the payload names no transcript", () => {
+    expect(transcriptToWatch("Stop", inProject)).toBeNull();
+  });
+
+  it("watches nothing while a turn is still running, since it writes as it goes", () => {
+    expect(transcriptToWatch("PermissionRequest", withTranscript)).toBeNull();
+    expect(transcriptToWatch("PreToolUse", withTranscript)).toBeNull();
+    expect(transcriptToWatch("Notification", withTranscript)).toBeNull();
   });
 });
 

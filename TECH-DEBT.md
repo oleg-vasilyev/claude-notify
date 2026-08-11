@@ -52,6 +52,30 @@ reusing the staleness rule as the give-up rule.
 
 ---
 
+## Only a finished turn's ping is checked against its session
+
+The rule that a queued ping must still be true — see `PLAN.md` — reaches `Stop`
+pings and nothing else. Two kinds are left out, for different reasons.
+
+**The model's own pings.** `notify.ts` is run as a shell command, so it gets no
+hook payload and no `transcript_path`, and these are the pings with the most to
+say. The path exists: the command runs with the project as its working
+directory, and Claude Code keeps one folder of transcripts per project. Picking
+the most recently written of them would be right whenever a project has one
+session open and wrong whenever it has two, which is why it is not guessed at
+today.
+
+**Mid-turn pings** — a permission wall, a question the app is holding. Their
+transcripts move while the wait is genuinely open, so the rule as measured would
+drop true pings. Deciding these needs a signal that a transcript's date is not:
+whether the *last* entry is the one that raised the wall.
+
+**Pick either up when a ping of that kind is seen arriving after its session
+moved on** — the model's, if `--transcript` can be passed by the caller instead
+of inferred; the mid-turn ones, only with a measurement of their own.
+
+---
+
 ## `hook-notification.ts` ships although its event has never fired
 
 A full day of real use produced zero `HOOK Notification` lines in the desktop

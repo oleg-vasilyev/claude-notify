@@ -1,12 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { impossible } from "#domain/impossible.ts";
-import { selectPending } from "#domain/ping/pending.ts";
+import { DROP, selectPending, transcriptPathsIn, type DroppedPing } from "#domain/ping/pending.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
 import { DELIVERY, readConfig } from "#state/config.ts";
 import { log } from "#state/log.ts";
 import { clearPending, readPending } from "#state/pending-queue.ts";
+import { modifiedTimesOf } from "#state/session-transcript.ts";
 import { claimWatcherLock, releaseWatcherLock } from "#state/watcher-lock.ts";
 import { ANSWERING_OUTCOME, collectAnswers, type AnsweringOutcome } from "#app/answering.ts";
 import { deliver } from "#app/deliver.ts";
@@ -50,6 +51,19 @@ const pauseAfter = (outcome: AnsweringOutcome): number => {
   }
 };
 
+const whyDropped = (dropped: DroppedPing): string => {
+  switch (dropped.kind) {
+    case DROP.stale:
+      return "DROP stale";
+
+    case DROP.movedOn:
+      return "DROP moved on";
+
+    default:
+      return impossible(dropped);
+  }
+};
+
 const flush = async (): Promise<void> => {
   const pending = readPending();
 
@@ -58,10 +72,13 @@ const flush = async (): Promise<void> => {
   const selection = selectPending(pending, {
     now: Date.now(),
     staleMinutes: config.staleMinutes,
+    transcriptModifiedAt: modifiedTimesOf(transcriptPathsIn(pending)),
   });
 
   for (const dropped of selection.dropped) {
-    log(`DROP stale (queued ${new Date(dropped.queuedAt).toISOString()}) | ${dropped.message}`);
+    const queuedAt = new Date(dropped.ping.queuedAt).toISOString();
+
+    log(`${whyDropped(dropped)} (queued ${queuedAt}) | ${dropped.ping.message}`);
   }
 
   for (const message of selection.deliver) {

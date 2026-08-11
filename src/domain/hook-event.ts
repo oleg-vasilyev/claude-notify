@@ -13,6 +13,7 @@ export type HookPayload = {
   cwd?: string;
   tool_name?: string;
   message?: string;
+  transcript_path?: string;
   background_tasks?: unknown[];
   tool_input?: {
     questions?: {

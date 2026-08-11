@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 
+const UNSAFE_IN_A_FILE_NAME = /[^\w-]/g;
+
 export const projectHome = (): string => fileURLToPath(new URL("../..", import.meta.url));
 
 export const envFile = (): string => process.env.CLAUDE_NOTIFY_ENV ?? join(projectHome(), ".env");
@@ -25,6 +27,9 @@ export const askedQuestionFile = (id: string): string =>
   join(stateHome(), `question-${id}.json`);
 
 export const answerFile = (id: string): string => join(stateHome(), `answer-${id}.json`);
+
+export const sessionNoteFile = (sessionId: string): string =>
+  join(stateHome(), `session-${sessionId.replace(UNSAFE_IN_A_FILE_NAME, "_")}.json`);
 
 export const updateOffsetFile = (): string => join(stateHome(), "update-offset.txt");
 

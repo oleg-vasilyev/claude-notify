@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { pingFor, stillWorking, transcriptToWatch } from "#domain/ping/hook-ping.ts";
+import { pingFor as maybePing, stillWorking, type HookPing } from "#domain/ping/hook-ping.ts";
+import type { HookEvent } from "#domain/hook-event.ts";
+
+
+const pingFor = (event: HookEvent, payload: HookPayload, quoting: boolean): HookPing => {
+  const ping = maybePing(event, payload, quoting);
+
+  if (ping === null) {
+    throw new Error(`${event} was expected to say something`);
+  }
+
+  return ping;
+};
 
 
 const inProject: HookPayload = { cwd: "D:\\Temp\\another-project" };
@@ -24,26 +36,11 @@ describe("isHookEvent", () => {
   });
 });
 
-describe("transcriptToWatch", () => {
-  const TRANSCRIPT = "C:\\sessions\\one.jsonl";
-  const withTranscript: HookPayload = { ...inProject, transcript_path: TRANSCRIPT };
-
-  it("watches the session a finished turn belongs to", () => {
-    expect(transcriptToWatch("Stop", withTranscript)).toBe(TRANSCRIPT);
-  });
-
-  it("watches nothing when the payload names no transcript", () => {
-    expect(transcriptToWatch("Stop", inProject)).toBeNull();
-  });
-
-  it("watches nothing while a turn is still running, since it writes as it goes", () => {
-    expect(transcriptToWatch("PermissionRequest", withTranscript)).toBeNull();
-    expect(transcriptToWatch("PreToolUse", withTranscript)).toBeNull();
-    expect(transcriptToWatch("Notification", withTranscript)).toBeNull();
-  });
-});
-
 describe("pingFor", () => {
+  it("says nothing when the user submits a prompt — that event only records that work resumed", () => {
+    expect(maybePing("UserPromptSubmit", inProject, QUOTING)).toBeNull();
+  });
+
   it("says the turn ended", () => {
     expect(pingFor("Stop", inProject, QUOTING).message).toBe("[another-project] закончил ход, ждёт тебя");
   });

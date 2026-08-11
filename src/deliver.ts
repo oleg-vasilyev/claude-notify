@@ -17,7 +17,7 @@ import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 export type PingRequest = {
   message: string;
   rateLimitMinutes: number;
-  transcriptPath?: string | null;
+  sessionId?: string | null;
   ignorePresence?: boolean;
 };
 
@@ -86,7 +86,7 @@ export const deliver = async (request: PingRequest): Promise<PingOutcome> => {
       appendPending({
         queuedAt: Date.now(),
         message,
-        transcriptPath: request.transcriptPath ?? null,
+        sessionId: request.sessionId ?? null,
       });
       log(`QUEUED idle=${verdict.idleSeconds}s | ${message}`);
 

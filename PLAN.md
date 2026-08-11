@@ -41,6 +41,7 @@ Two sources, deliberately redundant:
 | `PreToolUse` on `ExitPlanMode` | a plan awaits approval mid-turn | `план готов, жду апрув` |
 | `PermissionRequest` | a permission prompt is about to show | `просит разрешение: <tool>` |
 | `Notification` | permission prompts and idle waiting, per the docs | never observed to fire — see tombstones |
+| `UserPromptSubmit` | the user wrote into the session | nothing — it only records that work resumed |
 
 The mid-turn events matter because `Stop` cannot see them: a question dialog or
 a permission prompt suspends the turn without ending it. All four have now been
@@ -198,15 +199,15 @@ ping is *queued*, never lost; the rate limit drops, and may only drop the
 generic fallback pings that have a better sibling.
 
 **The queue.** Suppressed pings append to `pending.jsonl`, one JSON object per
-line, each carrying the moment it was queued, the message, and — when a hook put
-it there — the path of the session's transcript. A single background watcher
-polls idleness every 30 seconds; once the user has been away
-`min_idle_minutes`, it flushes: entries older than `stale_minutes` are dropped,
-entries whose session has moved on are dropped, and the rest are deduplicated to
-**one message per project, keeping the longest** — so the model's contextual
-ping beats the hook's generic one — and sent. The watcher then exits; it is
-spawned again by the next suppressed ping. An 8-hour deadline bounds a watcher
-outliving an all-day session; by then every entry is stale anyway.
+line, each carrying the moment it was queued, the message, and the session it
+came from. A single background watcher polls idleness every 30 seconds; once the
+user has been away `min_idle_minutes`, it flushes: entries older than
+`stale_minutes` are dropped, entries whose session is not waiting are **put
+back**, and the rest are deduplicated to **one message per project, keeping the
+longest** — so the model's contextual ping beats the hook's generic one — and
+sent. The watcher then exits; it is spawned again by the next suppressed ping.
+An 8-hour deadline bounds a watcher outliving an all-day session; by then every
+entry is stale anyway.
 
 **A queued ping describes a moment, and the moment can end before it is
 delivered.** "Закончил ход, ждёт тебя" is queued because the user is at the
@@ -221,25 +222,46 @@ user sat through the ping, so they saw the screen — and its premise fails the
 moment the user *acts*: the ping that started this rule was nine minutes old,
 well inside a fifteen-minute window, and false for eight of them.
 
-So the flush asks the session itself. A hook payload carries `transcript_path`,
-the file Claude Code appends every message of that session to; the queued ping
-remembers it, and at flush time its modification date answers the only question
-that matters — **has anything happened in that session since we queued this?**
-If it has, the session is not waiting and the ping is dropped as `moved on`.
+**So the queue stops asking whether a ping was true when it was written, and
+asks whether its session is waiting now.** That is the only question worth
+asking at the moment of delivery, and the events that answer it are already
+being logged:
 
-Three things make this a fact rather than a guess. It is the session's own
-record, not an inference from timing; it fails safe — a transcript that cannot
-be read, or a ping that carries none, is delivered exactly as before; and **only
-a finished turn carries a transcript at all.**
+| The session last did this | It is | A ping from it |
+| --- | --- | --- |
+| ended a turn (`Stop`) | waiting for the user | goes out |
+| took a prompt (`UserPromptSubmit`) | working | waits its turn |
+| hit a permission or a question | standing at a wall | goes out while the wall stands |
 
-That last one is the whole scope of the rule. A quiet transcript means "nothing
-is happening here" only once the turn is over. A ping raised mid-turn — a
-permission wall, a question the app is holding — is raised while the session is
-still writing: another tool in the same turn returns, its result is appended, and
-the transcript moves although the wall is still standing. Checking those pings
-would drop true ones, which costs hours, to avoid false ones, which cost a
-glance. So they are queued exactly as before and only `stale_minutes` reaches
-them.
+`UserPromptSubmit` exists only for this: it is the one registered event that
+sends no ping, because "the user came back" is the fact that makes every other
+ping from that session false.
+
+**A ping whose session is busy is held, never dropped.** The agent may stop five
+minutes later and still need somebody — so the entry goes back into the queue and
+is judged again at the next flush, at most thirty seconds later. Only
+`stale_minutes` ends that loop, which is what it was always for.
+
+The held ping is not deduplicated against the `Stop` ping that follows it, and on
+the main path it cannot be: with the user away, `Stop` sends immediately rather
+than queueing, so the contextual ping arrives on the next flush as a second
+message. Two messages a few seconds apart, one of which says what is actually
+wanted, beats one that says «закончил ход» — and the alternative, holding the
+generic ping back to see whether a better one is coming, would be guessing about
+the future.
+
+**A wall comes down without an event to say so.** Approving a permission
+produces no hook; the tool simply runs. But the tool call it was blocking has an
+id, the payload carries it, and the transcript records the answer against that
+same id — so the flush reads the tail of the transcript and asks whether that
+one call has been answered yet. Once it has, the user has already dealt with the
+wall in the app and the ping stays home. This costs one read per flush rather
+than a process per tool call, which is what registering `PostToolUse` would have
+cost.
+
+Everything here fails safe. A session nothing is known about, a ping carrying no
+session, a transcript that cannot be read — all deliver, because a false ping
+costs a glance and a swallowed one costs hours.
 
 **The five seconds of silence it waits for are measured, not chosen.** The hook
 fires at the end of a turn, and the transcript is still being written as it
@@ -305,8 +327,9 @@ threshold is the knob if it ever is not.
    rate-limit window; the model's contextual pings always go through the
    presence filter and nothing else.
 2. **Presence suppression never discards while the ping is still true.** It
-   queues; a queued ping is discarded only when it has gone stale or its session
-   has moved on — both logged, never silent.
+   queues; a queued ping goes out only while its session is waiting, waits in
+   the queue while that session works, and is discarded only by `stale_minutes`
+   — logged, never silent.
 3. **Rate-limit stamps are per project.** One project's ping must not silence
    another's fallback. Paid for once — see tombstones.
 4. **At most one watcher.** A lock file holds the watcher's PID; a dead PID is

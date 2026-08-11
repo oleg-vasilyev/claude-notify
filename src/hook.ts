@@ -1,7 +1,9 @@
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { pingFor, stillWorking, transcriptToWatch } from "#domain/ping/hook-ping.ts";
+import { pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
+import { noteAfter } from "#domain/ping/session-activity.ts";
 import { readConfig } from "#state/config.ts";
 import { flattenPayload, log } from "#state/log.ts";
+import { writeSessionNote } from "#state/session-note.ts";
 import { ask } from "#app/ask.ts";
 import { deliver } from "#app/deliver.ts";
 
@@ -39,17 +41,22 @@ log(`HOOK ${event} | ${flattenPayload(raw)}`);
 
 const payload = parsed(raw);
 
+if (payload.session_id !== undefined) {
+  writeSessionNote(payload.session_id, noteAfter(event, payload, Date.now()));
+}
+
 if (stillWorking(event, payload)) {
   log(`SKIP the turn ended but background work is still running | ${event}`);
 } else {
-  const answered = await ask(event, payload);
+  const ping = pingFor(event, payload, readConfig()?.quoteQuestions === true);
 
-  if (answered === null) {
-    await deliver({
-      ...pingFor(event, payload, readConfig()?.quoteQuestions === true),
-      transcriptPath: transcriptToWatch(event, payload),
-    });
-  } else if (Object.keys(answered).length > NOTHING_TO_SAY) {
-    process.stdout.write(JSON.stringify(answered));
+  if (ping !== null) {
+    const answered = await ask(event, payload);
+
+    if (answered === null) {
+      await deliver({ ...ping, sessionId: payload.session_id ?? null });
+    } else if (Object.keys(answered).length > NOTHING_TO_SAY) {
+      process.stdout.write(JSON.stringify(answered));
+    }
   }
 }

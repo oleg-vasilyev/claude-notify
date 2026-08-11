@@ -13,6 +13,7 @@ const { values } = parseArgs({
   options: {
     message: { type: "string", short: "m" },
     project: { type: "string" },
+    session: { type: "string" },
     "rate-limit-minutes": { type: "string", default: "0" },
     now: { type: "boolean", default: false },
   },
@@ -29,6 +30,7 @@ if (said === "") {
 const outcome = await deliver({
   message: underProject(said, projectPrefixOf(values.project ?? process.cwd())),
   rateLimitMinutes: numberOr(values["rate-limit-minutes"], NEVER_RATE_LIMITED),
+  sessionId: values.session ?? null,
   ignorePresence: values.now,
 });
 

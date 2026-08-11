@@ -83,17 +83,17 @@ describe("deliver", () => {
     expect(appendPending).toHaveBeenCalledWith({
       queuedAt: expect.any(Number),
       message: "[a-project@home] жду апрув",
-      transcriptPath: null,
+      sessionId: null,
     });
   });
 
-  it("queues the session's transcript with the ping, so the flush can ask whether it moved on", async () => {
+  it("queues the session with the ping, so the flush can ask whether it is waiting yet", async () => {
     vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
 
-    await deliver({ ...ping, transcriptPath: "C:\\sessions\\one.jsonl" });
+    await deliver({ ...ping, sessionId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" });
 
     expect(appendPending).toHaveBeenCalledWith(
-      expect.objectContaining({ transcriptPath: "C:\\sessions\\one.jsonl" })
+      expect.objectContaining({ sessionId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" })
     );
   });
 

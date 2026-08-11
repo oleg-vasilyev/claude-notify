@@ -1,50 +1,69 @@
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { modifiedTimesOf } from "#state/session-transcript.ts";
+import { toolHasAnswered } from "#state/session-transcript.ts";
 
 
-const MILLISECONDS_PER_SECOND = 1000;
-const WRITTEN_AT_SECONDS = 1_700_000_000;
+const TOOL_USE = "toolu_0000000000000000000001";
+const ANOTHER_TOOL_USE = "toolu_0000000000000000000002";
+const PADDING_LINES = 4000;
 
 const folder = mkdtempSync(join(tmpdir(), "claude-notify-transcripts-"));
 
-const transcript = (name: string, atSeconds: number): string => {
+const asked = (id: string): string =>
+  JSON.stringify({
+    type: "assistant",
+    message: { role: "assistant", content: [{ type: "tool_use", id, name: "Bash" }] },
+  });
+
+const answered = (id: string): string =>
+  JSON.stringify({
+    type: "user",
+    message: { role: "user", content: [{ type: "tool_result", tool_use_id: id }] },
+  });
+
+const transcript = (name: string, lines: string[]): string => {
   const path = join(folder, name);
 
-  writeFileSync(path, "{}\n", "utf8");
-  utimesSync(path, atSeconds, atSeconds);
+  writeFileSync(path, `${lines.join("\n")}\n`, "utf8");
 
   return path;
 };
 
-describe("modifiedTimesOf", () => {
+describe("toolHasAnswered", () => {
   afterAll(() => {
     rmSync(folder, { recursive: true, force: true });
   });
 
-  it("reports when a session was last written to", () => {
-    const path = transcript("one.jsonl", WRITTEN_AT_SECONDS);
+  it("sees the answer to a tool call, which is the wall coming down", () => {
+    const path = transcript("answered.jsonl", [asked(TOOL_USE), answered(TOOL_USE)]);
 
-    expect(modifiedTimesOf([path]).get(path)).toBe(WRITTEN_AT_SECONDS * MILLISECONDS_PER_SECOND);
+    expect(toolHasAnswered(path, TOOL_USE)).toBe(true);
   });
 
-  it("says nothing about a transcript that is not there, rather than guessing a time", () => {
-    const missing = join(folder, "never-written.jsonl");
+  it("sees a tool call still waiting, which is the wall still standing", () => {
+    const path = transcript("waiting.jsonl", [asked(TOOL_USE)]);
 
-    expect(modifiedTimesOf([missing]).has(missing)).toBe(false);
+    expect(toolHasAnswered(path, TOOL_USE)).toBe(false);
   });
 
-  it("keeps the transcripts it can read when one of them is missing", () => {
-    const path = transcript("two.jsonl", WRITTEN_AT_SECONDS);
+  it("does not mistake another tool call's answer for this one", () => {
+    const path = transcript("other.jsonl", [asked(TOOL_USE), answered(ANOTHER_TOOL_USE)]);
 
-    expect([...modifiedTimesOf([join(folder, "gone.jsonl"), path]).keys()]).toEqual([path]);
+    expect(toolHasAnswered(path, TOOL_USE)).toBe(false);
   });
 
-  it("asks about nothing and answers with nothing", () => {
-    expect(modifiedTimesOf([]).size).toBe(0);
+  it("finds an answer at the end of a transcript far larger than it reads", () => {
+    const padding = Array.from({ length: PADDING_LINES }, () => answered(ANOTHER_TOOL_USE));
+    const path = transcript("long.jsonl", [asked(TOOL_USE), ...padding, answered(TOOL_USE)]);
+
+    expect(toolHasAnswered(path, TOOL_USE)).toBe(true);
+  });
+
+  it("says the wall still stands when the transcript cannot be read at all", () => {
+    expect(toolHasAnswered(join(folder, "never-written.jsonl"), TOOL_USE)).toBe(false);
   });
 });

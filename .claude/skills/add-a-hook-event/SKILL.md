@@ -52,6 +52,26 @@ Cyrillic question shipped as mojibake while every test passed.
 
 Copy `payload.json` and edit the copy for an event that needs a different shape.
 
+## When the log cannot answer, build a throwaway and ask
+
+The log only shows events already registered, and shows nothing at all about
+what Claude Code hands a process by other means. Both were answered in minutes
+by disposable probes rather than by reasoning:
+
+- **A probe MCP server** — twenty lines that dump `process.env` and the tool
+  call's `extra` to a file, registered with `claude mcp add`, driven by one
+  `claude -p` run from a chosen directory. That is how
+  `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PROJECT_DIR` were found; neither is
+  documented, and the whole session-activity design rests on them.
+- **A probe project** — a temp directory whose own `.claude/settings.json`
+  registers a logging hook for every event you are curious about, including the
+  ones this product does not use. Project scope means the user's global settings
+  are never touched. That is how `UserPromptSubmit` was confirmed to fire, and
+  how a denied tool was shown to produce `PreToolUse` with no `PostToolUse`.
+
+Remove the registration and the files afterwards, and say in the commit that the
+fact was measured rather than read — the next person will want to know which.
+
 ## The two hazards in the installer
 
 - **Duplicate registrations.** Setup replaces its own entries by looking for the

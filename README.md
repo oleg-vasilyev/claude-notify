@@ -135,8 +135,7 @@ Everything the notifier decides is one line in
 | `SENT` | delivered |
 | `SENT via relay` | delivered by handing it to another machine, which sends it on |
 | `QUEUED idle=Ns` | you were at the keyboard; the watcher delivers it once you leave |
-| `DROP stale` | it sat queued longer than `stale_minutes` — you were here all along |
-| `DROP moved on` | you answered and the session went back to work while the ping waited, so it was no longer true |
+| `DROP stale` | it sat queued longer than `stale_minutes` — you were here all along, or its session never stopped |
 | `SKIP rate-limit [proj]` | that project pinged too recently |
 | `HOOK <event>` | a Claude Code hook fired, with its payload |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
@@ -171,8 +170,9 @@ src/domain/     every decision, pure — no files, no network, no clock
   ping/         what to say, and whether to say it now
     delivery.ts       send, queue, or skip
     hook-ping.ts      what each Claude Code event has to say
-    pending.ts        which queued pings are still true, and which one wins per project
+    pending.ts        which queued pings may go now, and which one wins per project
     ping-tool.ts      what the model's own ping tool says, and how it reports back
+    session-activity.ts  whether a session is working, waiting, or stuck at a wall
     usage.ts          the limits line
   asking/       putting a question on the phone, and reading the answer
     answer.ts         which Telegram update answers which question
@@ -192,7 +192,8 @@ src/state/      what this product remembers between runs
   last-sent.ts      one stamp per project, for the rate limit
   log.ts            the one log file every decision lands in
   pending-queue.ts  pings held back while you were at the keyboard
-  session-transcript.ts when Claude Code last wrote to a session's own record
+  session-note.ts   what each session was last seen doing
+  session-transcript.ts whether a tool call has been answered in a session's record
   update-offset.ts  how far the watcher has read Telegram
   watcher-lock.ts   who is delivering the queue right now
 src/presence/idle-time.ts   how long since you touched anything (win32 via koffi)

@@ -1,16 +1,29 @@
-import { statSync } from "node:fs";
+import { openSync, readSync, statSync, closeSync } from "node:fs";
 
 
-export const modifiedTimesOf = (paths: readonly string[]): Map<string, number> => {
-  const times = new Map<string, number>();
+const TAIL_BYTES = 512 * 1024;
+const FROM_THE_START = 0;
 
-  for (const path of paths) {
-    try {
-      times.set(path, statSync(path).mtimeMs);
-    } catch {
-      continue;
-    }
+const tailOf = (path: string): string => {
+  const file = openSync(path, "r");
+
+  try {
+    const size = statSync(path).size;
+    const from = size > TAIL_BYTES ? size - TAIL_BYTES : FROM_THE_START;
+    const buffer = Buffer.alloc(size - from);
+
+    readSync(file, buffer, FROM_THE_START, buffer.length, from);
+
+    return buffer.toString("utf8");
+  } finally {
+    closeSync(file);
   }
+};
 
-  return times;
+export const toolHasAnswered = (transcriptPath: string, toolUseId: string): boolean => {
+  try {
+    return tailOf(transcriptPath).includes(`"tool_use_id":"${toolUseId}"`);
+  } catch {
+    return false;
+  }
 };

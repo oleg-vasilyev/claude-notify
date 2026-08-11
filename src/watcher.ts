@@ -1,13 +1,15 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { impossible } from "#domain/impossible.ts";
-import { DROP, selectPending, transcriptPathsIn, type DroppedPing } from "#domain/ping/pending.ts";
+import { selectPending, sessionsIn, type PendingPing } from "#domain/ping/pending.ts";
+import { mayGoOut, wallToCheck } from "#domain/ping/session-activity.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
 import { DELIVERY, readConfig } from "#state/config.ts";
 import { log } from "#state/log.ts";
-import { clearPending, readPending } from "#state/pending-queue.ts";
-import { modifiedTimesOf } from "#state/session-transcript.ts";
+import { appendPending, clearPending, readPending } from "#state/pending-queue.ts";
+import { readSessionNote } from "#state/session-note.ts";
+import { toolHasAnswered } from "#state/session-transcript.ts";
 import { claimWatcherLock, releaseWatcherLock } from "#state/watcher-lock.ts";
 import { ANSWERING_OUTCOME, collectAnswers, type AnsweringOutcome } from "#app/answering.ts";
 import { deliver } from "#app/deliver.ts";
@@ -51,34 +53,41 @@ const pauseAfter = (outcome: AnsweringOutcome): number => {
   }
 };
 
-const whyDropped = (dropped: DroppedPing): string => {
-  switch (dropped.kind) {
-    case DROP.stale:
-      return "DROP stale";
+const sessionsThatMustWait = (pending: readonly PendingPing[]): Set<string> => {
+  const waiting = new Set<string>();
 
-    case DROP.movedOn:
-      return "DROP moved on";
+  for (const sessionId of sessionsIn(pending)) {
+    const note = readSessionNote(sessionId);
+    const wall = note === null ? null : wallToCheck(note);
+    const cameDown = wall !== null && toolHasAnswered(wall.transcriptPath, wall.toolUseId);
 
-    default:
-      return impossible(dropped);
+    if (!mayGoOut(note, cameDown)) {
+      waiting.add(sessionId);
+    }
   }
+
+  return waiting;
 };
 
 const flush = async (): Promise<void> => {
   const pending = readPending();
 
-  clearPending();
-
   const selection = selectPending(pending, {
     now: Date.now(),
     staleMinutes: config.staleMinutes,
-    transcriptModifiedAt: modifiedTimesOf(transcriptPathsIn(pending)),
+    sessionsThatMustWait: sessionsThatMustWait(pending),
   });
 
-  for (const dropped of selection.dropped) {
-    const queuedAt = new Date(dropped.ping.queuedAt).toISOString();
+  clearPending();
 
-    log(`${whyDropped(dropped)} (queued ${queuedAt}) | ${dropped.ping.message}`);
+  for (const ping of selection.held) {
+    appendPending(ping);
+  }
+
+  for (const dropped of selection.dropped) {
+    const queuedAt = new Date(dropped.queuedAt).toISOString();
+
+    log(`DROP stale (queued ${queuedAt}) | ${dropped.message}`);
   }
 
   for (const message of selection.deliver) {

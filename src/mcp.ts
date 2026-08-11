@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import {
   MCP_SERVER_NAME,
+  notifyArgv,
   PING_TOOL,
   PING_TOOL_DESCRIPTION,
   PING_TOOL_TITLE,
@@ -22,7 +23,12 @@ const notifyEntry = fileURLToPath(new URL("./notify.ts", import.meta.url));
 
 const spokenBy = async (message: string): Promise<ToolAnswer> =>
   new Promise((settle) => {
-    const notify = spawn(process.execPath, [notifyEntry, "--message", message], {
+    const argv = notifyArgv(notifyEntry, message, {
+      id: process.env.CLAUDE_CODE_SESSION_ID,
+      projectDirectory: process.env.CLAUDE_PROJECT_DIR,
+    });
+
+    const notify = spawn(process.execPath, argv, {
       cwd: process.cwd(),
       windowsHide: true,
     });

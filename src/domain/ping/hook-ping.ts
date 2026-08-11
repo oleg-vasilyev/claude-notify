@@ -17,8 +17,6 @@ export type HookPing = {
 export const stillWorking = (event: HookEvent, payload: HookPayload): boolean =>
   event === HOOK_EVENT.stop && (payload.background_tasks ?? []).length > NOTHING_RUNNING;
 
-export const transcriptToWatch = (event: HookEvent, payload: HookPayload): string | null =>
-  event === HOOK_EVENT.stop ? (payload.transcript_path ?? null) : null;
 
 const shortened = (text: string): string => {
   if (text.length <= LONGEST_QUOTED_QUESTION) {
@@ -50,10 +48,13 @@ export const pingFor = (
   event: HookEvent,
   payload: HookPayload,
   quoting: boolean
-): HookPing => {
+): HookPing | null => {
   const project = projectPrefixOf(payload.cwd);
 
   switch (event) {
+    case HOOK_EVENT.userPromptSubmit:
+      return null;
+
     case HOOK_EVENT.stop:
       return {
         message: project + copy.turnEnded,

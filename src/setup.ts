@@ -111,6 +111,7 @@ const REGISTRATIONS: Registration[] = [
     command: askCommand(HOOK_EVENT.preToolUse),
   },
   { event: HOOK_EVENT.permissionRequest, command: askCommand(HOOK_EVENT.permissionRequest) },
+  { event: HOOK_EVENT.userPromptSubmit, command: pingCommand(HOOK_EVENT.userPromptSubmit) },
 ];
 
 const ask = async (question: string): Promise<string> => {

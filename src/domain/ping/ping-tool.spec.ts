@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  notifyArgv,
   nothingWasSent,
   outcomeReport,
   PING_OUTCOME,
@@ -96,6 +97,38 @@ describe("toolAnswer", () => {
 
   it("counts a notifier that died without a code as a failure", () => {
     expect(toolAnswer("anything", "", null).failed).toBe(true);
+  });
+});
+
+describe("notifyArgv", () => {
+  const ENTRY = "D:\\Temp\\a-project\\src\\notify.ts";
+  const SESSION = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+  const PROJECT = "D:\\Temp\\a-project";
+
+  it("carries the session so a queued ping can be held while that session works", () => {
+    const argv = notifyArgv(ENTRY, "жду выбор", { id: SESSION, projectDirectory: PROJECT });
+
+    expect(argv).toEqual([ENTRY, "--message", "жду выбор", "--session", SESSION, "--project", PROJECT]);
+  });
+
+  it("still pings when the environment names no session, losing only the holding", () => {
+    const argv = notifyArgv(ENTRY, "жду выбор", { id: undefined, projectDirectory: PROJECT });
+
+    expect(argv).toEqual([ENTRY, "--message", "жду выбор", "--project", PROJECT]);
+  });
+
+  it("still pings when the environment names no project, falling back to the working directory", () => {
+    const argv = notifyArgv(ENTRY, "жду выбор", { id: SESSION, projectDirectory: undefined });
+
+    expect(argv).toEqual([ENTRY, "--message", "жду выбор", "--session", SESSION]);
+  });
+
+  it("treats an empty variable as an absent one, since a blank flag is worse than none", () => {
+    expect(notifyArgv(ENTRY, "жду выбор", { id: "", projectDirectory: "" })).toEqual([
+      ENTRY,
+      "--message",
+      "жду выбор",
+    ]);
   });
 });
 

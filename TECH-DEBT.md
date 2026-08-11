@@ -52,30 +52,16 @@ reusing the staleness rule as the give-up rule.
 
 ---
 
-## Only a finished turn's ping is checked against its session
+## A session note is written and never swept up
 
-The rule that a queued ping must still be true — see `PLAN.md` — reaches `Stop`
-pings and nothing else. Two kinds are left out, for different reasons.
+Every hook writes `session-<id>.json` into the state directory, and nothing
+deletes it. `SessionEnd` was not observed firing in a headless run, so there is
+no reliable event to delete on, and a machine accumulates one small file per
+session forever — a few hundred bytes each, so this is untidiness rather than a
+problem.
 
-**The model's own pings.** `ping_user` reaches `deliver` through `notify.ts`, and
-neither knows which session called: MCP hands a tool a message, not a transcript.
-These are the pings with the most to say, and the tool's own advice makes the gap
-sharper — it tells the model to carry on rather than wait, so the ping most
-likely to be overtaken by its own author is the one nothing can drop. The
-transcript is guessable: the server runs in the project's directory, and Claude
-Code keeps one folder of transcripts per project, so the most recently written
-would be right whenever a project has one session open and wrong whenever it has
-two. MCP's own answer is better — a tool call carries no session, but the client
-declares `roots`, and a future protocol revision may carry more.
-
-**Mid-turn pings** — a permission wall, a question the app is holding. Their
-transcripts move while the wait is genuinely open, so the rule as measured would
-drop true pings. Deciding these needs a signal that a transcript's date is not:
-whether the *last* entry is the one that raised the wall.
-
-**Pick either up when a ping of that kind is seen arriving after its session
-moved on** — the model's, if `--transcript` can be passed by the caller instead
-of inferred; the mid-turn ones, only with a measurement of their own.
+**Sweep notes untouched for a day, the first time the state directory is
+annoying to read**, or fold it into whatever ends up rotating `log.txt`.
 
 ---
 
@@ -97,21 +83,21 @@ config directly rather than asking the CLI.
 
 ---
 
-## The ping tool trusts its own working directory to name the project
+## The ping tool reads Claude Code's environment, which is not a contract
 
-`mcp.ts` derives the `[project]` prefix from `process.cwd()`, because Claude Code
-spawns an MCP server in the directory of the session that owns it. That is
-observed behaviour, not a documented promise. If it ever changes — a server
-shared between sessions, a spawn from the user's home directory — every ping
-from every project would be filed under one wrong name, and the only symptom is
-a prefix nobody reads carefully.
+`mcp.ts` takes `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PROJECT_DIR` from the
+environment Claude Code spawns it with — measured with a throwaway MCP server,
+not documented anywhere. They are the only way a tool call can know which session
+made it, since MCP itself hands a tool nothing but its arguments. If either
+disappears, the tool keeps working and loses a property each: no session means
+its pings are never held for a busy session, no project directory means the
+prefix falls back to the server's working directory.
 
-MCP has the authoritative answer already: the client can declare `roots`, and a
-server may ask for them. It is not used here because one source of truth beats
-two, and the simpler one works today.
+Both failures are silent and both fail safe, which is why this is a note rather
+than a guard.
 
-**Ask for the roots the first time a ping arrives under a project the session
-was not in.**
+**Look here first if tool pings start arriving under the wrong project, or stop
+being held while a session works.**
 
 ---
 

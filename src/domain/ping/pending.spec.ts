@@ -1,28 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { DROP, selectPending, transcriptPathsIn, type PendingPing } from "#domain/ping/pending.ts";
+import { selectPending, sessionsIn, type PendingPing } from "#domain/ping/pending.ts";
 
 
 const NOW = Date.parse("2026-08-07T12:00:00Z");
 const MINUTE = 60_000;
-const SECOND = 1_000;
 const STALE_MINUTES = 15;
-const SETTLING_SECONDS = 5;
-const TRANSCRIPT = "C:\\sessions\\one.jsonl";
+const A_SESSION = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+const ANOTHER_SESSION = "11111111-2222-3333-4444-555555555555";
+const NOBODY_WAITS = new Set<string>();
 
 const queued = (minutesAgo: number, message: string): PendingPing => ({
   queuedAt: NOW - minutesAgo * MINUTE,
   message,
-  transcriptPath: null,
+  sessionId: null,
 });
 
-const followed = (ping: PendingPing, transcriptPath: string): PendingPing => ({
-  ...ping,
-  transcriptPath,
-});
+const from = (ping: PendingPing, sessionId: string): PendingPing => ({ ...ping, sessionId });
 
-const select = (pending: PendingPing[], transcriptModifiedAt = new Map<string, number>()) =>
-  selectPending(pending, { now: NOW, staleMinutes: STALE_MINUTES, transcriptModifiedAt });
+const select = (pending: PendingPing[], sessionsThatMustWait: ReadonlySet<string> = NOBODY_WAITS) =>
+  selectPending(pending, { now: NOW, staleMinutes: STALE_MINUTES, sessionsThatMustWait });
 
 describe("selectPending", () => {
   it("delivers a fresh ping", () => {
@@ -30,13 +27,14 @@ describe("selectPending", () => {
 
     expect(selection.deliver).toEqual(["[a] hello"]);
     expect(selection.dropped).toEqual([]);
+    expect(selection.held).toEqual([]);
   });
 
   it("drops a ping that went stale while the user sat through it", () => {
     const selection = select([queued(20, "[a] old news")]);
 
     expect(selection.deliver).toEqual([]);
-    expect(selection.dropped).toEqual([{ kind: DROP.stale, ping: queued(20, "[a] old news") }]);
+    expect(selection.dropped).toEqual([queued(20, "[a] old news")]);
   });
 
   it("keeps a ping that is exactly at the staleness edge", () => {
@@ -77,7 +75,7 @@ describe("selectPending", () => {
   });
 
   it("handles an empty queue", () => {
-    expect(select([])).toEqual({ deliver: [], dropped: [] });
+    expect(select([])).toEqual({ deliver: [], dropped: [], held: [] });
   });
 
   it("reports every dropped ping, not just the first", () => {
@@ -85,69 +83,64 @@ describe("selectPending", () => {
   });
 });
 
-describe("selectPending, when the session it describes has moved on", () => {
-  const ping = followed(queued(9, "[a] the turn ended"), TRANSCRIPT);
+describe("selectPending, when a session is not waiting yet", () => {
+  const busy = new Set([A_SESSION]);
 
-  const withTranscriptWrittenAt = (at: number) => select([ping], new Map([[TRANSCRIPT, at]]));
-
-  it("drops a ping whose transcript grew after it was queued", () => {
-    const selection = withTranscriptWrittenAt(NOW - MINUTE);
+  it("holds a ping whose session is still working, rather than dropping it", () => {
+    const ping = from(queued(2, "[a] a fork only you can settle"), A_SESSION);
+    const selection = select([ping], busy);
 
     expect(selection.deliver).toEqual([]);
-    expect(selection.dropped).toEqual([{ kind: DROP.movedOn, ping }]);
+    expect(selection.dropped).toEqual([]);
+    expect(selection.held).toEqual([ping]);
   });
 
-  it("keeps a ping whose transcript has not moved since", () => {
-    expect(withTranscriptWrittenAt(ping.queuedAt).deliver).toEqual(["[a] the turn ended"]);
+  it("delivers a ping from a session that has stopped and is waiting", () => {
+    const ping = from(queued(2, "[a] waiting for your approval"), ANOTHER_SESSION);
+
+    expect(select([ping], busy).deliver).toEqual(["[a] waiting for your approval"]);
   });
 
-  it("keeps a ping through the writes the hook's own turn causes", () => {
-    const settled = ping.queuedAt + SETTLING_SECONDS * SECOND;
-
-    expect(withTranscriptWrittenAt(settled).deliver).toEqual(["[a] the turn ended"]);
-    expect(withTranscriptWrittenAt(settled + SECOND).deliver).toEqual([]);
+  it("delivers a ping that names no session, since nothing says to wait", () => {
+    expect(select([queued(2, "[a] by hand")], busy).deliver).toEqual(["[a] by hand"]);
   });
 
-  it("keeps a ping whose transcript could not be read at all", () => {
-    expect(select([ping]).deliver).toEqual(["[a] the turn ended"]);
+  it("drops a held ping once it goes stale, so nothing waits forever", () => {
+    const ping = from(queued(20, "[a] a fork only you can settle"), A_SESSION);
+    const selection = select([ping], busy);
+
+    expect(selection.held).toEqual([]);
+    expect(selection.dropped).toEqual([ping]);
   });
 
-  it("keeps a ping that carries no transcript, since nothing says it moved on", () => {
-    const byHand = queued(9, "[a] waiting on you");
+  it("lets one project's other session through while this one waits", () => {
+    const busyPing = from(queued(2, "[a] short"), A_SESSION);
+    const freePing = from(queued(1, "[a] another session is already waiting for you"), ANOTHER_SESSION);
 
-    expect(select([byHand], new Map([[TRANSCRIPT, NOW]])).deliver).toEqual(["[a] waiting on you"]);
+    expect(select([busyPing, freePing], busy).deliver).toEqual(["[a] another session is already waiting for you"]);
   });
 
-  it("prefers staleness as the reason when a ping is both stale and left behind", () => {
-    const old = followed(queued(20, "[a] old news"), TRANSCRIPT);
+  it("does not let a held ping win the dedupe and silence a deliverable one", () => {
+    const busyPing = from(queued(2, "[a] a very long message from the session that is busy"), A_SESSION);
+    const freePing = from(queued(1, "[a] brief"), ANOTHER_SESSION);
 
-    expect(select([old], new Map([[TRANSCRIPT, NOW]])).dropped).toEqual([
-      { kind: DROP.stale, ping: old },
-    ]);
-  });
-
-  it("lets a project's other session still be delivered", () => {
-    const other = followed(queued(2, "[a] another session is waiting"), "C:\\sessions\\two.jsonl");
-
-    expect(select([ping, other], new Map([[TRANSCRIPT, NOW]])).deliver).toEqual([
-      "[a] another session is waiting",
-    ]);
+    expect(select([busyPing, freePing], busy).deliver).toEqual(["[a] brief"]);
   });
 });
 
-describe("transcriptPathsIn", () => {
-  it("collects every transcript worth asking about, once", () => {
-    const paths = transcriptPathsIn([
-      followed(queued(1, "[a] one"), TRANSCRIPT),
-      followed(queued(1, "[a] two"), TRANSCRIPT),
+describe("sessionsIn", () => {
+  it("collects every session worth asking about, once", () => {
+    const sessions = sessionsIn([
+      from(queued(1, "[a] one"), A_SESSION),
+      from(queued(1, "[a] two"), A_SESSION),
       queued(1, "[b] three"),
-      followed(queued(1, "[b] four"), "C:\\sessions\\two.jsonl"),
+      from(queued(1, "[b] four"), ANOTHER_SESSION),
     ]);
 
-    expect(paths).toEqual([TRANSCRIPT, "C:\\sessions\\two.jsonl"]);
+    expect(sessions).toEqual([A_SESSION, ANOTHER_SESSION]);
   });
 
-  it("asks about nothing when no ping carries a transcript", () => {
-    expect(transcriptPathsIn([queued(1, "[a] one")])).toEqual([]);
+  it("asks about nothing when no ping names a session", () => {
+    expect(sessionsIn([queued(1, "[a] one")])).toEqual([]);
   });
 });

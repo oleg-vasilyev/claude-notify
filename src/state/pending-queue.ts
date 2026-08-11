@@ -24,7 +24,7 @@ const pendingFrom = (line: string): PendingPing | null => {
   return {
     queuedAt: parsed.queuedAt,
     message: parsed.message,
-    transcriptPath: typeof parsed.transcriptPath === "string" ? parsed.transcriptPath : null,
+    sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : null,
   };
 };
 

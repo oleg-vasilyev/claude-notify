@@ -30,7 +30,7 @@ vi.mock("#state/file-locations.ts", () => ({
 const A_PING = {
   queuedAt: 1_700_000_000_000,
   message: "[a] hello",
-  transcriptPath: "C:\\sessions\\one.jsonl",
+  sessionId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 };
 
 describe("the state files", () => {
@@ -69,14 +69,14 @@ describe("the state files", () => {
     expect(readPending()).toEqual([A_PING]);
   });
 
-  it("reads a queue left by a version that knew nothing of transcripts", () => {
+  it("reads a queue left by a version that knew nothing of sessions", () => {
     writeFileSync(
       join(state, "pending.jsonl"),
       `{"queuedAt":${A_PING.queuedAt},"message":"[a] hello"}\n`,
       "utf8"
     );
 
-    expect(readPending()).toEqual([{ ...A_PING, transcriptPath: null }]);
+    expect(readPending()).toEqual([{ ...A_PING, sessionId: null }]);
   });
 
   it("survives a line that parses to nothing at all, rather than stranding the whole queue", () => {

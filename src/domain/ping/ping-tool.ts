@@ -73,6 +73,22 @@ export const nothingWasSent = (outcome: PingOutcome): boolean => {
   }
 };
 
+export type Session = { id: string | undefined; projectDirectory: string | undefined };
+
+export const notifyArgv = (entryPoint: string, message: string, session: Session): string[] => {
+  const argv = [entryPoint, "--message", message];
+
+  if (session.id !== undefined && session.id !== "") {
+    argv.push("--session", session.id);
+  }
+
+  if (session.projectDirectory !== undefined && session.projectDirectory !== "") {
+    argv.push("--project", session.projectDirectory);
+  }
+
+  return argv;
+};
+
 export type ToolAnswer = { said: string; failed: boolean };
 
 export const toolAnswer = (said: string, complained: string, exitCode: number | null): ToolAnswer => {

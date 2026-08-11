@@ -1,5 +1,6 @@
 const SECONDS_PER_MINUTE = 60;
 const MILLISECONDS_PER_MINUTE = 60_000;
+const NOT_YET_SENT = 0;
 
 export type DeliveryFacts = {
   idleSeconds: number;
@@ -32,8 +33,12 @@ export const decideDelivery = (facts: DeliveryFacts): DeliveryVerdict => {
   }
 
   const sinceLastSentMinutes = minutesSinceLastSent(facts);
+  const insideTheWindow =
+    sinceLastSentMinutes !== null &&
+    sinceLastSentMinutes >= NOT_YET_SENT &&
+    sinceLastSentMinutes < facts.rateLimitMinutes;
 
-  if (sinceLastSentMinutes !== null && sinceLastSentMinutes < facts.rateLimitMinutes) {
+  if (insideTheWindow) {
     return { kind: DELIVERY_VERDICT.skip, sinceLastSentMinutes };
   }
 

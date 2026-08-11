@@ -1,6 +1,6 @@
 import { copy } from "#domain/copy.ru.ts";
 import type { ReceivedAnswer } from "#domain/asking/answer.ts";
-import type { HookEvent } from "#domain/ping/hook-ping.ts";
+import type { HookEvent } from "#domain/hook-event.ts";
 import { ALLOW, QUESTION_KIND, type AskedQuestion } from "#domain/asking/question.ts";
 
 

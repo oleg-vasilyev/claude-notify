@@ -1,5 +1,6 @@
 import { copy } from "#domain/copy.ru.ts";
-import { projectPrefixOf } from "#domain/ping/project.ts";
+import { HOOK_EVENT, type HookEvent, type HookPayload } from "#domain/hook-event.ts";
+import { projectPrefixOf } from "#domain/project.ts";
 
 
 const TURN_END_RATE_LIMIT_MINUTES = 10;
@@ -8,37 +9,10 @@ const LONGEST_QUOTED_QUESTION = 180;
 const ELLIPSIS = "…";
 const NOTHING_RUNNING = 0;
 
-export const HOOK_EVENT = {
-  stop: "Stop",
-  preToolUse: "PreToolUse",
-  permissionRequest: "PermissionRequest",
-  notification: "Notification",
-} as const;
-
-export const HOOK_EVENTS = Object.values(HOOK_EVENT);
-
-export type HookEvent = (typeof HOOK_EVENT)[keyof typeof HOOK_EVENT];
-
-export type HookPayload = {
-  cwd?: string;
-  tool_name?: string;
-  message?: string;
-  background_tasks?: unknown[];
-  tool_input?: {
-    questions?: {
-      question?: string;
-      options?: { label?: string; description?: string }[];
-    }[];
-  };
-};
-
 export type HookPing = {
   message: string;
   rateLimitMinutes: number;
 };
-
-export const isHookEvent = (candidate: string): candidate is HookEvent =>
-  (HOOK_EVENTS as readonly string[]).includes(candidate);
 
 export const stillWorking = (event: HookEvent, payload: HookPayload): boolean =>
   event === HOOK_EVENT.stop && (payload.background_tasks ?? []).length > NOTHING_RUNNING;

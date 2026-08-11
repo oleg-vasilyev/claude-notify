@@ -69,6 +69,11 @@ Three rules about running it, and the first is the one that costs money:
   and all three were one `catch` broad enough to swallow the difference;
   narrowing it to the one call that can really fail killed two and left better
   code. Look at the code before reaching for an assertion.
+- **This gate pays you for deleting guards, so raising it is a change like any
+  other and goes through gate 4.** `decideDelivery` went 79% to 91% by removing
+  a `rateLimitMinutes > 0` that turned out to be load-bearing; the score rose
+  because the mutants went with it. Nothing here can catch that — only the
+  review did.
 
 ## 3b. `npm run e2e`
 
@@ -90,9 +95,22 @@ inside one. The `phase-reviewer` subagent exists for this pass.
 so a tree that moves under it produces findings against code that no longer
 exists.
 
+**It finds what the other gates structurally cannot.** Mutation testing can only
+mutate code that is there — so when a phase *deletes* a guard, no mutant exists
+to survive and the score goes up. That is exactly how a rewritten `decideDelivery`
+lost "a rate limit of zero never skips" with every gate green. Give the reviewer
+the phase's intent in the brief, so it can check the diff against what was meant
+rather than only against the rules.
+
 **Run any rule the phase itself introduced against the phase's own diff,
 first.** A new rule is at its least believed by the person who just wrote it,
 because they are still holding the reasoning that made it obvious.
+
+**When you break something on purpose to watch a check fail, confirm the break
+landed.** Files here are CRLF, so a `node -e` replacement written with `\n`
+silently matches nothing — three times in one phase, and once the tests then
+"passed" against source that had never been touched, which reads exactly like a
+check that is working. Edit the file, re-read it, then run.
 
 ## 5. A retrospective
 

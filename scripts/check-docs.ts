@@ -17,7 +17,7 @@ const FIXTURE_NAMES = new Set([
   "Temp",
   "…",
 ]);
-const PING_PREFIX = /\[([^\]@\s"[]+)@/g;
+const PING_PREFIX = /\[([^\]@\s"[${}]+)@/g;
 const CWD_FIXTURE = /cwd"?:\s*"([^"]*)"/g;
 const PATH_SEPARATOR = /[\\/]+/;
 const LOCAL_LINK = /\[[^\]]*\]\((?!https?:)([^)]+)\)/g;
@@ -84,7 +84,7 @@ const onlyOurOwnNames = (path: string, text: string): void => {
   for (const [, named] of text.matchAll(PING_PREFIX)) {
     if (named !== undefined && !FIXTURE_NAMES.has(named)) {
       complain(
-        `${path}: the ping prefix [${named}@…] names a project that is not this one — a fixture names the check, never somebody's real work`
+        `${path}: the ping prefix [${named}@…] names a project that is not this one — use one of ${[...FIXTURE_NAMES].join(", ")}, since a fixture names the check and never somebody's real work`
       );
     }
   }

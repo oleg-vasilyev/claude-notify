@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { HookPayload } from "#domain/ping/hook-ping.ts";
+import type { HookPayload } from "#domain/hook-event.ts";
 import { ALLOW, DENY, ownsAskUserQuestion, questionFrom, questionText } from "#domain/asking/question.ts";
 
 

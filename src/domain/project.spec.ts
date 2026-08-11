@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EVERY_PROJECT, projectKeyOf, projectPrefixOf, withMachineLabel } from "#domain/ping/project.ts";
+import { EVERY_PROJECT, projectKeyOf, projectPrefixOf, withMachineLabel } from "#domain/project.ts";
 
 
 describe("projectKeyOf", () => {

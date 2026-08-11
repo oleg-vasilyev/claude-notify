@@ -1,6 +1,6 @@
 import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
-import { projectKeyOf, withMachineLabel } from "#domain/ping/project.ts";
+import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
 import { usageLine } from "#domain/ping/usage.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
@@ -36,8 +36,18 @@ const sendVia = async (delivery: Delivery, text: string): Promise<void> => {
   }
 };
 
-const sentVia = (delivery: Delivery): string =>
-  delivery.kind === DELIVERY.relay ? "SENT via relay" : "SENT";
+const sentVia = (delivery: Delivery): string => {
+  switch (delivery.kind) {
+    case DELIVERY.telegram:
+      return "SENT";
+
+    case DELIVERY.relay:
+      return "SENT via relay";
+
+    default:
+      return impossible(delivery);
+  }
+};
 
 const withUsage = async (message: string): Promise<string> => {
   const line = usageLine(await fetchUsage(), new Date());

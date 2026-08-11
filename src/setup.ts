@@ -5,11 +5,19 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import { copy } from "#domain/copy.ru.ts";
+import { HOOK_EVENT, type HookEvent } from "#domain/hook-event.ts";
 import type { ClaudeSettings, HookCommand, Registration } from "#domain/setup/hook-registration.ts";
 import { registerHooks } from "#domain/setup/hook-registration.ts";
 import { impossible } from "#domain/impossible.ts";
 import { withMemoryRule } from "#domain/setup/memory-rule.ts";
-import { relayWanted, SECRET_CHOICE, secretChoice, type Inherited } from "#domain/setup/setup-choice.ts";
+import {
+  hostingWanted,
+  inheritedSecret,
+  relayWanted,
+  SECRET_CHOICE,
+  secretChoice,
+  type Inherited,
+} from "#domain/setup/setup-choice.ts";
 import { startupScript } from "#domain/setup/startup-script.ts";
 import { numberOr } from "#domain/written-number.ts";
 import { relayAnswers, relayMessage } from "#relay/relay-client.ts";
@@ -57,7 +65,7 @@ const hookEntry = fileURLToPath(new URL("./hook.ts", import.meta.url));
 const notifyEntry = fileURLToPath(new URL("./notify.ts", import.meta.url));
 const relayEntry = fileURLToPath(new URL("./relay.ts", import.meta.url));
 
-const pingCommand = (event: string): HookCommand => ({
+const pingCommand = (event: HookEvent): HookCommand => ({
   type: "command",
   command: process.execPath,
   args: [hookEntry, event, OWNED_MARKER],
@@ -65,7 +73,7 @@ const pingCommand = (event: string): HookCommand => ({
   async: true,
 });
 
-const askCommand = (event: string): HookCommand => ({
+const askCommand = (event: HookEvent): HookCommand => ({
   type: "command",
   command: process.execPath,
   args: [hookEntry, event, OWNED_MARKER],
@@ -82,21 +90,21 @@ const soundOf = (wav: string): HookCommand => ({
 
 const REGISTRATIONS: Registration[] = [
   {
-    event: "Stop",
-    command: pingCommand("Stop"),
+    event: HOOK_EVENT.stop,
+    command: pingCommand(HOOK_EVENT.stop),
     sound: soundOf("C:\\Windows\\Media\\Windows Notify.wav"),
   },
   {
-    event: "Notification",
-    command: pingCommand("Notification"),
+    event: HOOK_EVENT.notification,
+    command: pingCommand(HOOK_EVENT.notification),
     sound: soundOf("C:\\Windows\\Media\\chimes.wav"),
   },
   {
-    event: "PreToolUse",
+    event: HOOK_EVENT.preToolUse,
     matcher: "AskUserQuestion|ExitPlanMode",
-    command: askCommand("PreToolUse"),
+    command: askCommand(HOOK_EVENT.preToolUse),
   },
-  { event: "PermissionRequest", command: askCommand("PermissionRequest") },
+  { event: HOOK_EVENT.permissionRequest, command: askCommand(HOOK_EVENT.permissionRequest) },
 ];
 
 const ask = async (question: string): Promise<string> => {
@@ -127,10 +135,12 @@ const inheritedToken =
   inherited?.delivery.kind === DELIVERY.telegram ? inherited.delivery.token : undefined;
 const inheritedChatId =
   inherited?.delivery.kind === DELIVERY.telegram ? inherited.delivery.chatId : undefined;
-const inheritedRelayUrl = inherited?.delivery.kind === DELIVERY.relay ? inherited.delivery.url : undefined;
-const inheritedSecret =
-  inherited?.delivery.kind === DELIVERY.relay ? inherited.delivery.secret : inherited?.hosting?.secret;
+const inheritedRelay = inherited?.delivery.kind === DELIVERY.relay ? inherited.delivery : undefined;
 const inheritedHosting = inherited?.hosting ?? null;
+const carriedSecret = inheritedSecret({
+  ofTheRelayItSendsThrough: inheritedRelay?.secret,
+  ofTheRelayItHosts: inheritedHosting?.secret,
+});
 
 const telegramDelivery = async (): Promise<TelegramDelivery> => {
   const token = values.token ?? inheritedToken ?? (await ask("Telegram bot token: "));
@@ -159,7 +169,7 @@ const telegramDelivery = async (): Promise<TelegramDelivery> => {
 const relayUrlThatAnswers = async (): Promise<string> => {
   const url =
     values["relay-url"] ??
-    inheritedRelayUrl ??
+    inheritedRelay?.url ??
     (await ask("Relay URL (http://home-laptop:8787): "));
 
   if (url === "") {
@@ -184,8 +194,8 @@ const asked = {
 };
 
 const carriedOver: Inherited = {
-  sendsThroughARelay: inheritedRelayUrl !== undefined,
-  secret: inheritedSecret ?? "",
+  sendsThroughARelay: inheritedRelay !== undefined,
+  secret: carriedSecret,
 };
 
 const sendingThroughARelay = relayWanted(asked, carriedOver);
@@ -195,8 +205,11 @@ const direct = sendingThroughARelay ? null : await telegramDelivery();
 const machineLabel =
   values.label ?? inherited?.machineLabel ?? (await ask("Machine label (home / work): "));
 
-const hosting =
-  direct !== null && (values["relay-port"] !== undefined || inheritedHosting !== null);
+const hosting = hostingWanted(
+  sendingThroughARelay,
+  values["relay-port"] !== undefined,
+  inheritedHosting !== null
+);
 const relayPort = numberOr(values["relay-port"], inheritedHosting?.port ?? DEFAULT_RELAY_PORT);
 
 const chosenSecret = async (): Promise<string> => {

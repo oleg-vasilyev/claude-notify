@@ -9,6 +9,20 @@ export type Inherited = {
   secret: string;
 };
 
+export type CarriedSecrets = {
+  ofTheRelayItSendsThrough: string | undefined;
+  ofTheRelayItHosts: string | undefined;
+};
+
+export const inheritedSecret = (carried: CarriedSecrets): string =>
+  carried.ofTheRelayItSendsThrough ?? carried.ofTheRelayItHosts ?? "";
+
+export const hostingWanted = (
+  sendingThroughARelay: boolean,
+  portAsked: boolean,
+  hostedBefore: boolean
+): boolean => !sendingThroughARelay && (portAsked || hostedBefore);
+
 export const SECRET_CHOICE = {
   use: "use",
   ask: "ask",

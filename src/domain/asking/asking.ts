@@ -1,4 +1,4 @@
-import type { HookEvent, HookPayload } from "#domain/ping/hook-ping.ts";
+import type { HookEvent, HookPayload } from "#domain/hook-event.ts";
 import { questionFrom, QUESTION_KIND, type AskedQuestion } from "#domain/asking/question.ts";
 
 

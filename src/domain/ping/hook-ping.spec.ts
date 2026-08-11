@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/ping/hook-ping.ts";
+import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
+import { pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
 
 
 const inProject: HookPayload = { cwd: "D:\\Temp\\another-project" };

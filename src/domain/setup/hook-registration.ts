@@ -1,3 +1,6 @@
+import type { HookEvent } from "#domain/hook-event.ts";
+
+
 const PLAYS_A_SOUND = /SoundPlayer|PlaySync|afplay|\.wav/i;
 
 export type HookCommand = {
@@ -20,7 +23,7 @@ export type ClaudeSettings = {
 };
 
 export type Registration = {
-  event: string;
+  event: HookEvent;
   matcher?: string;
   command: HookCommand;
   sound?: HookCommand;

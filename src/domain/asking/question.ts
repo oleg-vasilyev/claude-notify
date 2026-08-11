@@ -1,5 +1,5 @@
 import { copy, recognise } from "#domain/copy.ru.ts";
-import { HOOK_EVENT, type HookEvent, type HookPayload } from "#domain/ping/hook-ping.ts";
+import { HOOK_EVENT, type HookEvent, type HookPayload } from "#domain/hook-event.ts";
 
 
 const ASK_TOOL = "AskUserQuestion";

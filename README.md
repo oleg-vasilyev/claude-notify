@@ -152,14 +152,15 @@ src/domain/     every decision, pure — no files, no network, no clock
                     has to be recognised in a payload
   duration.ts       "1 ч 12 мин"
   env-file.ts       reading and updating .env without losing your comments
+  hook-event.ts     the Claude Code events this product knows, and their payload
   impossible.ts     the case a union grew and a switch did not
+  project.ts        the project key and the machine label
   relay-protocol.ts what the two ends of a relay agree on, and who may send
   written-number.ts a number somebody typed into a settings file
   ping/         what to say, and whether to say it now
     delivery.ts       send, queue, or skip
     hook-ping.ts      what each Claude Code event has to say
     pending.ts        which queued pings survive, and which one wins per project
-    project.ts        the project key and the machine label
     usage.ts          the limits line
   asking/       putting a question on the phone, and reading the answer
     answer.ts         which Telegram update answers which question

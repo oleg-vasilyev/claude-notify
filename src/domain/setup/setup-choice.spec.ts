@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { relayWanted, secretChoice } from "#domain/setup/setup-choice.ts";
+import {
+  hostingWanted,
+  inheritedSecret,
+  relayWanted,
+  secretChoice,
+} from "#domain/setup/setup-choice.ts";
 
 
 const NOTHING_ASKED = {};
@@ -86,5 +91,43 @@ describe("secretChoice", () => {
       kind: "use",
       secret: "",
     });
+  });
+});
+
+describe("inheritedSecret", () => {
+  it("prefers the secret this machine proves itself with over the one it relays with", () => {
+    expect(
+      inheritedSecret({ ofTheRelayItSendsThrough: "mine", ofTheRelayItHosts: "theirs" })
+    ).toBe("mine");
+  });
+
+  it("falls back to the secret it hosts a relay with", () => {
+    expect(
+      inheritedSecret({ ofTheRelayItSendsThrough: undefined, ofTheRelayItHosts: "theirs" })
+    ).toBe("theirs");
+  });
+
+  it("has no secret to carry over on a machine that has neither", () => {
+    expect(
+      inheritedSecret({ ofTheRelayItSendsThrough: undefined, ofTheRelayItHosts: undefined })
+    ).toBe("");
+  });
+});
+
+describe("hostingWanted", () => {
+  it("hosts when a port was asked for", () => {
+    expect(hostingWanted(SENDING_DIRECT, true, false)).toBe(true);
+  });
+
+  it("keeps hosting on a rerun that names no port, rather than quietly standing down", () => {
+    expect(hostingWanted(SENDING_DIRECT, false, true)).toBe(true);
+  });
+
+  it("hosts nothing on a machine that never did and was not asked to", () => {
+    expect(hostingWanted(SENDING_DIRECT, false, false)).toBe(false);
+  });
+
+  it("refuses to host on a machine that sends through a relay, since it has no token to forward with", () => {
+    expect(hostingWanted(SENDING, true, true)).toBe(false);
   });
 });

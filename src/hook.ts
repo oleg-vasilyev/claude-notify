@@ -1,4 +1,5 @@
-import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/ping/hook-ping.ts";
+import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
+import { pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
 import { readConfig } from "#state/config.ts";
 import { flattenPayload, log } from "#state/log.ts";
 import { ask } from "#app/ask.ts";

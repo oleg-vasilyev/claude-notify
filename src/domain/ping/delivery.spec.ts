@@ -58,6 +58,18 @@ describe("decideDelivery", () => {
     ).toEqual({ kind: "send" });
   });
 
+  it("never skips a deliberate ping, whatever the stamp says", () => {
+    expect(
+      decideDelivery(facts({ rateLimitMinutes: 0, lastSentAt: NOW + MINUTE }))
+    ).toEqual({ kind: "send" });
+  });
+
+  it("sends against a stamp from the future, since a clock that moved must not swallow a ping", () => {
+    expect(
+      decideDelivery(facts({ rateLimitMinutes: 10, lastSentAt: NOW + MINUTE }))
+    ).toEqual({ kind: "send" });
+  });
+
   it("ignores a rate limit that has never sent anything", () => {
     expect(decideDelivery(facts({ rateLimitMinutes: 10, lastSentAt: null }))).toEqual({
       kind: "send",

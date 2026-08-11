@@ -27,11 +27,11 @@ the product.
 
 Two sources, deliberately redundant:
 
-1. **The model itself.** A rule in the global `~/.claude/CLAUDE.md` (installed
-   by setup) tells the agent: before ending a turn that waits on the user, call
-   `notify.ts` with a short Russian message naming the project and what is
-   needed. This is the high-value path — the ping says *why* — but it is model
-   behaviour, so it is probabilistic by nature.
+1. **The model itself**, through a tool it is given: `ping_user`, served over MCP
+   by `mcp.ts` and registered once per machine for every project. The agent
+   passes one Russian line saying what is needed. This is the high-value path —
+   the ping says *why* — but it is model behaviour, so it is probabilistic by
+   nature.
 2. **Hooks**, the mechanical fallback for turns where the model did not call:
 
 | Event | Fires when | Message |
@@ -48,6 +48,30 @@ observed firing in the desktop app; `Notification` alone never has.
 
 Hook pings pass `-RateLimitMinutes` so a burst collapses; deliberate model
 pings pass none and are never rate-limited.
+
+**The model is told what is needed and nothing else.** The `[project]` prefix is
+derived from the working directory the session is in, never from what the model
+typed, because a model asked to name its own project names the *product* rather
+than the folder — measured, and wrong in every one of the 23 pings it had sent
+from this checkout, which split one project's rate-limit stamps and queue
+identity in two. The machine label and the limits line are added the same way,
+downstream. What is left for the model is the only part it actually knows.
+
+**And the tool answers back.** A ping used to be a shot in the dark: the command
+exited 0 whether the message reached a phone or went into the queue. The tool
+reports which — so an agent told "they are still at the keyboard, this is
+queued" can carry on working instead of stopping to wait. Nothing else in the
+product gives the model a fact about the user's presence, and it is deliberately
+the *only* one: the tool description forbids the model from judging presence
+itself, since a model that guesses "they are probably still here" swallows the
+ping the whole product exists to send.
+
+The cost is a resident process per open session, which is how MCP works. It is
+kept honest by making it thin: the server holds no delivery logic and spawns
+`notify.ts` per call, so an edit to the funnel takes effect on the next ping
+rather than at the next restart. A resident process serving stale code is the
+same trap as the stale config in the tombstones below, and this is the shape
+that refuses it.
 
 **`Stop` says nothing while background work is still running.** The event fires
 every time the agent hands the turn back, including the hand-backs it makes
@@ -338,6 +362,15 @@ threshold is the knob if it ever is not.
   documented behaviour (permission prompts, idle waits) was happening on
   screen. The fallback therefore rests on `Stop` + `PreToolUse` +
   `PermissionRequest`, and no design may assume `Notification` works.
+- **Teaching the model to ping through a paragraph of prose.** For two months
+  the model-initiated ping was a rule in the global `~/.claude/CLAUDE.md`
+  carrying a shell command. It worked — 32 real pings in five days — but three
+  things about it never could: the command embedded a machine path with an
+  unquoted space, so every invocation depended on the model silently repairing
+  it; a typo or a moved checkout produced *nothing at all*, no line in the log
+  and no error; and no permission rule can name a shell command exactly, so it
+  survived only because sessions happened to run in auto mode. A tool has one
+  name, one schema, and a permission entry that matches it exactly.
 - **A global rate limit silenced cross-project fallbacks.** One stamp file meant
   a ping from the project you were watching muted the safety net of the one you
   were not, for ten minutes — observed live on day one, hence invariant 3.

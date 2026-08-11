@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
@@ -9,7 +10,10 @@ import { HOOK_EVENT, type HookEvent } from "#domain/hook-event.ts";
 import type { ClaudeSettings, HookCommand, Registration } from "#domain/setup/hook-registration.ts";
 import { registerHooks } from "#domain/setup/hook-registration.ts";
 import { impossible } from "#domain/impossible.ts";
-import { withMemoryRule } from "#domain/setup/memory-rule.ts";
+import { memoryAfterSetup } from "#domain/setup/memory-rule.ts";
+import { MCP_SERVER_NAME, PING_TOOL } from "#domain/ping/ping-tool.ts";
+import { forgetToolCommand, registerToolCommand } from "#domain/setup/registration-command.ts";
+import { PING_TOOL_PERMISSION, withToolAllowed } from "#domain/setup/tool-permission.ts";
 import {
   hostingWanted,
   inheritedSecret,
@@ -49,6 +53,7 @@ const SECRET_BYTES = 24;
 const OWNED_MARKER = "claude-notify";
 const OWNED_MARKERS = [OWNED_MARKER, "telegram-notify"];
 const JSON_INDENT = 2;
+const COMMAND_WORKED = 0;
 
 const { values } = parseArgs({
   options: {
@@ -64,6 +69,7 @@ const { values } = parseArgs({
 const hookEntry = fileURLToPath(new URL("./hook.ts", import.meta.url));
 const notifyEntry = fileURLToPath(new URL("./notify.ts", import.meta.url));
 const relayEntry = fileURLToPath(new URL("./relay.ts", import.meta.url));
+const mcpEntry = fileURLToPath(new URL("./mcp.ts", import.meta.url));
 
 const pingCommand = (event: HookEvent): HookCommand => ({
   type: "command",
@@ -254,26 +260,48 @@ writeConfig({
 
 console.log(`settings written to ${envFile()}`);
 
+const registerCommand = registerToolCommand(process.execPath, mcpEntry);
+
+const claudeAccepted = (command: string): boolean =>
+  spawnSync(command, { stdio: "ignore", shell: true }).status === COMMAND_WORKED;
+
+claudeAccepted(forgetToolCommand());
+
+const toolRegistered = claudeAccepted(registerCommand);
+
+if (toolRegistered) {
+  console.log(`ping tool registered for every project: ${MCP_SERVER_NAME}/${PING_TOOL}`);
+} else {
+  console.log("could not reach the claude CLI — register the ping tool yourself, once:");
+  console.log(`  ${registerCommand}`);
+}
+
 const settings = readJsonFile<ClaudeSettings>(claudeSettingsFile(), {});
+const hooked = registerHooks(settings, REGISTRATIONS, OWNED_MARKERS);
+const permitted = toolRegistered ? withToolAllowed(hooked, PING_TOOL_PERMISSION) : hooked;
 
 mkdirSync(claudeHome(), { recursive: true });
 
-writeFileSync(
-  claudeSettingsFile(),
-  `${JSON.stringify(registerHooks(settings, REGISTRATIONS, OWNED_MARKERS), null, JSON_INDENT)}\n`,
-  "utf8"
-);
+writeFileSync(claudeSettingsFile(), `${JSON.stringify(permitted, null, JSON_INDENT)}\n`, "utf8");
 
 console.log(`hooks registered in ${claudeSettingsFile()}`);
 
 const memory = existsSync(claudeMemoryFile()) ? readFileSync(claudeMemoryFile(), "utf8") : "";
-const withRule = withMemoryRule(memory, `${process.execPath} ${notifyEntry}`);
+const withRule = memoryAfterSetup(
+  memory,
+  `${process.execPath} ${notifyEntry}`,
+  toolRegistered
+);
 
 if (withRule !== memory) {
   writeFileSync(claudeMemoryFile(), withRule, "utf8");
-  console.log(`rule added to ${claudeMemoryFile()}`);
+  console.log(
+    toolRegistered
+      ? `ping rule removed from ${claudeMemoryFile()} — the tool's own description replaces it`
+      : `rule added to ${claudeMemoryFile()}`
+  );
 } else {
-  console.log("rule already present in the global CLAUDE.md");
+  console.log("the global CLAUDE.md already says what it should");
 }
 
 if (hosting) {

@@ -50,7 +50,7 @@ src/
   relay/      forwarding for a machine that cannot reach Telegram
   usage/      the account's limit windows
   deliver.ts  the funnel every ping goes through
-  hook.ts notify.ts watcher.ts relay.ts setup.ts   entry points
+  hook.ts notify.ts mcp.ts watcher.ts relay.ts setup.ts   entry points
 ```
 
 Everything outside `domain/` is impure, and **each folder is named after its
@@ -63,14 +63,12 @@ folder whose subject no longer fits in one phrase has become a bucket.
 file, no socket, no clock — a function that needs the time takes a `Date` or a
 number of milliseconds. This is what makes a delivery rule testable in
 milliseconds instead of by walking away from the keyboard for three minutes,
-and it is a **lint zone, not an aspiration**: `eslint.config.js` fails the
-build. The zone was proven by committing a deliberate `import { readFileSync }`
-into `domain/` and watching it fail — a zone that never fires looks exactly
-like a zone with nothing to report.
+and it is a **lint zone, not an aspiration**: `eslint.config.js` fails the build.
 
 Entry points are composition roots: they read argv or stdin, call one domain
-function, hand the verdict to one edge. When an entry point grows a branch
-worth naming, that branch belongs in `domain/`.
+function, hand the verdict to one edge. A branch worth naming — or a string
+another program will parse — belongs in `domain/`, the only place it gets a
+spec: an argv built inline in `setup.ts` shipped `C:\Program` past every gate.
 
 **`domain/copy.ru.ts` is the only file in the product that may hold Russian** —
 the `.ru` is in the name so a stray string elsewhere reads as the mistake it is.

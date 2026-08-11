@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { MEMORY_RULE_HEADING, memoryRule, withMemoryRule } from "#domain/setup/memory-rule.ts";
+import {
+  memoryAfterSetup,
+  MEMORY_RULE_HEADING,
+  memoryRule,
+  withMemoryRule,
+  withoutMemoryRule,
+} from "#domain/setup/memory-rule.ts";
+
+
+const REGISTERED = true;
+const NOT_REGISTERED = false;
 
 
 const COMMAND = "node D:\\repo\\claude-notify\\src\\notify.ts";
@@ -48,5 +58,59 @@ describe("withMemoryRule", () => {
     expect(refreshed).toContain("# Also mine");
     expect(refreshed).toContain("keep me too");
     expect(refreshed).not.toContain("stale");
+  });
+});
+
+describe("withoutMemoryRule", () => {
+  it("takes the rule out once the tool describes itself", () => {
+    expect(withoutMemoryRule(withMemoryRule("", COMMAND))).toBe("");
+  });
+
+  it("leaves a memory file that never had the rule exactly as it was", () => {
+    const mine = "# My own rules\n\nAlways answer in Russian.\n";
+
+    expect(withoutMemoryRule(mine)).toBe(mine);
+  });
+
+  it("keeps the sections on both sides of the rule it removes, exactly", () => {
+    const both = `# Mine\n\nkeep me\n\n${MEMORY_RULE_HEADING}\n\ngoing away\n\n# Also mine\n\nkeep me too\n`;
+
+    expect(withoutMemoryRule(both)).toBe("# Mine\n\nkeep me\n\n# Also mine\n\nkeep me too\n");
+  });
+
+  it("does not leave a blank file full of newlines behind", () => {
+    expect(withoutMemoryRule(`\n\n${MEMORY_RULE_HEADING}\n\nonly this\n\n`)).toBe("");
+  });
+
+  it("does not leave the blank lines behind when the rule came first", () => {
+    const first = `${MEMORY_RULE_HEADING}\n\ngoing away\n\n# Mine\n\nkeep me\n`;
+
+    expect(withoutMemoryRule(first)).toBe("# Mine\n\nkeep me\n");
+  });
+
+  it("is safe to run again when the rule is already gone", () => {
+    const once = withoutMemoryRule(`# Mine\n\nkeep me\n\n${MEMORY_RULE_HEADING}\n\ngone\n`);
+
+    expect(withoutMemoryRule(once)).toBe(once);
+  });
+});
+
+describe("memoryAfterSetup", () => {
+  it("retires the rule once the tool carries its own description", () => {
+    const installed = withMemoryRule("", COMMAND);
+
+    expect(memoryAfterSetup(installed, COMMAND, REGISTERED)).toBe("");
+  });
+
+  it("keeps the rule when the tool could not be registered, so a machine is never left with neither", () => {
+    expect(memoryAfterSetup("", COMMAND, NOT_REGISTERED)).toContain(MEMORY_RULE_HEADING);
+  });
+
+  it("puts the rule back on a machine the tool never reached", () => {
+    const stripped = withoutMemoryRule(withMemoryRule("# Mine\n\nkeep me\n", COMMAND));
+    const restored = memoryAfterSetup(stripped, COMMAND, NOT_REGISTERED);
+
+    expect(restored).toContain(MEMORY_RULE_HEADING);
+    expect(restored).toContain("keep me");
   });
 });

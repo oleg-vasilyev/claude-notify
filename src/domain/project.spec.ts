@@ -1,7 +1,47 @@
 import { describe, expect, it } from "vitest";
 
-import { EVERY_PROJECT, projectKeyOf, projectPrefixOf, withMachineLabel } from "#domain/project.ts";
+import {
+  EVERY_PROJECT,
+  projectKeyOf,
+  projectPrefixOf,
+  underProject,
+  withMachineLabel,
+} from "#domain/project.ts";
 
+
+describe("underProject", () => {
+  const WORKING_IN = "[a-project] ";
+
+  it("names the project the caller is actually in", () => {
+    expect(underProject("жду апрув", WORKING_IN)).toBe("[a-project] жду апрув");
+  });
+
+  it("replaces a prefix the model invented, since the folder is the truth", () => {
+    expect(underProject("[another-project] жду апрув", WORKING_IN)).toBe("[a-project] жду апрув");
+  });
+
+  it("leaves the message alone when there is no working directory to name", () => {
+    expect(underProject("[another-project] жду апрув", "")).toBe("[another-project] жду апрув");
+  });
+
+  it("does not mistake a bracket that never closes for a prefix", () => {
+    expect(underProject("[не закрыл скобку", WORKING_IN)).toBe("[a-project] [не закрыл скобку");
+  });
+
+  it("keeps a labelled prefix out of the message body", () => {
+    expect(underProject("[another-project@work] жду", WORKING_IN)).toBe("[a-project] жду");
+  });
+
+  it("survives a message that is nothing but a prefix", () => {
+    expect(underProject("[another-project]", WORKING_IN)).toBe("[a-project] ");
+  });
+
+  it("leaves brackets inside the sentence alone — only a prefix is a prefix", () => {
+    expect(underProject("жду решения по [миграции] сейчас", WORKING_IN)).toBe(
+      "[a-project] жду решения по [миграции] сейчас"
+    );
+  });
+});
 
 describe("projectKeyOf", () => {
   it("reads the project from a plain prefix", () => {

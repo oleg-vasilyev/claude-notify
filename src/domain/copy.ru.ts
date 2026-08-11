@@ -31,6 +31,7 @@ export const copy = {
   minutes: (count: number) => `${count} мин`,
 
   pingExample: "[a-project] Закончил фазу 2, жду апрув на миграцию БД",
+  toolPingExample: "Закончил фазу 2, жду апрув на миграцию БД",
 } as const;
 
 export const recognise = {

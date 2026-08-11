@@ -248,8 +248,16 @@ export default [
   {
     // The setup CLI, the relay, the log writer and the dev scripts are what a
     // person reads in a terminal: a wizard, a server you start and watch, the
-    // log itself, and a gate reporting what it found.
-    files: ["src/setup.ts", "src/relay.ts", "src/state/log.ts", "scripts/**/*.ts"],
+    // log itself, and a gate reporting what it found. notify.ts joins them
+    // because its one line of stdout is its answer — to a person running it by
+    // hand, and to the ping tool that spawns it and relays what it said.
+    files: [
+      "src/setup.ts",
+      "src/relay.ts",
+      "src/notify.ts",
+      "src/state/log.ts",
+      "scripts/**/*.ts",
+    ],
     rules: {
       "no-console": "off",
     },

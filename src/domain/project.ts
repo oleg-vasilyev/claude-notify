@@ -1,5 +1,6 @@
 const LABELLED_OR_PLAIN_PREFIX = /^\[([^\]@]+)[\]@]/;
 const PLAIN_PREFIX = /^\[([^\]@]+)\]/;
+const ANY_PREFIX = /^\[[^\]]*\]\s*/;
 const UNSAFE_IN_A_FILE_NAME = /[^\w-]/g;
 const PATH_SEPARATOR = /[\\/]/;
 
@@ -32,6 +33,9 @@ export const withMachineLabel = (message: string, machineLabel: string): string 
 
   return `[${machineLabel}] ${message}`;
 };
+
+export const underProject = (message: string, projectPrefix: string): string =>
+  projectPrefix === "" ? message : `${projectPrefix}${message.replace(ANY_PREFIX, "")}`;
 
 export const projectPrefixOf = (workingDirectory: string | undefined): string => {
   if (workingDirectory === undefined || workingDirectory === "") {

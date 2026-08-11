@@ -119,6 +119,18 @@ measurement was right, the number was right, and the scope was invented. When a
 phase justifies a constant with evidence, **say out loud what the evidence
 covers, and let that be the guard in the code.**
 
+**Check the prose the model reads against the code it describes.** A tool
+description, a memory rule, an error string — these are product copy that makes
+promises about behaviour, and nothing in `check`, coverage, mutation or e2e can
+notice when one stops being true. `ping_user`'s description told the model its
+ping would be dropped if the session moved on; the drop needs a transcript path
+that channel never has. Only the reviewer could see it, so name every promise the
+diff makes in the brief.
+
+**Write the four documents before gate 4, not after, and do not run `check` in
+between.** The review changes them — twice now, a phase has paid for one `check`
+run over documents the reviewer then rewrote.
+
 **When you break something on purpose to watch a check fail, confirm the break
 landed.** Files here are CRLF, so a `node -e` replacement written with `\n`
 silently matches nothing — three times in one phase, and once the tests then

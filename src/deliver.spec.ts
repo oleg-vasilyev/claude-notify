@@ -97,6 +97,42 @@ describe("deliver", () => {
     );
   });
 
+  it("reports that it reached the phone, so a caller can tell the difference", async () => {
+    expect(await deliver(ping)).toEqual({ kind: "sent" });
+  });
+
+  it("reports the queue and how long the user has been idle", async () => {
+    vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
+
+    expect(await deliver(ping)).toEqual({ kind: "queued", idleSeconds: PRESENT_SECONDS });
+  });
+
+  it("reports the rate limit with the age of the stamp that caused it", async () => {
+    const A_MINUTE = 60_000;
+
+    vi.mocked(readLastSentAt).mockReturnValue(Date.now() - A_MINUTE);
+
+    const outcome = await deliver({ ...ping, rateLimitMinutes: 10 });
+
+    expect(outcome.kind).toBe("skipped");
+    expect(outcome).toMatchObject({ sinceLastSentMinutes: expect.closeTo(1, 1) });
+  });
+
+  it("reports a failed send with the reason, rather than swallowing it", async () => {
+    vi.mocked(sendMessage).mockRejectedValue(new Error("Telegram refused with 404"));
+
+    expect(await deliver(ping)).toEqual({
+      kind: "failed",
+      why: "Error: Telegram refused with 404",
+    });
+  });
+
+  it("reports an unconfigured machine instead of pretending it sent something", async () => {
+    vi.mocked(readConfig).mockReturnValue(null);
+
+    expect(await deliver(ping)).toEqual({ kind: "unconfigured" });
+  });
+
   it("starts a watcher for the queued ping", async () => {
     vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
 

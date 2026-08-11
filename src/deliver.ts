@@ -1,5 +1,6 @@
 import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
+import { PING_OUTCOME, type PingOutcome } from "#domain/ping/ping-tool.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
 import { usageLine } from "#domain/ping/usage.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
@@ -62,11 +63,11 @@ const withUsage = async (message: string): Promise<string> => {
   return `${message}\n\n${line}`;
 };
 
-export const deliver = async (request: PingRequest): Promise<void> => {
+export const deliver = async (request: PingRequest): Promise<PingOutcome> => {
   const config = readConfig();
 
   if (config === null) {
-    return;
+    return { kind: PING_OUTCOME.unconfigured };
   }
 
   const message = withMachineLabel(request.message, config.machineLabel);
@@ -93,12 +94,12 @@ export const deliver = async (request: PingRequest): Promise<void> => {
         startWatcher();
       }
 
-      return;
+      return { kind: PING_OUTCOME.queued, idleSeconds: verdict.idleSeconds };
 
     case DELIVERY_VERDICT.skip:
       log(`SKIP rate-limit [${project}] | ${message}`);
 
-      return;
+      return { kind: PING_OUTCOME.skipped, sinceLastSentMinutes: verdict.sinceLastSentMinutes };
 
     case DELIVERY_VERDICT.send:
       break;
@@ -113,8 +114,12 @@ export const deliver = async (request: PingRequest): Promise<void> => {
     await sendVia(config.delivery, text);
     writeLastSentAt(project, Date.now());
     log(`${sentVia(config.delivery)} | ${text.replaceAll("\n", " | ")}`);
+
+    return { kind: PING_OUTCOME.sent };
   } catch (failure) {
     log(`ERROR send failed: ${String(failure)} | ${message}`);
     process.exitCode = 1;
+
+    return { kind: PING_OUTCOME.failed, why: String(failure) };
   }
 };

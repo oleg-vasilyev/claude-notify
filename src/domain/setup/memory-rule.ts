@@ -19,24 +19,58 @@ Do NOT send it for routine turn ends where nothing is needed from the user - onl
 
 const NEXT_TOP_LEVEL_HEADING = /^# /m;
 
-export const withMemoryRule = (existing: string, pingCommand: string): string => {
-  const fresh = memoryRule(pingCommand);
+type Section = { before: string; after: string } | null;
+
+const sectionIn = (existing: string): Section => {
   const headingAt = existing.indexOf(MEMORY_RULE_HEADING);
 
   if (headingAt < 0) {
+    return null;
+  }
+
+  const rest = existing.slice(headingAt + MEMORY_RULE_HEADING.length);
+  const nextHeading = NEXT_TOP_LEVEL_HEADING.exec(rest);
+
+  return {
+    before: existing.slice(0, headingAt),
+    after: nextHeading === null ? "" : rest.slice(nextHeading.index),
+  };
+};
+
+export const withMemoryRule = (existing: string, pingCommand: string): string => {
+  const fresh = memoryRule(pingCommand);
+  const section = sectionIn(existing);
+
+  if (section === null) {
     const separator = existing.trim() === "" ? "" : "\n\n";
 
     return `${existing.trimEnd()}${separator}${fresh}`;
   }
 
-  const before = existing.slice(0, headingAt);
-  const rest = existing.slice(headingAt + MEMORY_RULE_HEADING.length);
-  const nextHeading = NEXT_TOP_LEVEL_HEADING.exec(rest);
-  const after = nextHeading === null ? "" : rest.slice(nextHeading.index);
-
-  if (`${before}${fresh}${after}` === existing) {
+  if (`${section.before}${fresh}${section.after}` === existing) {
     return existing;
   }
 
-  return `${before}${fresh}${after === "" ? "" : `\n${after}`}`;
+  return `${section.before}${fresh}${section.after === "" ? "" : `\n${section.after}`}`;
 };
+
+export const withoutMemoryRule = (existing: string): string => {
+  const section = sectionIn(existing);
+
+  if (section === null) {
+    return existing;
+  }
+
+  const before = section.before.trim();
+  const after = section.after.trim();
+  const kept = before === "" ? after : `${before}\n\n${after}`;
+
+  return kept === "" ? "" : `${kept}\n`;
+};
+
+export const memoryAfterSetup = (
+  existing: string,
+  pingCommand: string,
+  toolRegistered: boolean
+): string =>
+  toolRegistered ? withoutMemoryRule(existing) : withMemoryRule(existing, pingCommand);

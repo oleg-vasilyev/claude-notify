@@ -19,6 +19,12 @@ your limit windows stand — so you can tell whether coming back is even worth
 it. While you are at the keyboard nothing is sent: the sound is enough, and the
 ping waits in a queue until you actually leave.
 
+The agent reaches you through a tool it can see, `ping_user` — it writes the one
+line that says what is needed, and the project, the machine and the limits are
+filled in around it. The tool answers back whether the ping went out or is
+waiting for you to leave, so an agent that cannot have you yet keeps working
+instead of stopping. When it does not call, the hooks still do.
+
 And when you are away, a question is not merely announced — it is **asked**,
 with a button per option, and an answer typed in your own words accepted just
 as well. A machine that cannot reach Telegram at all — a work laptop behind a
@@ -41,9 +47,9 @@ npm install && npm run setup
 
 Setup asks for the token and a machine label, writes them to **`.env`** in the
 checkout, resolves your chat id, registers the Claude Code hooks (Telegram and
-sound), adds the ping rule to the global `~/.claude/CLAUDE.md`, and sends a test
-message. The hooks point at this checkout, so keep it where it is — moving it
-means running setup again.
+sound), gives the agent a **`ping_user` tool** for every project on this machine,
+and sends a test message. The hooks and the tool point at this checkout, so keep
+it where it is — moving it means running setup again.
 
 4. Restart Claude Code so the hooks load.
 
@@ -142,8 +148,12 @@ No line at all means nothing called it: the model did not ping and no hook
 fired. To prove the pipe end to end, bypassing the presence filter:
 
 ```bash
-node src/notify.ts --message "[test] проверка" --now
+node src/notify.ts --message "проверка" --now
 ```
+
+It names the project after the directory you run it in; pass `--project name` to
+say otherwise. It prints what happened — delivered, queued, or refused — which
+is the same sentence the `ping_user` tool hands back to the agent.
 
 ## Development
 
@@ -162,6 +172,7 @@ src/domain/     every decision, pure — no files, no network, no clock
     delivery.ts       send, queue, or skip
     hook-ping.ts      what each Claude Code event has to say
     pending.ts        which queued pings are still true, and which one wins per project
+    ping-tool.ts      what the model's own ping tool says, and how it reports back
     usage.ts          the limits line
   asking/       putting a question on the phone, and reading the answer
     answer.ts         which Telegram update answers which question
@@ -170,9 +181,10 @@ src/domain/     every decision, pure — no files, no network, no clock
     question.ts       a hook payload turned into something answerable by phone
   setup/        what the installer writes, and where it writes it
     hook-registration.ts  merging into settings.json without clobbering it
-    memory-rule.ts    the rule setup writes into the global CLAUDE.md
+    memory-rule.ts    the rule setup retires once the tool describes itself
     setup-choice.ts   which way a machine sends, and where its relay secret comes from
     startup-script.ts the batch file that brings the relay up at login
+    tool-permission.ts the exact name Claude Code must allow for the ping tool
 src/state/      what this product remembers between runs
   asked-question.ts the question a hook waits on, and the answer it waits for
   config.ts         the settings, read from .env
@@ -194,7 +206,8 @@ src/ask.ts              the funnel a question goes through, and waits in
 src/answering.ts        reading Telegram for answers, for the watcher
 src/watcher-process.ts  is a watcher running, and starting one that outlives us
 src/hook.ts     entry point: one Claude Code event
-src/notify.ts   entry point: one ping, from the model or by hand
+src/notify.ts   entry point: one ping, by hand or from the ping tool
+src/mcp.ts      entry point: the ping tool the model sees, over MCP on stdio
 src/watcher.ts  entry point: delivers what presence held back, and collects answers
 src/relay.ts    entry point: the resident forwarder, for other machines
 src/setup.ts    entry point: the installer

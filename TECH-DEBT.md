@@ -57,13 +57,16 @@ reusing the staleness rule as the give-up rule.
 The rule that a queued ping must still be true — see `PLAN.md` — reaches `Stop`
 pings and nothing else. Two kinds are left out, for different reasons.
 
-**The model's own pings.** `notify.ts` is run as a shell command, so it gets no
-hook payload and no `transcript_path`, and these are the pings with the most to
-say. The path exists: the command runs with the project as its working
-directory, and Claude Code keeps one folder of transcripts per project. Picking
-the most recently written of them would be right whenever a project has one
-session open and wrong whenever it has two, which is why it is not guessed at
-today.
+**The model's own pings.** `ping_user` reaches `deliver` through `notify.ts`, and
+neither knows which session called: MCP hands a tool a message, not a transcript.
+These are the pings with the most to say, and the tool's own advice makes the gap
+sharper — it tells the model to carry on rather than wait, so the ping most
+likely to be overtaken by its own author is the one nothing can drop. The
+transcript is guessable: the server runs in the project's directory, and Claude
+Code keeps one folder of transcripts per project, so the most recently written
+would be right whenever a project has one session open and wrong whenever it has
+two. MCP's own answer is better — a tool call carries no session, but the client
+declares `roots`, and a future protocol revision may carry more.
 
 **Mid-turn pings** — a permission wall, a question the app is holding. Their
 transcripts move while the wait is genuinely open, so the rule as measured would
@@ -73,6 +76,42 @@ whether the *last* entry is the one that raised the wall.
 **Pick either up when a ping of that kind is seen arriving after its session
 moved on** — the model's, if `--transcript` can be passed by the caller instead
 of inferred; the mid-turn ones, only with a measurement of their own.
+
+---
+
+## A machine can end up with both ping channels at once
+
+Setup retires the memory rule only when it managed to register the tool, so a
+machine without the `claude` CLI keeps the old shell-command rule. The reverse
+case is not handled: a machine where an earlier run registered the tool, and a
+later run cannot reach the CLI — a broken PATH, a CLI mid-upgrade — puts the rule
+back while Claude Code's own config still holds the registration. The model then
+has two ways to say one thing, and deliberate pings are never rate-limited, so a
+single wait can buzz the phone twice.
+
+Nothing checks whether the tool is *already* registered, because the only honest
+check is asking the CLI that is by hypothesis missing.
+
+**Fix it the first time a wait produces two pings**, by reading Claude Code's
+config directly rather than asking the CLI.
+
+---
+
+## The ping tool trusts its own working directory to name the project
+
+`mcp.ts` derives the `[project]` prefix from `process.cwd()`, because Claude Code
+spawns an MCP server in the directory of the session that owns it. That is
+observed behaviour, not a documented promise. If it ever changes — a server
+shared between sessions, a spawn from the user's home directory — every ping
+from every project would be filed under one wrong name, and the only symptom is
+a prefix nobody reads carefully.
+
+MCP has the authoritative answer already: the client can declare `roots`, and a
+server may ask for them. It is not used here because one source of truth beats
+two, and the simpler one works today.
+
+**Ask for the roots the first time a ping arrives under a project the session
+was not in.**
 
 ---
 

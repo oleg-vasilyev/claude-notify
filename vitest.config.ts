@@ -15,6 +15,7 @@ export default defineConfig({
         "src/**/*.spec.ts",
         "src/hook.ts",
         "src/notify.ts",
+        "src/mcp.ts",
         "src/watcher.ts",
         "src/setup.ts",
         "src/relay.ts",

@@ -31,7 +31,9 @@
     "e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
-    "koffi": "^2.15.1"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "koffi": "^2.15.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",

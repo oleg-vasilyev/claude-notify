@@ -20,6 +20,9 @@ export type DeliveryVerdict =
   | { kind: typeof DELIVERY_VERDICT.queue; idleSeconds: number }
   | { kind: typeof DELIVERY_VERDICT.skip; sinceLastSentMinutes: number };
 
+const minutesSinceLastSent = (facts: DeliveryFacts): number | null =>
+  facts.lastSentAt === null ? null : (facts.now - facts.lastSentAt) / MILLISECONDS_PER_MINUTE;
+
 export const decideDelivery = (facts: DeliveryFacts): DeliveryVerdict => {
   const userIsPresent =
     facts.minIdleMinutes > 0 && facts.idleSeconds < facts.minIdleMinutes * SECONDS_PER_MINUTE;
@@ -28,15 +31,10 @@ export const decideDelivery = (facts: DeliveryFacts): DeliveryVerdict => {
     return { kind: DELIVERY_VERDICT.queue, idleSeconds: facts.idleSeconds };
   }
 
-  if (facts.rateLimitMinutes > 0 && facts.lastSentAt !== null) {
-    const sinceLastSent = facts.now - facts.lastSentAt;
+  const sinceLastSentMinutes = minutesSinceLastSent(facts);
 
-    if (sinceLastSent < facts.rateLimitMinutes * MILLISECONDS_PER_MINUTE) {
-      return {
-        kind: DELIVERY_VERDICT.skip,
-        sinceLastSentMinutes: sinceLastSent / MILLISECONDS_PER_MINUTE,
-      };
-    }
+  if (sinceLastSentMinutes !== null && sinceLastSentMinutes < facts.rateLimitMinutes) {
+    return { kind: DELIVERY_VERDICT.skip, sinceLastSentMinutes };
   }
 
   return { kind: DELIVERY_VERDICT.send };

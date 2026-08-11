@@ -60,6 +60,7 @@ export const startRelay = async (host: RelayHost): Promise<Server> => {
   const server = createServer((request, response) => {
     void (async () => {
       const path = (request.url ?? "").split(QUERY)[0] ?? "";
+      const body = await bodyOf(request);
 
       if (path === HEALTH_PATH) {
         answer(response, ACCEPTED);
@@ -73,11 +74,7 @@ export const startRelay = async (host: RelayHost): Promise<Server> => {
         return;
       }
 
-      const asked = relayRequestFrom(
-        host.secret,
-        request.headers.authorization,
-        await bodyOf(request)
-      );
+      const asked = relayRequestFrom(host.secret, request.headers.authorization, body);
 
       switch (asked.kind) {
         case RELAY_REQUEST.unauthorised:

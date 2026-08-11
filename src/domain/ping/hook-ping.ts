@@ -17,6 +17,11 @@ export type HookPing = {
 export const stillWorking = (event: HookEvent, payload: HookPayload): boolean =>
   event === HOOK_EVENT.stop && (payload.background_tasks ?? []).length > NOTHING_RUNNING;
 
+const SCRIPT_RUNS_IT = "sdk-";
+
+export const nobodyIsWatching = (entrypoint: string | undefined): boolean =>
+  entrypoint !== undefined && entrypoint.startsWith(SCRIPT_RUNS_IT);
+
 
 const shortened = (text: string): string => {
   if (text.length <= LONGEST_QUOTED_QUESTION) {

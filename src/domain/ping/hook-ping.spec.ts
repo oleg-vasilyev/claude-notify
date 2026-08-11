@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { pingFor as maybePing, stillWorking, type HookPing } from "#domain/ping/hook-ping.ts";
+import {
+  nobodyIsWatching,
+  pingFor as maybePing,
+  stillWorking,
+  type HookPing,
+} from "#domain/ping/hook-ping.ts";
 import type { HookEvent } from "#domain/hook-event.ts";
 
 
@@ -33,6 +38,28 @@ describe("isHookEvent", () => {
 
   it("rejects anything else, so a typo in a hook registration cannot ping nonsense", () => {
     expect(isHookEvent("Whatever")).toBe(false);
+  });
+});
+
+describe("nobodyIsWatching", () => {
+  it("recognises a session a script is running, whichever SDK runs it", () => {
+    expect(nobodyIsWatching("sdk-cli")).toBe(true);
+    expect(nobodyIsWatching("sdk-ts")).toBe(true);
+    expect(nobodyIsWatching("sdk-py")).toBe(true);
+  });
+
+  it("leaves the desktop app alone", () => {
+    expect(nobodyIsWatching("claude-desktop")).toBe(false);
+  });
+
+  it("pings for an entrypoint it has never heard of, since a swallowed ping costs hours", () => {
+    expect(nobodyIsWatching("some-new-host")).toBe(false);
+    expect(nobodyIsWatching(undefined)).toBe(false);
+    expect(nobodyIsWatching("")).toBe(false);
+  });
+
+  it("does not mistake an entrypoint that merely mentions an sdk", () => {
+    expect(nobodyIsWatching("desktop-sdk-bridge")).toBe(false);
   });
 });
 

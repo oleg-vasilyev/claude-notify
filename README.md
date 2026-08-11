@@ -137,7 +137,8 @@ Everything the notifier decides is one line in
 | `QUEUED idle=Ns` | you were at the keyboard; the watcher delivers it once you leave |
 | `DROP stale` | it sat queued longer than `stale_minutes` — you were here all along, or its session never stopped |
 | `SKIP rate-limit [proj]` | that project pinged too recently |
-| `HOOK <event>` | a Claude Code hook fired, with its payload |
+| `HOOK <event>` | a Claude Code hook fired, with its payload and the entrypoint that ran it |
+| `SKIP a session a script is running` | the hooks fired for a scripted session — no person is waiting, so the mechanical ping stays home |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
 | `WARN usage unavailable` | the limits line was skipped; the ping itself went out |

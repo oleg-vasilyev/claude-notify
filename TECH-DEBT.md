@@ -58,7 +58,8 @@ Every hook writes `session-<id>.json` into the state directory, and nothing
 deletes it. `SessionEnd` was not observed firing in a headless run, so there is
 no reliable event to delete on, and a machine accumulates one small file per
 session forever — a few hundred bytes each, so this is untidiness rather than a
-problem.
+problem. Sessions a script runs leave nothing, which is what keeps it small: a
+job classifying email would otherwise have left a note per message.
 
 **Sweep notes untouched for a day, the first time the state directory is
 annoying to read**, or fold it into whatever ends up rotating `log.txt`.

@@ -1,5 +1,5 @@
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
+import { nobodyIsWatching, pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
 import { noteAfter } from "#domain/ping/session-activity.ts";
 import { readConfig } from "#state/config.ts";
 import { flattenPayload, log } from "#state/log.ts";
@@ -37,9 +37,16 @@ if (!isHookEvent(event)) {
 
 const raw = await readStdin();
 
-log(`HOOK ${event} entrypoint=${process.env.CLAUDE_CODE_ENTRYPOINT ?? "-"} | ${flattenPayload(raw)}`);
+const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT;
+
+log(`HOOK ${event} entrypoint=${entrypoint ?? "-"} | ${flattenPayload(raw)}`);
 
 const payload = parsed(raw);
+
+if (nobodyIsWatching(entrypoint)) {
+  log(`SKIP a session a script is running | ${event}`);
+  process.exit(0);
+}
 
 if (payload.session_id !== undefined) {
   writeSessionNote(payload.session_id, noteAfter(event, payload, Date.now()));

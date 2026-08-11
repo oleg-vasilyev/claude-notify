@@ -47,6 +47,21 @@ The mid-turn events matter because `Stop` cannot see them: a question dialog or
 a permission prompt suspends the turn without ending it. All four have now been
 observed firing in the desktop app; `Notification` alone never has.
 
+**A hook says nothing for a session a script is running.** Claude Code is also an
+API: a job that classifies email starts a real session per item, and each one
+takes a prompt and ends its turn seconds later. The hooks fire exactly as they do
+for a person, and «закончил ход, ждёт тебя» is then a lie — five of them arrived
+from one such job in two hours before this was noticed. The payload cannot tell
+the two apart, measured key by key; the hook process's own environment can, and
+`CLAUDE_CODE_ENTRYPOINT` reads `sdk-cli` where a desktop session reads
+`claude-desktop`.
+
+Only the *mechanical* pings are suppressed. A script that calls `ping_user`
+itself is still delivered, because deciding it needs a person is a judgement, and
+whoever wrote the script made it deliberately — the same reason a model's own
+ping was never rate-limited. And the rule fails safe in the usual direction: an
+entrypoint this product has never heard of pings.
+
 Hook pings pass `-RateLimitMinutes` so a burst collapses; deliberate model
 pings pass none and are never rate-limited.
 

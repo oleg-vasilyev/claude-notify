@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MEMORY_RULE_HEADING, memoryRule, withMemoryRule } from "#domain/memory-rule.ts";
+import { MEMORY_RULE_HEADING, memoryRule, withMemoryRule } from "#domain/setup/memory-rule.ts";
 
 
 const COMMAND = "node D:\\repo\\claude-notify\\src\\notify.ts";

@@ -17,7 +17,7 @@ const MALFORMED = 400;
 const UNAUTHORISED = 401;
 const NOT_FOUND = 404;
 const TELEGRAM_REFUSED = 502;
-const A_PING = "[job-finder@work] закончил ход, ждёт тебя";
+const A_PING = "[a-project@work] закончил ход, ждёт тебя";
 
 let server: Server;
 let root: string;

@@ -18,10 +18,10 @@ module in the next folder. Three consequences:
 2. **Mock our own modules too.** `deliver.ts` is not tested by letting
    `decideDelivery` really run — mock it, drive the funnel by what it returns,
    and a wrong verdict fails in `delivery.spec.ts` where the fault is.
-3. **Leave data tables real.** `copy.ts` is keys and text, not behaviour;
+3. **Leave data tables real.** `copy.ru.ts` is keys and text, not behaviour;
    mocking it would compare a constant against itself.
 
-The corollary bites: **no logic may live in `copy.ts`.** Because the table is
+The corollary bites: **no logic may live in `copy.ru.ts`.** Because the table is
 never mocked, a decision taken inside it is asserted against itself and is
 therefore unkillable by mutation testing. Choosing between `1 ч` and
 `1 ч 12 мин` is `duration.ts`'s job; the table only interpolates.
@@ -42,13 +42,26 @@ test — a function that reads the clock itself has already failed the layer rul
 `vi.mock` is hoisted above the imports, so the imports read normally and the
 factories run when the mocked module is first requested:
 
+**Mock a module partially, never wholly.** A factory returning only the function
+you care about silently deletes everything else the module exports, and the code
+under test then receives `undefined` for a constant it was reading:
+
 ```ts
-import { readConfig } from "#edges/config.ts";
-import { deliver } from "#edges/deliver.ts";
+import { readConfig } from "#state/config.ts";
+import { deliver } from "#app/deliver.ts";
 
 
-vi.mock("#edges/config.ts", () => ({ readConfig: vi.fn() }));
+vi.mock("#state/config.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#state/config.ts")>()),
+  readConfig: vi.fn(),
+}));
 ```
+
+Paid for once: `state/config.ts` grew a `DELIVERY` table, three specs replaced
+the whole module with `{ readConfig: vi.fn() }`, and thirty-two cases failed with
+a stack pointing at the production line rather than at the fake. **A wholesale
+mock makes a failure lie about where the bug is**, which costs more than the
+failure itself.
 
 `clearMocks: true` in `vitest.config.ts` resets every spy between cases, so a
 `beforeEach` sets the defaults and each case overrides exactly one thing. A spy
@@ -86,7 +99,7 @@ a release gate, not in `check`, so one is owed only for what no unit can reach:
 - **A bug that got past the units.** That is evidence the seam is real.
 
 Nothing in `e2e/` may import from `src/` except the entry point it spawns — no
-types, no `copy.ts`. A harness that imported the copy table would assert a
+types, no `copy.ru.ts`. A harness that imported the copy table would assert a
 constant against itself, so expected Russian is written out in full.
 
 A scenario never sleeps and never polls: the fake server exposes `whenAsked()`
@@ -130,7 +143,7 @@ nothing to decide — the moment one grows a branch, the branch belongs in
 
 ## Judging a spec you did not write
 
-1. Does it import anything unmocked besides its subject and `copy.ts`?
+1. Does it import anything unmocked besides its subject and `copy.ru.ts`?
 2. Does any assertion belong to another module? A `deliver` spec checking how a
    percentage is rounded is really testing `usage.ts`.
 3. **Would every assertion fail if the subject broke?** This is what the

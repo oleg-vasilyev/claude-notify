@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { usageLine, type UsageLimit, type UsageSnapshot } from "#domain/usage.ts";
+import { usageLine, type UsageLimit, type UsageSnapshot } from "#domain/ping/usage.ts";
 
 
 const NOW = new Date("2026-08-07T12:00:00Z");

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ReceivedAnswer } from "#domain/answer.ts";
-import { hookAnswerOutput } from "#domain/hook-answer.ts";
-import { ALLOW, DENY, type AskedQuestion } from "#domain/question.ts";
+import type { ReceivedAnswer } from "#domain/asking/answer.ts";
+import { hookAnswerOutput } from "#domain/asking/hook-answer.ts";
+import { ALLOW, DENY, type AskedQuestion } from "#domain/asking/question.ts";
 
 
 const HANDED_BACK = {};

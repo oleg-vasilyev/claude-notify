@@ -1,4 +1,4 @@
-import type { AskedQuestion } from "#domain/question.ts";
+import { QUESTION_KIND, type AskedQuestion } from "#domain/asking/question.ts";
 
 
 const SEPARATOR = ":";
@@ -98,7 +98,7 @@ const wroteWords = (
     return null;
   }
 
-  const answerable = questions.filter((question) => question.kind === "choice");
+  const answerable = questions.filter((question) => question.kind === QUESTION_KIND.choice);
   const only = answerable[0];
 
   if (answerable.length !== ONLY_ONE || only === undefined) {

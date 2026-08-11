@@ -1,7 +1,7 @@
-import { copy } from "#domain/copy.ts";
-import type { ReceivedAnswer } from "#domain/answer.ts";
-import type { HookEvent } from "#domain/hook-ping.ts";
-import { ALLOW, type AskedQuestion } from "#domain/question.ts";
+import { copy } from "#domain/copy.ru.ts";
+import type { ReceivedAnswer } from "#domain/asking/answer.ts";
+import type { HookEvent } from "#domain/ping/hook-ping.ts";
+import { ALLOW, QUESTION_KIND, type AskedQuestion } from "#domain/asking/question.ts";
 
 
 const LET_IT_THROUGH = {};
@@ -29,7 +29,7 @@ export const hookAnswerOutput = (
     return LET_IT_THROUGH;
   }
 
-  if (question.kind === "permission") {
+  if (question.kind === QUESTION_KIND.permission) {
     if (answer.chosenValue === null) {
       return LET_IT_THROUGH;
     }

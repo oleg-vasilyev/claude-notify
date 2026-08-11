@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AskedQuestion } from "#domain/question.ts";
+import type { AskedQuestion } from "#domain/asking/question.ts";
 import {
   forgetQuestion,
   readAnswer,
@@ -31,7 +31,7 @@ vi.mock("#state/file-locations.ts", () => ({
 
 const AN_OFFSET = 51;
 const A_MESSAGE = 77;
-const HEADLINE = "[job-finder@home] Чем продолжим?";
+const HEADLINE = "[a-project@home] Чем продолжим?";
 
 const question: AskedQuestion = {
   id: "abc12345",
@@ -108,7 +108,7 @@ describe("the question a hook is waiting on", () => {
   it("ignores the other files sharing the state directory", () => {
     writeAskedQuestion(question, A_MESSAGE, HEADLINE);
     writeFileSync(join(state, "pending.jsonl"), "{}", "utf8");
-    writeFileSync(join(state, "last-sent-job-finder.txt"), "1", "utf8");
+    writeFileSync(join(state, "last-sent-a-project.txt"), "1", "utf8");
 
     expect(readAskedQuestions()).toEqual([stored]);
   });

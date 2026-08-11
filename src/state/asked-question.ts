@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { ReceivedAnswer } from "#domain/answer.ts";
-import type { AskedQuestion } from "#domain/question.ts";
+import type { ReceivedAnswer } from "#domain/asking/answer.ts";
+import type { AskedQuestion } from "#domain/asking/question.ts";
 import { answerFile, askedQuestionFile, stateHome } from "#state/file-locations.ts";
 
 

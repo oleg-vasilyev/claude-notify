@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { startupScript } from "#domain/startup-script.ts";
+import { startupScript } from "#domain/setup/startup-script.ts";
 
 
 const NODE = "C:\\Program Files\\nodejs\\node.exe";

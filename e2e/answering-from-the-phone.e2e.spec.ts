@@ -14,7 +14,7 @@ const ALWAYS_AWAY = 0;
 const A_MINUTE = 1;
 
 const askedPayload = {
-  cwd: "D:\\Temp\\job-finder",
+  cwd: "D:\\Temp\\a-project",
   tool_name: "AskUserQuestion",
   tool_input: {
     questions: [
@@ -30,7 +30,7 @@ const askedPayload = {
 };
 
 const permissionPayload = {
-  cwd: "D:\\Temp\\job-finder",
+  cwd: "D:\\Temp\\a-project",
   tool_name: "Bash",
   tool_input: { command: "git push" },
 };
@@ -89,7 +89,7 @@ describe("a question answered from the phone", () => {
 
     await running;
 
-    expect(telegram.sentText()).toContain("[job-finder@home] Чем продолжим");
+    expect(telegram.sentText()).toContain("[a-project@home] Чем продолжим");
     expect(telegram.sentText()).toContain("Форк ← рекомендует");
   });
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/hook-ping.ts";
+import { isHookEvent, pingFor, stillWorking, type HookPayload } from "#domain/ping/hook-ping.ts";
 
 
-const inProject: HookPayload = { cwd: "D:\\Temp\\FoolProof" };
+const inProject: HookPayload = { cwd: "D:\\Temp\\another-project" };
 const QUOTING = true;
 const KEEPING_IT_HERE = false;
 
@@ -25,7 +25,7 @@ describe("isHookEvent", () => {
 
 describe("pingFor", () => {
   it("says the turn ended", () => {
-    expect(pingFor("Stop", inProject, QUOTING).message).toBe("[FoolProof] закончил ход, ждёт тебя");
+    expect(pingFor("Stop", inProject, QUOTING).message).toBe("[another-project] закончил ход, ждёт тебя");
   });
 
   it("rate-limits the turn-end fallback so a burst collapses", () => {
@@ -40,7 +40,7 @@ describe("pingFor", () => {
     };
 
     expect(pingFor("PreToolUse", payload, QUOTING).message).toBe(
-      "[FoolProof] вопрос: Каким делать репозиторий?"
+      "[another-project] вопрос: Каким делать репозиторий?"
     );
   });
 
@@ -56,7 +56,7 @@ describe("pingFor", () => {
 
     const { message } = pingFor("PreToolUse", payload, QUOTING);
 
-    expect(message.length).toBeLessThanOrEqual("[FoolProof] ".length + 180);
+    expect(message.length).toBeLessThanOrEqual("[another-project] ".length + 180);
     expect(message.endsWith("…")).toBe(true);
   });
 
@@ -70,33 +70,33 @@ describe("pingFor", () => {
   it("announces a plan waiting for approval", () => {
     const payload: HookPayload = { ...inProject, tool_name: "ExitPlanMode" };
 
-    expect(pingFor("PreToolUse", payload, QUOTING).message).toBe("[FoolProof] план готов, жду апрув");
+    expect(pingFor("PreToolUse", payload, QUOTING).message).toBe("[another-project] план готов, жду апрув");
   });
 
   it("falls back when a question tool carried no question", () => {
     const payload: HookPayload = { ...inProject, tool_input: { questions: [] } };
 
-    expect(pingFor("PreToolUse", payload, QUOTING).message).toBe("[FoolProof] ждёт твоего ответа");
+    expect(pingFor("PreToolUse", payload, QUOTING).message).toBe("[another-project] ждёт твоего ответа");
   });
 
   it("names the tool asking for permission", () => {
     const payload: HookPayload = { ...inProject, tool_name: "Bash" };
 
     expect(pingFor("PermissionRequest", payload, QUOTING).message).toBe(
-      "[FoolProof] просит разрешение: Bash"
+      "[another-project] просит разрешение: Bash"
     );
   });
 
   it("still says something when the permission payload named no tool", () => {
     expect(pingFor("PermissionRequest", inProject, QUOTING).message).toBe(
-      "[FoolProof] просит разрешение: инструмент"
+      "[another-project] просит разрешение: инструмент"
     );
   });
 
   it("passes through what a notification says", () => {
     const payload: HookPayload = { ...inProject, message: "нужно решение" };
 
-    expect(pingFor("Notification", payload, QUOTING).message).toBe("[FoolProof] нужно решение");
+    expect(pingFor("Notification", payload, QUOTING).message).toBe("[another-project] нужно решение");
   });
 
   it("works without a working directory, which is all a payload really guarantees", () => {
@@ -105,7 +105,7 @@ describe("pingFor", () => {
 
   it("keeps the question to itself on a machine that does not quote", () => {
     expect(pingFor("PreToolUse", asked, KEEPING_IT_HERE).message).toBe(
-      "[FoolProof] ждёт твоего ответа"
+      "[another-project] ждёт твоего ответа"
     );
   });
 
@@ -113,7 +113,7 @@ describe("pingFor", () => {
     const payload: HookPayload = { ...inProject, tool_name: "ExitPlanMode" };
 
     expect(pingFor("PreToolUse", payload, KEEPING_IT_HERE).message).toBe(
-      "[FoolProof] план готов, жду апрув"
+      "[another-project] план готов, жду апрув"
     );
   });
 
@@ -121,13 +121,13 @@ describe("pingFor", () => {
     const payload: HookPayload = { ...inProject, tool_name: "Bash" };
 
     expect(pingFor("PermissionRequest", payload, KEEPING_IT_HERE).message).toBe(
-      "[FoolProof] просит разрешение: Bash"
+      "[another-project] просит разрешение: Bash"
     );
   });
 
   it("says the turn ended whether or not it quotes", () => {
     expect(pingFor("Stop", inProject, KEEPING_IT_HERE).message).toBe(
-      "[FoolProof] закончил ход, ждёт тебя"
+      "[another-project] закончил ход, ждёт тебя"
     );
   });
 });

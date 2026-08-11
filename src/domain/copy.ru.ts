@@ -17,6 +17,8 @@ export const copy = {
   permissionAnsweredFromPhone: (said: string) =>
     `Пользователь ответил из Telegram: «${said}».`,
 
+  installed: (label: string) => `[setup@${label}] claude-notify подключён на этой машине`,
+
   sessionWindow: "5 часов",
   weekWindow: "неделя",
   windowShare: (bar: string, percent: number, label: string) => `${bar} ${percent}% · ${label}`,
@@ -27,4 +29,10 @@ export const copy = {
   lessThanAMinute: "меньше минуты",
   hours: (count: number) => `${count} ч`,
   minutes: (count: number) => `${count} мин`,
+
+  pingExample: "[a-project] Закончил фазу 2, жду апрув на миграцию БД",
+} as const;
+
+export const recognise = {
+  recommendedMarks: ["(рекомендую", "(recommended"],
 } as const;

@@ -9,11 +9,18 @@ export type Inherited = {
   secret: string;
 };
 
+export const SECRET_CHOICE = {
+  use: "use",
+  ask: "ask",
+  generate: "generate",
+  none: "none",
+} as const;
+
 export type SecretChoice =
-  | { kind: "use"; secret: string }
-  | { kind: "ask" }
-  | { kind: "generate" }
-  | { kind: "none" };
+  | { kind: typeof SECRET_CHOICE.use; secret: string }
+  | { kind: typeof SECRET_CHOICE.ask }
+  | { kind: typeof SECRET_CHOICE.generate }
+  | { kind: typeof SECRET_CHOICE.none };
 
 export const relayWanted = (asked: AskedFor, inherited: Inherited): boolean =>
   asked.relayUrl !== undefined || (asked.token === undefined && inherited.sendsThroughARelay);
@@ -25,16 +32,16 @@ export const secretChoice = (
   hostingARelay: boolean
 ): SecretChoice => {
   if (asked.secret !== undefined) {
-    return { kind: "use", secret: asked.secret };
+    return { kind: SECRET_CHOICE.use, secret: asked.secret };
   }
 
   if (inherited.secret !== "") {
-    return { kind: "use", secret: inherited.secret };
+    return { kind: SECRET_CHOICE.use, secret: inherited.secret };
   }
 
   if (sendingThroughARelay) {
-    return { kind: "ask" };
+    return { kind: SECRET_CHOICE.ask };
   }
 
-  return hostingARelay ? { kind: "generate" } : { kind: "none" };
+  return hostingARelay ? { kind: SECRET_CHOICE.generate } : { kind: SECRET_CHOICE.none };
 };

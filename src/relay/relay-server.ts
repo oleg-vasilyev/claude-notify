@@ -1,6 +1,12 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 
-import { HEALTH_PATH, PING_PATH, relayRequestFrom } from "#domain/relay-protocol.ts";
+import { impossible } from "#domain/impossible.ts";
+import {
+  HEALTH_PATH,
+  PING_PATH,
+  RELAY_REQUEST,
+  relayRequestFrom,
+} from "#domain/relay-protocol.ts";
 import { log } from "#state/log.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
 
@@ -74,22 +80,25 @@ export const startRelay = async (host: RelayHost): Promise<Server> => {
       );
 
       switch (asked.kind) {
-        case "unauthorised":
+        case RELAY_REQUEST.unauthorised:
           log(`RELAY refused, wrong secret from ${request.socket.remoteAddress ?? UNKNOWN_CALLER}`);
           answer(response, UNAUTHORISED);
 
           return;
 
-        case "malformed":
+        case RELAY_REQUEST.malformed:
           log("RELAY refused, the request carried no message");
           answer(response, MALFORMED);
 
           return;
 
-        case "ping":
+        case RELAY_REQUEST.ping:
           answer(response, await forward(host, asked.message));
 
           return;
+
+        default:
+          return impossible(asked);
       }
     })();
   });

@@ -11,7 +11,10 @@ import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 
 vi.mock("node:crypto", () => ({ randomUUID: () => "abc12345-0000-0000-0000-000000000000" }));
 vi.mock("node:timers/promises", () => ({ setTimeout: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("#state/config.ts", () => ({ readConfig: vi.fn() }));
+vi.mock("#state/config.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#state/config.ts")>()),
+  readConfig: vi.fn(),
+}));
 vi.mock("#state/log.ts", () => ({ log: vi.fn() }));
 vi.mock("#presence/idle-time.ts", () => ({ idleSeconds: vi.fn() }));
 vi.mock("#state/asked-question.ts", () => ({
@@ -31,8 +34,6 @@ const ID = "abc12345";
 const A_STEP_MS = 30_000;
 const A_MESSAGE = 77;
 
-const RELAY_PORT = 8787;
-
 const config: Config = {
   delivery: { kind: "telegram", token: "T", chatId: "42" },
   machineLabel: "home",
@@ -41,12 +42,11 @@ const config: Config = {
   includeUsage: false,
   askMinutes: 10,
   quoteQuestions: true,
-  relaySecret: "",
-  relayPort: RELAY_PORT,
+  hosting: null,
 };
 
 const payload = {
-  cwd: "D:\\Temp\\job-finder",
+  cwd: "D:\\Temp\\a-project",
   tool_name: "AskUserQuestion",
   tool_input: {
     questions: [
@@ -110,7 +110,7 @@ describe("ask", () => {
   it("labels the message with the project and the machine", async () => {
     await ask("PreToolUse", payload);
 
-    expect(vi.mocked(sendQuestion).mock.calls[0]?.[2]).toContain("[job-finder@home]");
+    expect(vi.mocked(sendQuestion).mock.calls[0]?.[2]).toContain("[a-project@home]");
   });
 
   it("writes the question down before sending, so the watcher can match an answer", async () => {
@@ -119,7 +119,7 @@ describe("ask", () => {
     expect(writeAskedQuestion).toHaveBeenCalledWith(
       expect.objectContaining({ id: ID }),
       A_MESSAGE,
-      "[job-finder@home] Чем продолжим?"
+      "[a-project@home] Чем продолжим?"
     );
   });
 
@@ -178,7 +178,7 @@ describe("ask", () => {
   it("says nothing on a machine that pings through a relay, since an answer has no way back", async () => {
     vi.mocked(readConfig).mockReturnValue({
       ...config,
-      delivery: { kind: "relay", url: "http://home:8787" },
+      delivery: { kind: "relay", url: "http://home:8787", secret: "s3cr3t" },
     });
 
     const output = await ask("PreToolUse", payload);
@@ -188,7 +188,7 @@ describe("ask", () => {
   });
 
   it("says nothing for an event that carries no question", async () => {
-    const output = await ask("Stop", { cwd: "D:\\Temp\\job-finder" });
+    const output = await ask("Stop", { cwd: "D:\\Temp\\a-project" });
 
     expect(output).toBeNull();
     expect(sendQuestion).not.toHaveBeenCalled();

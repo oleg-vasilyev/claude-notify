@@ -28,15 +28,17 @@ const config: Config = {
   includeUsage: false,
   askMinutes: 7,
   quoteQuestions: true,
-  relaySecret: "",
-  relayPort: DEFAULT_RELAY_PORT,
+  hosting: null,
 };
 
 const relayed: Config = {
   ...config,
-  delivery: { kind: "relay", url: "http://home-laptop:8787" },
-  relaySecret: "s3cr3t",
-  relayPort: ANOTHER_PORT,
+  delivery: { kind: "relay", url: "http://home-laptop:8787", secret: "s3cr3t" },
+};
+
+const hostingOne: Config = {
+  ...config,
+  hosting: { port: ANOTHER_PORT, secret: "s3cr3t" },
 };
 
 afterAll(() => {
@@ -63,8 +65,7 @@ describe("readConfigFrom", () => {
       includeUsage: true,
       askMinutes: 10,
       quoteQuestions: true,
-      relaySecret: "",
-      relayPort: DEFAULT_RELAY_PORT,
+      hosting: null,
     });
   });
 
@@ -86,25 +87,38 @@ describe("readConfigFrom", () => {
     expect(readConfigFrom(path)?.minIdleMinutes).toBe(3);
   });
 
-  it("reads a machine that pings through a relay and holds no token of its own", () => {
+  it("reads a machine that pings through a relay, carrying the secret it proves itself with", () => {
     const path = envWith("RELAY_URL=http://home-laptop:8787\nRELAY_SECRET=s3cr3t\n");
 
     expect(readConfigFrom(path)?.delivery).toEqual({
       kind: "relay",
       url: "http://home-laptop:8787",
+      secret: "s3cr3t",
     });
   });
 
-  it("carries the shared secret a relayed machine has to prove itself with", () => {
-    const path = envWith("RELAY_URL=http://home-laptop:8787\nRELAY_SECRET=s3cr3t\n");
+  it("hosts a relay on the port and secret a machine with a token of its own carries", () => {
+    const path = envWith(`BOT_TOKEN=T\nCHAT_ID=42\nRELAY_SECRET=s3cr3t\nRELAY_PORT=${ANOTHER_PORT}\n`);
 
-    expect(readConfigFrom(path)?.relaySecret).toBe("s3cr3t");
+    expect(readConfigFrom(path)?.hosting).toEqual({ port: ANOTHER_PORT, secret: "s3cr3t" });
   });
 
-  it("reads the port a relay host is to listen on", () => {
+  it("hosts on the default port when a secret is set but no port is", () => {
+    const path = envWith("BOT_TOKEN=T\nCHAT_ID=42\nRELAY_SECRET=s3cr3t\n");
+
+    expect(readConfigFrom(path)?.hosting?.port).toBe(DEFAULT_RELAY_PORT);
+  });
+
+  it("hosts nothing on a machine with no secret, however the port is set", () => {
     const path = envWith(`BOT_TOKEN=T\nCHAT_ID=42\nRELAY_PORT=${ANOTHER_PORT}\n`);
 
-    expect(readConfigFrom(path)?.relayPort).toBe(ANOTHER_PORT);
+    expect(readConfigFrom(path)?.hosting).toBeNull();
+  });
+
+  it("hosts nothing on a machine that sends through a relay, since it has no token to forward with", () => {
+    const path = envWith("RELAY_URL=http://home-laptop:8787\nRELAY_SECRET=s3cr3t\n");
+
+    expect(readConfigFrom(path)?.hosting).toBeNull();
   });
 
   it("sends straight to Telegram on a host that both relays for others and has a token", () => {
@@ -133,6 +147,10 @@ describe("readConfigFrom", () => {
     expect(readConfigFrom(envWith("RELAY_URL=\nRELAY_SECRET=s3cr3t\n"))).toBeNull();
   });
 
+  it("refuses a relay with no secret, because every ping it sent would be turned away", () => {
+    expect(readConfigFrom(envWith("RELAY_URL=http://home-laptop:8787\n"))).toBeNull();
+  });
+
   it("refuses a file that is not there", () => {
     expect(readConfigFrom(join(directory, "absent.env"))).toBeNull();
   });
@@ -153,6 +171,22 @@ describe("writeConfigTo", () => {
     writeConfigTo(path, relayed);
 
     expect(readConfigFrom(path)).toEqual(relayed);
+  });
+
+  it("writes a relay host's settings a later read gets back unchanged", () => {
+    const path = join(directory, "hosting.env");
+
+    writeConfigTo(path, hostingOne);
+
+    expect(readConfigFrom(path)).toEqual(hostingOne);
+  });
+
+  it("blanks the port and the secret when a host stops relaying for others", () => {
+    const path = envWith(`BOT_TOKEN=T\nCHAT_ID=42\nRELAY_SECRET=s3cr3t\nRELAY_PORT=${ANOTHER_PORT}\n`);
+
+    writeConfigTo(path, config);
+
+    expect(readConfigFrom(path)?.hosting).toBeNull();
   });
 
   it("blanks the token when a machine is switched over to a relay", () => {

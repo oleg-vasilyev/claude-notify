@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 
-import type { PendingPing } from "#domain/pending.ts";
+import type { PendingPing } from "#domain/ping/pending.ts";
 import { pendingFile, stateHome } from "#state/file-locations.ts";
 
 

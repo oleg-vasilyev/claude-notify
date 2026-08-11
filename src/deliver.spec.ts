@@ -12,7 +12,10 @@ import { deliver } from "#app/deliver.ts";
 import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 
 
-vi.mock("#state/config.ts", () => ({ readConfig: vi.fn() }));
+vi.mock("#state/config.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#state/config.ts")>()),
+  readConfig: vi.fn(),
+}));
 vi.mock("#state/log.ts", () => ({ log: vi.fn() }));
 vi.mock("#presence/idle-time.ts", () => ({ idleSeconds: vi.fn() }));
 vi.mock("#state/pending-queue.ts", () => ({ appendPending: vi.fn() }));
@@ -28,8 +31,6 @@ vi.mock("#app/watcher-process.ts", () => ({
 const AWAY_SECONDS = 600;
 const PRESENT_SECONDS = 5;
 
-const RELAY_PORT = 8787;
-
 const config: Config = {
   delivery: { kind: "telegram", token: "T", chatId: "42" },
   machineLabel: "home",
@@ -38,18 +39,16 @@ const config: Config = {
   includeUsage: false,
   askMinutes: 10,
   quoteQuestions: true,
-  relaySecret: "",
-  relayPort: RELAY_PORT,
+  hosting: null,
 };
 
 const throughARelay: Config = {
   ...config,
   machineLabel: "work",
-  delivery: { kind: "relay", url: "http://home-laptop:8787" },
-  relaySecret: "s3cr3t",
+  delivery: { kind: "relay", url: "http://home-laptop:8787", secret: "s3cr3t" },
 };
 
-const ping = { message: "[job-finder] жду апрув", rateLimitMinutes: 0 };
+const ping = { message: "[a-project] жду апрув", rateLimitMinutes: 0 };
 
 describe("deliver", () => {
   beforeEach(() => {
@@ -66,13 +65,13 @@ describe("deliver", () => {
   it("sends the ping once the user is away", async () => {
     await deliver(ping);
 
-    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[job-finder@home] жду апрув");
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
   });
 
   it("stamps the project it just pinged, so the next fallback can be rate-limited", async () => {
     await deliver(ping);
 
-    expect(writeLastSentAt).toHaveBeenCalledWith("job-finder", expect.any(Number));
+    expect(writeLastSentAt).toHaveBeenCalledWith("a-project", expect.any(Number));
   });
 
   it("queues instead of sending while the user is at the keyboard", async () => {
@@ -83,7 +82,7 @@ describe("deliver", () => {
     expect(sendMessage).not.toHaveBeenCalled();
     expect(appendPending).toHaveBeenCalledWith({
       queuedAt: expect.any(Number),
-      message: "[job-finder@home] жду апрув",
+      message: "[a-project@home] жду апрув",
     });
   });
 
@@ -130,7 +129,7 @@ describe("deliver", () => {
     expect(sendMessage).toHaveBeenCalledWith(
       "T",
       "42",
-      "[job-finder@home] жду апрув\n\n▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов"
+      "[a-project@home] жду апрув\n\n▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов"
     );
   });
 
@@ -140,7 +139,7 @@ describe("deliver", () => {
 
     await deliver(ping);
 
-    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[job-finder@home] жду апрув");
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
     expect(log).toHaveBeenCalledWith("WARN usage unavailable");
   });
 
@@ -167,7 +166,7 @@ describe("deliver", () => {
     expect(relayMessage).toHaveBeenCalledWith(
       "http://home-laptop:8787",
       "s3cr3t",
-      "[job-finder@work] жду апрув"
+      "[a-project@work] жду апрув"
     );
   });
 

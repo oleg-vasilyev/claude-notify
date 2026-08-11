@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { EVERY_PROJECT, projectKeyOf, projectPrefixOf, withMachineLabel } from "#domain/project.ts";
+import { EVERY_PROJECT, projectKeyOf, projectPrefixOf, withMachineLabel } from "#domain/ping/project.ts";
 
 
 describe("projectKeyOf", () => {
   it("reads the project from a plain prefix", () => {
-    expect(projectKeyOf("[job-finder] waiting")).toBe("job-finder");
+    expect(projectKeyOf("[a-project] waiting")).toBe("a-project");
   });
 
   it("reads the project from a machine-labelled prefix", () => {
-    expect(projectKeyOf("[FoolProof@home] waiting")).toBe("FoolProof");
+    expect(projectKeyOf("[another-project@home] waiting")).toBe("another-project");
   });
 
   it("falls back when there is no prefix", () => {
@@ -31,7 +31,7 @@ describe("projectKeyOf", () => {
 
 describe("withMachineLabel", () => {
   it("inserts the label into a plain prefix", () => {
-    expect(withMachineLabel("[job-finder] waiting", "home")).toBe("[job-finder@home] waiting");
+    expect(withMachineLabel("[a-project] waiting", "home")).toBe("[a-project@home] waiting");
   });
 
   it("prefixes an unlabelled message with the machine alone", () => {
@@ -53,15 +53,15 @@ describe("withMachineLabel", () => {
 
 describe("projectPrefixOf", () => {
   it("names the project after the last segment of the path", () => {
-    expect(projectPrefixOf("D:\\Temp\\FoolProof")).toBe("[FoolProof] ");
+    expect(projectPrefixOf("D:\\Temp\\another-project")).toBe("[another-project] ");
   });
 
   it("reads a posix path too", () => {
-    expect(projectPrefixOf("/home/oleg/job-finder")).toBe("[job-finder] ");
+    expect(projectPrefixOf("/home/oleg/a-project")).toBe("[a-project] ");
   });
 
   it("ignores a trailing separator", () => {
-    expect(projectPrefixOf("D:\\Temp\\FoolProof\\")).toBe("[FoolProof] ");
+    expect(projectPrefixOf("D:\\Temp\\another-project\\")).toBe("[another-project] ");
   });
 
   it("returns nothing when the payload carried no directory", () => {

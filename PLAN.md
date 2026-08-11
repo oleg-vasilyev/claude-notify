@@ -126,7 +126,10 @@ shared secret, and that is deliberately less than a token: the worst a leaked
 secret buys is the ability to write into one chat, never the bot itself. The
 secret rides as a bearer header and is checked before the body is even parsed,
 so a stranger who guesses the port learns nothing from a malformed request that
-they would not have learned from a well-formed one.
+they would not have learned from a well-formed one. The URL and the secret are
+one fact, not two, and are read as one: a machine that names a relay without the
+secret to prove itself is treated as not configured at all, because every ping it
+made would come back refused.
 
 The traffic is plain HTTP over the local network, and stays that way on
 purpose: what crosses is a line already judged fit to appear on a phone. That is
@@ -185,7 +188,7 @@ the current windows are read and appended, so a ping delivered from the queue
 carries fresh numbers rather than the ones from when it was suppressed:
 
 ```
-[job-finder@home] Закончил фазу 2, жду апрув на миграцию БД
+[a-project@home] Закончил фазу 2, жду апрув на миграцию БД
 
 ▰▰▰▱▱▱▱▱▱▱ 35% · 5 часов
 ▰▰▰▰▰▱▱▱▱▱ 54% · неделя/Fable
@@ -291,9 +294,9 @@ threshold is the knob if it ever is not.
   documented behaviour (permission prompts, idle waits) was happening on
   screen. The fallback therefore rests on `Stop` + `PreToolUse` +
   `PermissionRequest`, and no design may assume `Notification` works.
-- **A global rate limit silenced cross-project fallbacks.** One stamp file
-  meant a job-finder ping muted FoolProof's safety net for ten minutes —
-  observed live on day one, hence invariant 3.
+- **A global rate limit silenced cross-project fallbacks.** One stamp file meant
+  a ping from the project you were watching muted the safety net of the one you
+  were not, for ten minutes — observed live on day one, hence invariant 3.
 - **The first missing-ping mystery was the presence filter working as
   designed.** A question at 22:17 pinged at 22:28: the model's call was
   suppressed while the user was still at the keyboard, and the delivery

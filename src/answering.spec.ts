@@ -37,7 +37,7 @@ const question = {
   text: "Чем продолжим?",
   options: [{ value: "0", label: "Форк", recommended: true }],
   messageId: A_MESSAGE,
-  headline: "[job-finder@home] Чем продолжим?",
+  headline: "[a-project@home] Чем продолжим?",
 };
 
 const press = {
@@ -61,7 +61,7 @@ describe("collectAnswers", () => {
       "T",
       "42",
       A_MESSAGE,
-      "[job-finder@home] Чем продолжим?\n\n✓ Ответ: Форк"
+      "[a-project@home] Чем продолжим?\n\n✓ Ответ: Форк"
     );
   });
 
@@ -86,7 +86,7 @@ describe("collectAnswers", () => {
 
     const outcome = await collectAnswers(telegram, LONG_POLL_SECONDS);
 
-    expect(outcome).toBe("nothing-asked");
+    expect(outcome).toEqual({ kind: "nothing-asked" });
     expect(fetchUpdates).not.toHaveBeenCalled();
   });
 
@@ -141,7 +141,7 @@ describe("collectAnswers", () => {
 
     const outcome = await collectAnswers(telegram, LONG_POLL_SECONDS);
 
-    expect(outcome).toBe("failed");
+    expect(outcome).toEqual({ kind: "failed" });
     expect(writeAnswer).not.toHaveBeenCalled();
   });
 

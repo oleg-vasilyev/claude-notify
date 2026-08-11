@@ -1,4 +1,4 @@
-import { copy } from "#domain/copy.ts";
+import { copy } from "#domain/copy.ru.ts";
 import { humanizeDuration } from "#domain/duration.ts";
 
 

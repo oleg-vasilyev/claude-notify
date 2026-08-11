@@ -35,8 +35,14 @@ Spend it on what no rule can check.
 - **Dispatch.** Is every closed union handled with `switch`, so adding a case
   becomes a compile error everywhere obliged to handle it? An `if` chain over a
   discriminant is a finding.
-- **Copy.** Any Russian string outside `domain/copy.ts` is a finding. Any
-  decision *inside* `copy.ts` — a plural, a choice of word — is a worse one: the
+- **Anything from outside this project.** A fixture, an example, a comment or a
+  commit message naming another of the user's projects is a finding, whatever it
+  is illustrating — the repository is public. `docs:check` guards the two shapes
+  a project name takes here, a ping prefix and a `cwd`; you are looking for the
+  shapes it cannot see, and for reasoning that assumes a codebase other than
+  this one.
+- **Copy.** Any Russian string outside `domain/copy.ru.ts` is a finding. Any
+  decision *inside* `copy.ru.ts` — a plural, a choice of word — is a worse one: the
   table is never mocked, so a decision there is asserted against itself and
   cannot be killed by mutation testing.
 - **Tests.** Does each new case assert something that would fail if the code

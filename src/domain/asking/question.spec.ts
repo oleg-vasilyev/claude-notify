@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { HookPayload } from "#domain/hook-ping.ts";
-import { ALLOW, DENY, ownsAskUserQuestion, questionFrom, questionText } from "#domain/question.ts";
+import type { HookPayload } from "#domain/ping/hook-ping.ts";
+import { ALLOW, DENY, ownsAskUserQuestion, questionFrom, questionText } from "#domain/asking/question.ts";
 
 
 const ID = "abc12345";

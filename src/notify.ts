@@ -1,9 +1,10 @@
 import { parseArgs } from "node:util";
 
+import { numberOr } from "#domain/written-number.ts";
 import { deliver } from "#app/deliver.ts";
 
 
-const DECIMAL = 10;
+const NEVER_RATE_LIMITED = 0;
 
 const { values } = parseArgs({
   options: {
@@ -16,11 +17,13 @@ const { values } = parseArgs({
 const message = values.message ?? "";
 
 if (message === "") {
-  throw new Error('claude-notify: a ping needs a message, e.g. --message "[proj] жду апрув"');
+  throw new Error(
+    'claude-notify: a ping needs a message, e.g. --message "[proj] waiting for your approval"'
+  );
 }
 
 await deliver({
   message,
-  rateLimitMinutes: Number.parseInt(values["rate-limit-minutes"], DECIMAL),
+  rateLimitMinutes: numberOr(values["rate-limit-minutes"], NEVER_RATE_LIMITED),
   ignorePresence: values.now,
 });

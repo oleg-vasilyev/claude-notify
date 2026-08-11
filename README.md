@@ -8,7 +8,7 @@ with a question, the sound notification plays to an empty room — and the agent
 sits idle until you happen to come back.
 
 ```
-[job-finder@home] Закончил фазу 2, жду апрув на миграцию БД
+[a-project@home] Закончил фазу 2, жду апрув на миграцию БД
 
 ▰▰▰▱▱▱▱▱▱▱ 35% · 5 часов
 ▰▰▰▰▰▱▱▱▱▱ 54% · неделя/Fable
@@ -105,14 +105,14 @@ entirely.
 | --- | --- |
 | `BOT_TOKEN` | the bot token from BotFather |
 | `CHAT_ID` | your chat with the bot, resolved automatically |
-| `MACHINE_LABEL` | the machine name in pings: `[job-finder@work]` |
+| `MACHINE_LABEL` | the machine name in pings: `[a-project@work]` |
 | `MIN_IDLE_MINUTES` | minutes without keyboard or mouse that count as "away" (default 3) |
 | `STALE_MINUTES` | minutes after which a queued ping expires undelivered (default 15) |
 | `INCLUDE_USAGE` | append the limits line to each ping (default true) |
 | `ASK_MINUTES` | how long a question waits on the phone before going back to the app (default 10; 0 turns answering off) |
 | `QUOTE_QUESTIONS` | whether the text of a question may leave this machine (default true) |
-| `RELAY_URL` | send through another machine instead of Telegram; set this *instead of* the token |
-| `RELAY_SECRET` | the shared secret between a relay and the machines it forwards for |
+| `RELAY_URL` | send through another machine instead of Telegram; set this *instead of* the token, and always together with `RELAY_SECRET` |
+| `RELAY_SECRET` | the shared secret between a relay and the machines it forwards for. With a token beside it, this machine *is* a relay; with `RELAY_URL`, it sends through one |
 | `RELAY_PORT` | the port `npm run relay` listens on, if this machine is the relay (default 8787) |
 
 One bot serves any number of machines; the label is what tells their pings
@@ -148,23 +148,29 @@ node src/notify.ts --message "[test] проверка" --now
 
 ```
 src/domain/     every decision, pure — no files, no network, no clock
-  answer.ts         which Telegram update answers which question
-  asking.ts         ask on the phone, or leave it to the app
-  copy.ts           every Russian string the user reads
-  delivery.ts       send, queue, or skip
+  copy.ru.ts        the one file that may hold Russian: what is sent, and what
+                    has to be recognised in a payload
   duration.ts       "1 ч 12 мин"
   env-file.ts       reading and updating .env without losing your comments
-  hook-answer.ts    the answer, shaped as a decision Claude Code accepts
-  hook-ping.ts      what each Claude Code event has to say
-  hook-registration.ts  merging into settings.json without clobbering it
-  memory-rule.ts    the rule setup writes into the global CLAUDE.md
-  pending.ts        which queued pings survive, and which one wins per project
-  project.ts        the project key and the machine label
-  question.ts       a hook payload turned into something answerable by phone
+  impossible.ts     the case a union grew and a switch did not
   relay-protocol.ts what the two ends of a relay agree on, and who may send
-  setup-choice.ts   which way a machine sends, and where its relay secret comes from
-  startup-script.ts the batch file that brings the relay up at login
-  usage.ts          the limits line
+  written-number.ts a number somebody typed into a settings file
+  ping/         what to say, and whether to say it now
+    delivery.ts       send, queue, or skip
+    hook-ping.ts      what each Claude Code event has to say
+    pending.ts        which queued pings survive, and which one wins per project
+    project.ts        the project key and the machine label
+    usage.ts          the limits line
+  asking/       putting a question on the phone, and reading the answer
+    answer.ts         which Telegram update answers which question
+    asking.ts         ask on the phone, or leave it to the app
+    hook-answer.ts    the answer, shaped as a decision Claude Code accepts
+    question.ts       a hook payload turned into something answerable by phone
+  setup/        what the installer writes, and where it writes it
+    hook-registration.ts  merging into settings.json without clobbering it
+    memory-rule.ts    the rule setup writes into the global CLAUDE.md
+    setup-choice.ts   which way a machine sends, and where its relay secret comes from
+    startup-script.ts the batch file that brings the relay up at login
 src/state/      what this product remembers between runs
   asked-question.ts the question a hook waits on, and the answer it waits for
   config.ts         the settings, read from .env

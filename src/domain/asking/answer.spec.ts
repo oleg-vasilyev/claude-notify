@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { answersIn, callbackDataFor, highestUpdateId, type TelegramUpdate } from "#domain/answer.ts";
-import { ALLOW, DENY, type AskedQuestion } from "#domain/question.ts";
+import { answersIn, callbackDataFor, highestUpdateId, type TelegramUpdate } from "#domain/asking/answer.ts";
+import { ALLOW, DENY, type AskedQuestion } from "#domain/asking/question.ts";
 
 
 const CHAT = "42";

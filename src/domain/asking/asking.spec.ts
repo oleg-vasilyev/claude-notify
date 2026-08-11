@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decideAsk, type AskFacts } from "#domain/asking.ts";
+import { decideAsk, type AskFacts } from "#domain/asking/asking.ts";
 
 
 const ID = "abc12345";

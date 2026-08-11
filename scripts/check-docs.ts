@@ -4,6 +4,22 @@ import { join, relative, resolve } from "node:path";
 
 const DOCUMENTS = ["README.md", "PLAN.md", "CLAUDE.md", "TECH-DEBT.md"];
 const CLAUDE_MD_LINE_BUDGET = 130;
+const FOLDER_BUDGET = 12;
+const FIXTURE_NAMES = new Set([
+  "a-project",
+  "another-project",
+  "live-check",
+  "claude-notify",
+  "proj",
+  "a",
+  "b",
+  "setup",
+  "Temp",
+  "…",
+]);
+const PING_PREFIX = /\[([^\]@\s"[]+)@/g;
+const CWD_FIXTURE = /cwd"?:\s*"([^"]*)"/g;
+const PATH_SEPARATOR = /[\\/]+/;
 const LOCAL_LINK = /\[[^\]]*\]\((?!https?:)([^)]+)\)/g;
 const HEADING = /^#+\s+(.+)$/gm;
 const FENCE = /```[\s\S]*?```/g;
@@ -47,6 +63,43 @@ const exists = (path: string): boolean => {
   }
 };
 
+const everyFileUnder = (directory: string, suffixes: string[]): string[] =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      return everyFileUnder(path, suffixes);
+    }
+
+    return suffixes.some((suffix) => entry.name.endsWith(suffix)) ? [path] : [];
+  });
+
+const lastSegmentOf = (path: string): string => {
+  const segments = path.split(PATH_SEPARATOR).filter((segment) => segment !== "");
+
+  return segments[segments.length - 1] ?? "";
+};
+
+const onlyOurOwnNames = (path: string, text: string): void => {
+  for (const [, named] of text.matchAll(PING_PREFIX)) {
+    if (named !== undefined && !FIXTURE_NAMES.has(named)) {
+      complain(
+        `${path}: the ping prefix [${named}@…] names a project that is not this one — a fixture names the check, never somebody's real work`
+      );
+    }
+  }
+
+  for (const [, cwd] of text.matchAll(CWD_FIXTURE)) {
+    const project = cwd === undefined ? "" : lastSegmentOf(cwd);
+
+    if (project !== "" && !FIXTURE_NAMES.has(project)) {
+      complain(
+        `${path}: the cwd fixture ends in ${project}, which is not one of this project's reserved fixture names`
+      );
+    }
+  }
+};
+
 const sourceFiles = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -80,12 +133,26 @@ for (const document of DOCUMENTS) {
   }
 }
 
+for (const document of DOCUMENTS) {
+  onlyOurOwnNames(document, read(document));
+}
+
+for (const file of [
+  ...everyFileUnder("src", [".ts"]),
+  ...everyFileUnder("e2e", [".ts"]),
+  ...everyFileUnder(".claude", [".md", ".json"]),
+]) {
+  onlyOurOwnNames(file, read(file));
+}
+
 const readme = read("README.md");
 const shownBy = new Map<string, string>();
+const modulesIn = new Map<string, number>();
 
 for (const file of sourceFiles("src")) {
   const path = relative(resolve("src"), resolve(file)).split(/[\\/]/).join("/");
   const basename = path.split("/").pop() ?? path;
+  const folder = path.slice(0, -basename.length - 1);
   const shownAlready = shownBy.get(basename);
 
   if (shownAlready !== undefined) {
@@ -95,9 +162,14 @@ for (const file of sourceFiles("src")) {
   }
 
   shownBy.set(basename, path);
+  modulesIn.set(folder, (modulesIn.get(folder) ?? 0) + 1);
+}
 
-  if (!readme.includes(basename)) {
-    complain(`README.md: src/${path} is not in the source tree it shows`);
+for (const [folder, modules] of modulesIn) {
+  if (modules > FOLDER_BUDGET) {
+    complain(
+      `src/${folder} holds ${modules} modules against a budget of ${FOLDER_BUDGET} — a folder past that has stopped being one subject, so split it by what its parts are about`
+    );
   }
 }
 
@@ -145,4 +217,6 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`docs ok: ${DOCUMENTS.length} documents, links, tree and budget`);
+console.log(
+  `docs ok: ${DOCUMENTS.length} documents, links, secrets, file names and both budgets`
+);

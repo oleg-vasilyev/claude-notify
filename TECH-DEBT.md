@@ -9,14 +9,13 @@ remembers.
 
 ## Three domain files carry almost every surviving mutant
 
-The total is 88.8% against a break threshold of 85, up from 87.5% before the
-relay. Two phases running, every new file has arrived at 96–100% and pushed the
-number up, so the old fear — that the next `domain/` file would break the gate
-on its own — can be retired. The survivors stay concentrated in the three files
-that were already lagging and that neither phase touched: `memory-rule.ts`
-(67%), `env-file.ts` (81%), `delivery.ts` (81%). Mostly boundary and string
-mutants, where a test asserts *that* something happened rather than exactly
-what.
+The total was 88.8% against a break threshold of 85. Two phases running, every
+new file has arrived at 96–100% and pushed the number up, so the old fear — that
+the next `domain/` file would break the gate on its own — can be retired. The
+survivors stay concentrated in the three files that were already lagging and
+that neither phase touched: `memory-rule.ts` (67%), `env-file.ts` (81%),
+`delivery.ts` (81%). Mostly boundary and string mutants, where a test asserts
+*that* something happened rather than exactly what.
 
 The relay paid its own way here, and the method is worth repeating: the three
 survivors it produced were not gaps in the tests but a `catch` broad enough to
@@ -67,12 +66,19 @@ waits — in some other host it may simply work.
 
 ## Mocked modules have no stub files
 
-`deliver.spec.ts` mocks six edge modules with inline `vi.fn()` factories. The
-reference project insists on a `*.stub.ts` beside each mockable module, because
-a hand-rolled fake keeps compiling after the real signature changes.
+`deliver.spec.ts` mocks six edge modules with inline `vi.fn()` factories, where
+the reference project would keep a `*.stub.ts` beside each mockable module,
+because a hand-rolled fake keeps compiling after the real signature changes.
 
-**Write the stubs when a second spec mocks the same module**, or the first time
-a factory is caught disagreeing with a real signature.
+That trigger has now fired. `state/config.ts` grew a `DELIVERY` table, and three
+specs replacing the whole module with `{ readConfig: vi.fn() }` handed the code
+under test an `undefined` — thirty-two failures whose stack pointed at the
+production line rather than at the fake. The fix was smaller than stubs and
+covers the whole class: those mocks now spread `importOriginal()` and override
+only the function they mean to.
+
+**Mock a module partially, never wholly.** Write the stubs the first time that
+stops being enough.
 
 ---
 
@@ -110,23 +116,26 @@ file.**
 
 ---
 
-## One e2e scenario fails perhaps one run in five
+## One e2e scenario in a whole-suite run hangs, and it is never the same one
 
-`takes the keyboard away when nobody answered either` waits out a real
-one-minute window and then asserts the keyboard was removed. It passed nine runs
-out of ten while the relay was being built, and failed the tenth — always in a
-whole-file run, never alone, which points at leftovers from the case before it
-rather than at the assertion. The same file also passed three consecutive runs
-on the commit before this phase, so nothing here is suspected of causing it, and
-nothing here is cleared either.
+Two sightings so far. The first was `takes the keyboard away when nobody
+answered either`, in the answering file. The second was `never puts buttons on a
+question from a relayed machine`, in the relay file — which hung its full
+120-second timeout in `npm run e2e`, then passed 7/7 in 3 seconds when its file
+was run alone, and the whole suite passed 19/19 on the very next run.
 
-The suspects, in order: a watcher spawned by an earlier case still polling a
-server that `afterEach` has since closed, and `closeQuestion` swallowing its own
-failure so a refused edit looks like no edit at all.
+The second sighting kills the first one's suspects. That scenario has no
+`closeQuestion` and no watcher — `ASK_MINUTES=0` on the machine it uses — so
+neither "a watcher from an earlier case" nor "a swallowed `closeQuestion`
+failure" can explain it. What the two share is only this: a hook process that
+never returned, in a run where another e2e file had already spawned and torn
+down processes. `fileParallelism` is off, so it is not two files racing; the
+suspect is now something left running between files — a detached process, or a
+port not yet released — rather than anything inside either scenario.
 
-**Chase it the next time it fails**, with the whole file's log kept — a gate
-that is right four times in five teaches people to re-run it, which is worse
-than not having it.
+**Chase it the next time it hangs**, and keep the run whole: both files' logs,
+plus a process list taken while it is still stuck. A gate that is right four
+times in five teaches people to re-run it, which is worse than not having it.
 
 ---
 
@@ -165,8 +174,8 @@ exercise. The installer already knows how to find its own hook entries, so
   one place to update, and `git pull` is the upgrade. The price is that moving
   the checkout means running setup again, which is one command and is stated in
   `README.md`.
-- **The token lives outside the repository**, in `~/.claude/claude-notify/`, so
-  no `.gitignore` mistake can publish it and an update cannot overwrite it.
+- **The token lives in `.env` in the checkout**, gitignored, with `docs:check`
+  failing if that ever stops being true — the one gate that guards a secret.
 - **Hook scripts log their whole payload (truncated).** Verbose, but the
   payloads are the only documentation of what Claude Code actually sends each
   event, and they have already falsified the documentation once.

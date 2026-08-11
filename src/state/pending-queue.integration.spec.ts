@@ -73,15 +73,15 @@ describe("the state files", () => {
   });
 
   it("remembers when a project was last pinged", () => {
-    writeLastSentAt("job-finder", A_PING.queuedAt);
+    writeLastSentAt("a-project", A_PING.queuedAt);
 
-    expect(readLastSentAt("job-finder")).toBe(A_PING.queuedAt);
+    expect(readLastSentAt("a-project")).toBe(A_PING.queuedAt);
   });
 
   it("keeps one stamp per project, so one project cannot silence another", () => {
-    writeLastSentAt("job-finder", A_PING.queuedAt);
+    writeLastSentAt("a-project", A_PING.queuedAt);
 
-    expect(readLastSentAt("FoolProof")).toBeNull();
+    expect(readLastSentAt("another-project")).toBeNull();
   });
 
   it("reports no stamp for a project that has never been pinged", () => {

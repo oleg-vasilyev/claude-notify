@@ -4,10 +4,16 @@ const TRAILING_SLASHES = /\/+$/;
 export const PING_PATH = "/ping";
 export const HEALTH_PATH = "/health";
 
+export const RELAY_REQUEST = {
+  ping: "ping",
+  unauthorised: "unauthorised",
+  malformed: "malformed",
+} as const;
+
 export type RelayRequest =
-  | { kind: "ping"; message: string }
-  | { kind: "unauthorised" }
-  | { kind: "malformed" };
+  | { kind: typeof RELAY_REQUEST.ping; message: string }
+  | { kind: typeof RELAY_REQUEST.unauthorised }
+  | { kind: typeof RELAY_REQUEST.malformed };
 
 export const relayEndpoint = (base: string, path: string): string =>
   `${base.replace(TRAILING_SLASHES, "")}${path}`;
@@ -34,10 +40,10 @@ export const relayRequestFrom = (
   body: string
 ): RelayRequest => {
   if (secret === "" || authorization !== authorizationFor(secret)) {
-    return { kind: "unauthorised" };
+    return { kind: RELAY_REQUEST.unauthorised };
   }
 
   const message = messageIn(body);
 
-  return message === null ? { kind: "malformed" } : { kind: "ping", message };
+  return message === null ? { kind: RELAY_REQUEST.malformed } : { kind: RELAY_REQUEST.ping, message };
 };

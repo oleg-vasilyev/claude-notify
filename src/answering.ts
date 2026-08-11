@@ -1,5 +1,5 @@
-import { answersIn, highestUpdateId } from "#domain/answer.ts";
-import { copy } from "#domain/copy.ts";
+import { answersIn, highestUpdateId } from "#domain/asking/answer.ts";
+import { copy } from "#domain/copy.ru.ts";
 import type { TelegramDelivery } from "#state/config.ts";
 import { readAskedQuestions, writeAnswer } from "#state/asked-question.ts";
 import { log } from "#state/log.ts";
@@ -7,9 +7,16 @@ import { readUpdateOffset, writeUpdateOffset } from "#state/update-offset.ts";
 import { answerCallback, closeQuestion, fetchUpdates } from "#telegram/telegram-api.ts";
 
 
-const NOTHING = 0;
+export const ANSWERING_OUTCOME = {
+  nothingAsked: "nothing-asked",
+  collected: "collected",
+  failed: "failed",
+} as const;
 
-export type AnsweringOutcome = "nothing-asked" | "collected" | "failed";
+export type AnsweringOutcome =
+  | { kind: typeof ANSWERING_OUTCOME.nothingAsked }
+  | { kind: typeof ANSWERING_OUTCOME.collected }
+  | { kind: typeof ANSWERING_OUTCOME.failed };
 
 export const collectAnswers = async (
   delivery: TelegramDelivery,
@@ -17,8 +24,8 @@ export const collectAnswers = async (
 ): Promise<AnsweringOutcome> => {
   const questions = readAskedQuestions();
 
-  if (questions.length === NOTHING) {
-    return "nothing-asked";
+  if (questions.length === 0) {
+    return { kind: ANSWERING_OUTCOME.nothingAsked };
   }
 
   let updates;
@@ -28,7 +35,7 @@ export const collectAnswers = async (
   } catch (failure) {
     log(`WARN getUpdates failed: ${String(failure)}`);
 
-    return "failed";
+    return { kind: ANSWERING_OUTCOME.failed };
   }
 
   const seen = highestUpdateId(updates);
@@ -57,5 +64,5 @@ export const collectAnswers = async (
     }
   }
 
-  return "collected";
+  return { kind: ANSWERING_OUTCOME.collected };
 };

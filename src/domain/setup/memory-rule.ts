@@ -1,3 +1,6 @@
+import { copy } from "#domain/copy.ru.ts";
+
+
 export const MEMORY_RULE_HEADING = "# Telegram notifications when user action is needed";
 
 export const memoryRule = (pingCommand: string): string =>
@@ -9,7 +12,7 @@ The user often steps away from the laptop during long tasks. Whenever you are ab
 ${pingCommand} --message "<message>"
 \`\`\`
 
-Message: short, in Russian, starts with the project name in brackets, says what is needed. Example: \`[job-finder] Закончил фазу 2, жду апрув на миграцию БД\`. Keep under ~200 chars.
+Message: short, in Russian, starts with the project name in brackets, says what is needed. Example: \`${copy.pingExample}\`. Keep under ~200 chars.
 
 Do NOT send it for routine turn ends where nothing is needed from the user - only when you are actually waiting on them. Always just call it and let it decide: it silently queues the ping while the user is still at the keyboard and delivers it once they step away.
 `;

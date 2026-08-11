@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { relayWanted, secretChoice } from "#domain/setup-choice.ts";
+import { relayWanted, secretChoice } from "#domain/setup/setup-choice.ts";
 
 
 const NOTHING_ASKED = {};

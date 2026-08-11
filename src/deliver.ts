@@ -1,9 +1,10 @@
-import { decideDelivery } from "#domain/delivery.ts";
-import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
-import { usageLine } from "#domain/usage.ts";
+import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
+import { impossible } from "#domain/impossible.ts";
+import { projectKeyOf, withMachineLabel } from "#domain/ping/project.ts";
+import { usageLine } from "#domain/ping/usage.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
-import { readConfig, type Delivery } from "#state/config.ts";
+import { DELIVERY, readConfig, type Delivery } from "#state/config.ts";
 import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
@@ -18,22 +19,25 @@ export type PingRequest = {
   ignorePresence?: boolean;
 };
 
-const sendVia = async (delivery: Delivery, secret: string, text: string): Promise<void> => {
+const sendVia = async (delivery: Delivery, text: string): Promise<void> => {
   switch (delivery.kind) {
-    case "telegram":
+    case DELIVERY.telegram:
       await sendMessage(delivery.token, delivery.chatId, text);
 
       return;
 
-    case "relay":
-      await relayMessage(delivery.url, secret, text);
+    case DELIVERY.relay:
+      await relayMessage(delivery.url, delivery.secret, text);
 
       return;
+
+    default:
+      return impossible(delivery);
   }
 };
 
 const sentVia = (delivery: Delivery): string =>
-  delivery.kind === "relay" ? "SENT via relay" : "SENT";
+  delivery.kind === DELIVERY.relay ? "SENT via relay" : "SENT";
 
 const withUsage = async (message: string): Promise<string> => {
   const line = usageLine(await fetchUsage(), new Date());
@@ -66,7 +70,7 @@ export const deliver = async (request: PingRequest): Promise<void> => {
   });
 
   switch (verdict.kind) {
-    case "queue":
+    case DELIVERY_VERDICT.queue:
       appendPending({ queuedAt: Date.now(), message });
       log(`QUEUED idle=${verdict.idleSeconds}s | ${message}`);
 
@@ -76,19 +80,22 @@ export const deliver = async (request: PingRequest): Promise<void> => {
 
       return;
 
-    case "skip":
+    case DELIVERY_VERDICT.skip:
       log(`SKIP rate-limit [${project}] | ${message}`);
 
       return;
 
-    case "send":
+    case DELIVERY_VERDICT.send:
       break;
+
+    default:
+      return impossible(verdict);
   }
 
   const text = config.includeUsage ? await withUsage(message) : message;
 
   try {
-    await sendVia(config.delivery, config.relaySecret, text);
+    await sendVia(config.delivery, text);
     writeLastSentAt(project, Date.now());
     log(`${sentVia(config.delivery)} | ${text.replaceAll("\n", " | ")}`);
   } catch (failure) {

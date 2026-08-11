@@ -1,4 +1,4 @@
-﻿import { copy } from "#domain/copy.ts";
+﻿import { copy } from "#domain/copy.ru.ts";
 
 
 const MILLISECONDS_PER_MINUTE = 60_000;

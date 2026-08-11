@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectPending, type PendingPing } from "#domain/pending.ts";
+import { selectPending, type PendingPing } from "#domain/ping/pending.ts";
 
 
 const NOW = Date.parse("2026-08-07T12:00:00Z");

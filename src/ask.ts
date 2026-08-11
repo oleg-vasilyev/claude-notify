@@ -1,16 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { callbackDataFor } from "#domain/answer.ts";
-import { decideAsk } from "#domain/asking.ts";
-import { copy } from "#domain/copy.ts";
-import { hookAnswerOutput } from "#domain/hook-answer.ts";
-import type { HookEvent, HookPayload } from "#domain/hook-ping.ts";
-import { projectPrefixOf, withMachineLabel } from "#domain/project.ts";
-import { questionText } from "#domain/question.ts";
+import { callbackDataFor } from "#domain/asking/answer.ts";
+import { ASK_VERDICT, decideAsk } from "#domain/asking/asking.ts";
+import { copy } from "#domain/copy.ru.ts";
+import { hookAnswerOutput } from "#domain/asking/hook-answer.ts";
+import { impossible } from "#domain/impossible.ts";
+import type { HookEvent, HookPayload } from "#domain/ping/hook-ping.ts";
+import { projectPrefixOf, withMachineLabel } from "#domain/ping/project.ts";
+import { questionText } from "#domain/asking/question.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { forgetQuestion, readAnswer, writeAskedQuestion } from "#state/asked-question.ts";
-import { readConfig } from "#state/config.ts";
+import { DELIVERY, readConfig } from "#state/config.ts";
 import { log } from "#state/log.ts";
 import { closeQuestion, sendQuestion } from "#telegram/telegram-api.ts";
 import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
@@ -19,7 +20,6 @@ import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
 const ID_LENGTH = 8;
 const CHECK_EVERY_MS = 1000;
 const MILLISECONDS_PER_MINUTE = 60_000;
-const HEADLINE = 0;
 
 export const ask = async (
   event: HookEvent,
@@ -33,7 +33,7 @@ export const ask = async (
 
   const delivery = config.delivery;
 
-  if (delivery.kind !== "telegram") {
+  if (delivery.kind !== DELIVERY.telegram) {
     return null;
   }
 
@@ -48,16 +48,19 @@ export const ask = async (
   });
 
   switch (verdict.kind) {
-    case "present":
+    case ASK_VERDICT.present:
       log(`ASK skipped, at the keyboard ${verdict.idleSeconds}s | ${event}`);
 
       return null;
 
-    case "unaskable":
+    case ASK_VERDICT.unaskable:
       return null;
 
-    case "ask":
+    case ASK_VERDICT.ask:
       break;
+
+    default:
+      return impossible(verdict);
   }
 
   const question = verdict.question;
@@ -65,7 +68,7 @@ export const ask = async (
     questionText(question, projectPrefixOf(payload.cwd)),
     config.machineLabel
   );
-  const headline = text.split("\n")[HEADLINE] ?? text;
+  const headline = text.split("\n")[0] ?? text;
 
   let messageId: number | null;
 

@@ -1,9 +1,8 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
+import { numberIn } from "#domain/written-number.ts";
 import { stateHome, watcherLockFile } from "#state/file-locations.ts";
 
-
-const DECIMAL = 10;
 
 export const claimWatcherLock = (processId: number): void => {
   mkdirSync(stateHome(), { recursive: true });
@@ -16,9 +15,7 @@ export const releaseWatcherLock = (): void => {
 
 export const lockedWatcherProcessId = (): number | null => {
   try {
-    const processId = Number.parseInt(readFileSync(watcherLockFile(), "utf8").trim(), DECIMAL);
-
-    return Number.isNaN(processId) ? null : processId;
+    return numberIn(readFileSync(watcherLockFile(), "utf8").trim());
   } catch {
     return null;
   }

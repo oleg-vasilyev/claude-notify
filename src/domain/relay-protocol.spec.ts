@@ -35,9 +35,9 @@ describe("authorizationFor", () => {
 
 describe("relayRequestFrom", () => {
   it("accepts a message from a caller carrying the secret", () => {
-    expect(relayRequestFrom(SECRET, HEADER, bodyWith("[job-finder@work] закончил ход"))).toEqual({
+    expect(relayRequestFrom(SECRET, HEADER, bodyWith("[a-project@work] закончил ход"))).toEqual({
       kind: "ping",
-      message: "[job-finder@work] закончил ход",
+      message: "[a-project@work] закончил ход",
     });
   });
 

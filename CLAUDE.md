@@ -7,7 +7,7 @@ This file is loaded before every session, so it holds only what has to be known
 |---|---|
 | Adding or changing a hook event | `add-a-hook-event` skill |
 | Writing or changing any spec | `write-a-spec` skill |
-| Closing a phase, running the gates | `finish-phase` skill |
+| Touching config, the installer, a gate or a doc | `finish-phase` skill |
 | Writing or changing any document | `write-a-doc` skill |
 
 Four documents, one job each: `README.md` for arriving and installing, `PLAN.md`
@@ -28,13 +28,11 @@ executes is the file you edit. `tsconfig.json` mirrors that rather than
 describing a compiler: `erasableSyntaxOnly` and `verbatimModuleSyntax` keep the
 source strippable (no enums, no namespaces, `import type` for types), and
 `allowImportingTsExtensions` matches the explicit `.ts` in every import path.
-
-`strict: true`, `noUncheckedIndexedAccess`, and **no `any`**.
+Also `strict`, `noUncheckedIndexedAccess`, and **no `any`**.
 
 **There are no relative imports in `src/`** — every specifier is a `#domain/…`,
-`#state/…`, `#telegram/…` or `#app/…` subpath alias declared in `package.json`,
-so an import reads the same wherever it sits, and a layering violation is
-visible in the line itself.
+`#state/…` or `#app/…` subpath alias declared in `package.json`, so an import
+reads the same wherever it sits, and a layering violation is visible in the line.
 
 **Settings live in `.env`**, read through `domain/env-file.ts` and mapped in
 `state/config.ts`. `docs:check` fails unless it is gitignored and `.env.example`
@@ -45,18 +43,21 @@ lists every key — the token must never be committed.
 ```
 src/
   domain/     every decision, pure: state in as arguments, verdict out as a value
+    ping/ asking/ setup/   one folder per thing being decided about
   state/      what is remembered between runs: settings, log, queue, stamps, lock
   presence/   whether the user is at the keyboard
   telegram/   talking to Telegram
+  relay/      forwarding for a machine that cannot reach Telegram
   usage/      the account's limit windows
   deliver.ts  the funnel every ping goes through
-  hook.ts notify.ts watcher.ts setup.ts   entry points
+  hook.ts notify.ts watcher.ts relay.ts setup.ts   entry points
 ```
 
 Everything outside `domain/` is impure, and **each folder is named after its
 subject rather than after its position** — an `edges/` or `io/` bucket says what
 its contents are *not*, which is the vagueness the file names were cured of. A
-folder holding one module is fine; a bucket holding nine is not.
+folder holding one module is fine; **`docs:check` fails past twelve**, because a
+folder whose subject no longer fits in one phrase has become a bucket.
 
 **`domain/` may not import `node:*`, `koffi`, or anything impure.** No
 file, no socket, no clock — a function that needs the time takes a `Date` or a
@@ -71,14 +72,14 @@ Entry points are composition roots: they read argv or stdin, call one domain
 function, hand the verdict to one edge. When an entry point grows a branch
 worth naming, that branch belongs in `domain/`.
 
-**Everything the user reads in Telegram lives in `domain/copy.ts`** and nothing
-else contains a Russian string. There is no locale table: the product has one
-reader and one language, and a `copyIn(locale)` switch would be ceremony. A
-copy function interpolates and never decides — choosing between `1 ч` and
-`1 ч 12 мин` is `duration.ts`'s job, not the table's.
-
-Code, comments, commits and docs are English. Only what reaches Telegram is
-Russian.
+**`domain/copy.ru.ts` is the only file in the product that may hold Russian** —
+the `.ru` is in the name so a stray string elsewhere reads as the mistake it is.
+It holds both what is sent (`copy`) and the Russian the payload has to be
+*recognised* by (`recognise`). There is no locale table: one reader, one
+language, and a `copyIn(locale)` switch would be ceremony. A copy function
+interpolates and never decides — choosing between `1 ч` and `1 ч 12 мин` is
+`duration.ts`'s job, not the table's. Everything else — code, errors, comments,
+commits, docs — is English.
 
 ## Style
 
@@ -92,18 +93,17 @@ needs judgement:
 - **A number must be named by a `const`** — `project/named-numbers`. This
   product is a pile of thresholds, and an unnamed one reads as intent while
   behaving as an accident.
-- **Prefer a discriminated union over a nullable plus a separate reason.**
-  `decideDelivery` returns `{ kind: "queue"; idleSeconds }` rather than a
-  boolean and an out-parameter, so the caller's `switch` is exhaustive and
-  adding an outcome becomes a compile error everywhere obliged to handle it.
+- **Prefer a discriminated union over a nullable plus a separate reason**, spell
+  its members in a `const` table (`DELIVERY`, `ASK_VERDICT`) so no `case` repeats
+  a bare string, and close every `switch` with `default: impossible(x)` — TS
+  alone misses a missing case whenever the switch returns `void`.
 - **A file name has to survive being read on its own.** An editor tab shows
-  `pending.ts`, not its folder, so the name says what is inside: `usage.ts`
-  holds the usage line, `presence.ts` answers whether you are at the keyboard.
+  `pending.ts`, not its folder, so the name says what is inside.
+- **Only this project exists here.** No other project is named in a fixture, an
+  example or a commit — this repository is public, and `a-project` costs nothing
+  where a real name would publish somebody's work. `docs:check` guards it.
 - **Keep functions pure where you can**, and keep the impure ones small enough
   that what they do fits in their name.
-- `project/named-states` from the reference project is **not** adopted: it
-  guards states spelled across many features, and here one small union lives
-  beside its only consumer.
 
 ## Tests and gates
 

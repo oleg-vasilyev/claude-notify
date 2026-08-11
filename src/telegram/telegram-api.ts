@@ -1,4 +1,4 @@
-import type { TelegramUpdate } from "#domain/answer.ts";
+import type { TelegramUpdate } from "#domain/asking/answer.ts";
 
 
 const TELEGRAM = "https://api.telegram.org";

@@ -1,18 +1,22 @@
-import { copy } from "#domain/copy.ts";
-import type { HookEvent, HookPayload } from "#domain/hook-ping.ts";
+import { copy, recognise } from "#domain/copy.ru.ts";
+import { HOOK_EVENT, type HookEvent, type HookPayload } from "#domain/ping/hook-ping.ts";
 
 
 const ASK_TOOL = "AskUserQuestion";
 const LONGEST_ASKED = 500;
 const LONGEST_LABEL = 60;
 const ELLIPSIS = "…";
-const RECOMMENDED_MARKS = ["(рекомендую", "(recommended"];
 const FIRST = 0;
 
 export const ALLOW = "allow";
 export const DENY = "deny";
 
-export type QuestionKind = "choice" | "permission";
+export const QUESTION_KIND = {
+  choice: "choice",
+  permission: "permission",
+} as const;
+
+export type QuestionKind = (typeof QUESTION_KIND)[keyof typeof QUESTION_KIND];
 
 export type QuestionOption = {
   value: string;
@@ -33,7 +37,7 @@ const shortened = (text: string, longest: number): string =>
 const isRecommended = (description: string): boolean => {
   const lowered = description.toLowerCase();
 
-  return RECOMMENDED_MARKS.some((mark) => lowered.includes(mark));
+  return recognise.recommendedMarks.some((mark) => lowered.includes(mark));
 };
 
 const choiceOptions = (
@@ -59,7 +63,7 @@ const permissionOptions = (): QuestionOption[] => [
 ];
 
 export const ownsAskUserQuestion = (event: HookEvent, payload: HookPayload): boolean =>
-  event === "PreToolUse" && payload.tool_name === ASK_TOOL;
+  event === HOOK_EVENT.preToolUse && payload.tool_name === ASK_TOOL;
 
 export const questionFrom = (
   event: HookEvent,
@@ -80,13 +84,13 @@ export const questionFrom = (
       return null;
     }
 
-    return { id, kind: "choice", text: shortened(text, LONGEST_ASKED), options };
+    return { id, kind: QUESTION_KIND.choice, text: shortened(text, LONGEST_ASKED), options };
   }
 
-  if (event === "PermissionRequest" && payload.tool_name !== ASK_TOOL) {
+  if (event === HOOK_EVENT.permissionRequest && payload.tool_name !== ASK_TOOL) {
     return {
       id,
-      kind: "permission",
+      kind: QUESTION_KIND.permission,
       text: copy.permissionWanted(payload.tool_name ?? copy.someTool),
       options: permissionOptions(),
     };
@@ -98,7 +102,7 @@ export const questionFrom = (
 export const questionText = (question: AskedQuestion, project: string): string => {
   const lines = [project + question.text];
 
-  if (question.kind === "choice") {
+  if (question.kind === QUESTION_KIND.choice) {
     lines.push("");
 
     for (const option of question.options) {

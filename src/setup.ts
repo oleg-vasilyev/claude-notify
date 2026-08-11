@@ -4,20 +4,27 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-import type { ClaudeSettings, HookCommand, Registration } from "#domain/hook-registration.ts";
-import { registerHooks } from "#domain/hook-registration.ts";
-import { withMemoryRule } from "#domain/memory-rule.ts";
-import { relayWanted, secretChoice, type Inherited } from "#domain/setup-choice.ts";
-import { startupScript } from "#domain/startup-script.ts";
+import { copy } from "#domain/copy.ru.ts";
+import type { ClaudeSettings, HookCommand, Registration } from "#domain/setup/hook-registration.ts";
+import { registerHooks } from "#domain/setup/hook-registration.ts";
+import { impossible } from "#domain/impossible.ts";
+import { withMemoryRule } from "#domain/setup/memory-rule.ts";
+import { relayWanted, SECRET_CHOICE, secretChoice, type Inherited } from "#domain/setup/setup-choice.ts";
+import { startupScript } from "#domain/setup/startup-script.ts";
+import { numberOr } from "#domain/written-number.ts";
 import { relayAnswers, relayMessage } from "#relay/relay-client.ts";
-import { readConfigFrom, writeConfig, type Config, type Delivery } from "#state/config.ts";
+import {
+  DELIVERY,
+  readConfigFrom,
+  writeConfig,
+  type Delivery,
+  type TelegramDelivery,
+} from "#state/config.ts";
 import {
   claudeHome,
   claudeMemoryFile,
   claudeSettingsFile,
   envFile,
-  legacyConfigFile,
-  powershellConfigFile,
   startupRelayFile,
 } from "#state/file-locations.ts";
 import { botName, resolveChatId, sendMessage } from "#telegram/telegram-api.ts";
@@ -31,7 +38,6 @@ const DEFAULT_STALE_MINUTES = 15;
 const DEFAULT_ASK_MINUTES = 10;
 const DEFAULT_RELAY_PORT = 8787;
 const SECRET_BYTES = 24;
-const DECIMAL = 10;
 const OWNED_MARKER = "claude-notify";
 const OWNED_MARKERS = [OWNED_MARKER, "telegram-notify"];
 const JSON_INDENT = 2;
@@ -103,12 +109,6 @@ const ask = async (question: string): Promise<string> => {
   }
 };
 
-const numberOr = (written: string | undefined, fallback: number): number => {
-  const value = Number.parseInt(written ?? "", DECIMAL);
-
-  return Number.isNaN(value) ? fallback : value;
-};
-
 const readJsonFile = <T>(path: string, fallback: T): T => {
   if (!existsSync(path)) {
     return fallback;
@@ -121,42 +121,18 @@ const readJsonFile = <T>(path: string, fallback: T): T => {
   }
 };
 
-const legacyJsonConfig = (path: string): Config | null => {
-  const stored = readJsonFile<Record<string, string | number | boolean>>(path, {});
-
-  if (typeof stored.token !== "string" || typeof stored.chat_id !== "string") {
-    return null;
-  }
-
-  return {
-    delivery: { kind: "telegram", token: stored.token, chatId: stored.chat_id },
-    machineLabel: typeof stored.machine_label === "string" ? stored.machine_label : "",
-    minIdleMinutes:
-      typeof stored.min_idle_minutes === "number"
-        ? stored.min_idle_minutes
-        : DEFAULT_MIN_IDLE_MINUTES,
-    staleMinutes:
-      typeof stored.stale_minutes === "number" ? stored.stale_minutes : DEFAULT_STALE_MINUTES,
-    includeUsage: stored.include_usage !== false,
-    askMinutes: DEFAULT_ASK_MINUTES,
-    quoteQuestions: true,
-    relaySecret: "",
-    relayPort: DEFAULT_RELAY_PORT,
-  };
-};
-
-const inherited =
-  readConfigFrom(envFile()) ??
-  legacyJsonConfig(legacyConfigFile()) ??
-  legacyJsonConfig(powershellConfigFile());
+const inherited = readConfigFrom(envFile());
 
 const inheritedToken =
-  inherited?.delivery.kind === "telegram" ? inherited.delivery.token : undefined;
+  inherited?.delivery.kind === DELIVERY.telegram ? inherited.delivery.token : undefined;
 const inheritedChatId =
-  inherited?.delivery.kind === "telegram" ? inherited.delivery.chatId : undefined;
-const inheritedRelayUrl = inherited?.delivery.kind === "relay" ? inherited.delivery.url : undefined;
+  inherited?.delivery.kind === DELIVERY.telegram ? inherited.delivery.chatId : undefined;
+const inheritedRelayUrl = inherited?.delivery.kind === DELIVERY.relay ? inherited.delivery.url : undefined;
+const inheritedSecret =
+  inherited?.delivery.kind === DELIVERY.relay ? inherited.delivery.secret : inherited?.hosting?.secret;
+const inheritedHosting = inherited?.hosting ?? null;
 
-const telegramDelivery = async (): Promise<Delivery> => {
+const telegramDelivery = async (): Promise<TelegramDelivery> => {
   const token = values.token ?? inheritedToken ?? (await ask("Telegram bot token: "));
 
   if (token === "") {
@@ -177,10 +153,10 @@ const telegramDelivery = async (): Promise<Delivery> => {
 
   console.log(`chat id: ${chatId}`);
 
-  return { kind: "telegram", token, chatId };
+  return { kind: DELIVERY.telegram, token, chatId };
 };
 
-const relayDelivery = async (): Promise<Delivery> => {
+const relayUrlThatAnswers = async (): Promise<string> => {
   const url =
     values["relay-url"] ??
     inheritedRelayUrl ??
@@ -198,7 +174,7 @@ const relayDelivery = async (): Promise<Delivery> => {
 
   console.log(`relay ok: ${url}`);
 
-  return { kind: "relay", url };
+  return url;
 };
 
 const asked = {
@@ -209,40 +185,48 @@ const asked = {
 
 const carriedOver: Inherited = {
   sendsThroughARelay: inheritedRelayUrl !== undefined,
-  secret: inherited?.relaySecret ?? "",
+  secret: inheritedSecret ?? "",
 };
 
-const delivery = relayWanted(asked, carriedOver) ? await relayDelivery() : await telegramDelivery();
+const sendingThroughARelay = relayWanted(asked, carriedOver);
+const relayUrl = sendingThroughARelay ? await relayUrlThatAnswers() : "";
+const direct = sendingThroughARelay ? null : await telegramDelivery();
 
 const machineLabel =
   values.label ?? inherited?.machineLabel ?? (await ask("Machine label (home / work): "));
 
-const hosting = values["relay-port"] !== undefined;
-const relayPort = numberOr(values["relay-port"], inherited?.relayPort ?? DEFAULT_RELAY_PORT);
+const hosting =
+  direct !== null && (values["relay-port"] !== undefined || inheritedHosting !== null);
+const relayPort = numberOr(values["relay-port"], inheritedHosting?.port ?? DEFAULT_RELAY_PORT);
 
 const chosenSecret = async (): Promise<string> => {
-  const choice = secretChoice(asked, carriedOver, delivery.kind === "relay", hosting);
+  const choice = secretChoice(asked, carriedOver, sendingThroughARelay, hosting);
 
   switch (choice.kind) {
-    case "use":
+    case SECRET_CHOICE.use:
       return choice.secret;
 
-    case "ask":
+    case SECRET_CHOICE.ask:
       return ask("Relay secret (the one its host printed): ");
 
-    case "generate":
+    case SECRET_CHOICE.generate:
       return randomBytes(SECRET_BYTES).toString("hex");
 
-    case "none":
+    case SECRET_CHOICE.none:
       return "";
+
+    default:
+      return impossible(choice);
   }
 };
 
 const relaySecret = await chosenSecret();
 
-if (delivery.kind === "relay" && relaySecret === "") {
+if (sendingThroughARelay && relaySecret === "") {
   throw new Error("a relay needs the secret its host printed — without it every ping is refused");
 }
+
+const delivery: Delivery = direct ?? { kind: DELIVERY.relay, url: relayUrl, secret: relaySecret };
 
 writeConfig({
   delivery,
@@ -252,8 +236,7 @@ writeConfig({
   includeUsage: inherited?.includeUsage ?? true,
   askMinutes: inherited?.askMinutes ?? DEFAULT_ASK_MINUTES,
   quoteQuestions: inherited?.quoteQuestions ?? true,
-  relaySecret,
-  relayPort,
+  hosting: hosting ? { port: relayPort, secret: relaySecret } : null,
 });
 
 console.log(`settings written to ${envFile()}`);
@@ -296,16 +279,19 @@ if (hosting) {
 }
 
 if (!values["skip-test"]) {
-  const greeting = `[setup@${machineLabel}] claude-notify подключён на этой машине`;
+  const greeting = copy.installed(machineLabel);
 
   switch (delivery.kind) {
-    case "telegram":
+    case DELIVERY.telegram:
       await sendMessage(delivery.token, delivery.chatId, greeting);
       break;
 
-    case "relay":
-      await relayMessage(delivery.url, relaySecret, greeting);
+    case DELIVERY.relay:
+      await relayMessage(delivery.url, delivery.secret, greeting);
       break;
+
+    default:
+      impossible(delivery);
   }
 
   console.log("test message sent — check Telegram");

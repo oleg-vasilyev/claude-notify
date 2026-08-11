@@ -5,7 +5,7 @@ import {
   type ClaudeSettings,
   type HookCommand,
   type Registration,
-} from "#domain/hook-registration.ts";
+} from "#domain/setup/hook-registration.ts";
 
 
 const OURS = ["claude-notify", "telegram-notify"];

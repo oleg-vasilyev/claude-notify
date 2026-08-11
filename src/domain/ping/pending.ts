@@ -1,4 +1,4 @@
-import { projectKeyOf } from "#domain/project.ts";
+import { projectKeyOf } from "#domain/ping/project.ts";
 
 
 const MILLISECONDS_PER_MINUTE = 60_000;

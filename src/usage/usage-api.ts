@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import type { UsageSnapshot } from "#domain/usage.ts";
+import type { UsageSnapshot } from "#domain/ping/usage.ts";
 import { credentialsFile } from "#state/file-locations.ts";
 
 

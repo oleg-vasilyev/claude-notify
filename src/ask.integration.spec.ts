@@ -27,7 +27,10 @@ vi.mock("#state/file-locations.ts", () => ({
 }));
 
 vi.mock("#state/log.ts", () => ({ log: vi.fn() }));
-vi.mock("#state/config.ts", () => ({ readConfig: vi.fn() }));
+vi.mock("#state/config.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#state/config.ts")>()),
+  readConfig: vi.fn(),
+}));
 vi.mock("#presence/idle-time.ts", () => ({ idleSeconds: vi.fn() }));
 vi.mock("#app/watcher-process.ts", () => ({
   startWatcher: vi.fn(),
@@ -52,12 +55,11 @@ const config: Config = {
   includeUsage: false,
   askMinutes: 1,
   quoteQuestions: true,
-  relaySecret: "",
-  relayPort: 8787,
+  hosting: null,
 };
 
 const payload = {
-  cwd: "D:\\Temp\\job-finder",
+  cwd: "D:\\Temp\\a-project",
   tool_name: "AskUserQuestion",
   tool_input: {
     questions: [

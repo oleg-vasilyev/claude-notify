@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decideDelivery, type DeliveryFacts } from "#domain/delivery.ts";
+import { decideDelivery, type DeliveryFacts } from "#domain/ping/delivery.ts";
 
 
 const NOW = Date.parse("2026-08-07T12:00:00Z");

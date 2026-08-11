@@ -11,7 +11,7 @@ An event is named in five places, and missing one is the whole failure mode:
    the `switch` below it a compile error until the new case is written, which is
    the point of dispatching on a union.
 2. **`pingFor`** — the case: what the ping says, and its rate limit.
-3. **`copy.ts`** — the Russian the user reads. No string a user sees may appear
+3. **`copy.ru.ts`** — the Russian the user reads. No string a user sees may appear
    anywhere else.
 4. **`REGISTRATIONS`** in `setup.ts` — the event, its matcher if it needs one,
    and a sound if the event deserves one.
@@ -40,12 +40,17 @@ app, and how the shape of `tool_input.questions` was confirmed.
 To see a payload without waiting for the event, fire the hook by hand:
 
 ```bash
-echo '{"cwd":"D:\\Temp\\FoolProof","tool_name":"Bash"}' | node src/hook.ts PermissionRequest
+node src/hook.ts PermissionRequest < .claude/skills/finish-phase/payload.json
 ```
 
-Write the JSON to a **file** and pipe it with `type` when it contains anything
-non-ASCII — a shell that re-encodes the bytes is testing the shell, and that is
-exactly how a Cyrillic question shipped as mojibake while every test passed.
+**Always from a file, never from `echo`.** Not only for non-ASCII: no shell here
+delivers even `{"cwd":"D:\\…"}` intact — bash eats the backslashes, PowerShell
+re-encodes the bytes — and `hook.ts` reads unparseable JSON as an empty payload,
+so the command exits 0 and logs a ping naming no project and no tool. A shell
+that re-encodes the bytes is testing the shell, and that is exactly how a
+Cyrillic question shipped as mojibake while every test passed.
+
+Copy `payload.json` and edit the copy for an event that needs a different shape.
 
 ## The two hazards in the installer
 

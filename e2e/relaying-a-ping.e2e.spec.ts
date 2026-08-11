@@ -16,12 +16,12 @@ const ALWAYS_AWAY = 0;
 const NO_ANSWERING = 0;
 const ANY_FREE_PORT = 0;
 const NOWHERE = "http://127.0.0.1:1";
-const NOTHING = 0;
 
-const turnEnded = { cwd: "D:\\Temp\\job-finder", background_tasks: [] };
+
+const turnEnded = { cwd: "D:\\Temp\\a-project", background_tasks: [] };
 
 const askedPayload = {
-  cwd: "D:\\Temp\\job-finder",
+  cwd: "D:\\Temp\\a-project",
   tool_name: "AskUserQuestion",
   tool_input: {
     questions: [
@@ -104,7 +104,7 @@ describe("a ping relayed by the machine that can reach Telegram", () => {
     await runHook("Stop", turnEnded, work);
     await telegram.whenAsked();
 
-    expect(telegram.sentText()).toBe("[job-finder@work] закончил ход, ждёт тебя");
+    expect(telegram.sentText()).toBe("[a-project@work] закончил ход, ждёт тебя");
   });
 
   it("keeps the work machine's own label, so the two streams stay apart in one chat", async () => {
@@ -126,7 +126,7 @@ describe("a ping relayed by the machine that can reach Telegram", () => {
     await runHook("PreToolUse", askedPayload, work);
     await telegram.whenAsked();
 
-    expect(telegram.sentText()).toBe("[job-finder@work] ждёт твоего ответа");
+    expect(telegram.sentText()).toBe("[a-project@work] ждёт твоего ответа");
     expect(telegram.sentText()).not.toContain("миграцию");
   });
 
@@ -144,7 +144,7 @@ describe("a ping relayed by the machine that can reach Telegram", () => {
 
     await runHook("Stop", turnEnded, stranger);
 
-    expect(sends().length).toBe(NOTHING);
+    expect(sends().length).toBe(0);
   });
 
   it("says on both machines that the ping was refused, rather than losing it quietly", async () => {

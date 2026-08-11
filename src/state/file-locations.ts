@@ -12,8 +12,6 @@ export const claudeHome = (): string => join(homedir(), ".claude");
 export const stateHome = (): string =>
   process.env.CLAUDE_NOTIFY_HOME ?? join(claudeHome(), "claude-notify");
 
-export const legacyConfigFile = (): string => join(stateHome(), "config.json");
-
 export const logFile = (): string => join(stateHome(), "log.txt");
 
 export const pendingFile = (): string => join(stateHome(), "pending.jsonl");
@@ -47,6 +45,3 @@ export const claudeSettingsFile = (): string => join(claudeHome(), "settings.jso
 export const claudeMemoryFile = (): string => join(claudeHome(), "CLAUDE.md");
 
 export const credentialsFile = (): string => join(claudeHome(), ".credentials.json");
-
-export const powershellConfigFile = (): string =>
-  join(claudeHome(), "scripts", "telegram-notify", "config.json");

@@ -37,7 +37,7 @@ if (!isHookEvent(event)) {
 
 const raw = await readStdin();
 
-log(`HOOK ${event} | ${flattenPayload(raw)}`);
+log(`HOOK ${event} entrypoint=${process.env.CLAUDE_CODE_ENTRYPOINT ?? "-"} | ${flattenPayload(raw)}`);
 
 const payload = parsed(raw);
 

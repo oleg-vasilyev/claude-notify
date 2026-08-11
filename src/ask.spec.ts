@@ -31,15 +31,18 @@ const ID = "abc12345";
 const A_STEP_MS = 30_000;
 const A_MESSAGE = 77;
 
+const RELAY_PORT = 8787;
+
 const config: Config = {
-  token: "T",
-  chatId: "42",
+  delivery: { kind: "telegram", token: "T", chatId: "42" },
   machineLabel: "home",
   minIdleMinutes: 3,
   staleMinutes: 15,
   includeUsage: false,
   askMinutes: 10,
   quoteQuestions: true,
+  relaySecret: "",
+  relayPort: RELAY_PORT,
 };
 
 const payload = {
@@ -165,6 +168,18 @@ describe("ask", () => {
 
   it("says nothing when answering from Telegram is turned off", async () => {
     vi.mocked(readConfig).mockReturnValue({ ...config, askMinutes: 0 });
+
+    const output = await ask("PreToolUse", payload);
+
+    expect(output).toBeNull();
+    expect(sendQuestion).not.toHaveBeenCalled();
+  });
+
+  it("says nothing on a machine that pings through a relay, since an answer has no way back", async () => {
+    vi.mocked(readConfig).mockReturnValue({
+      ...config,
+      delivery: { kind: "relay", url: "http://home:8787" },
+    });
 
     const output = await ask("PreToolUse", payload);
 

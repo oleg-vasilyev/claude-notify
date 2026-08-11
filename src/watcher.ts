@@ -30,6 +30,8 @@ if (config === null) {
   process.exit(0);
 }
 
+const telegram = config.delivery.kind === "telegram" ? config.delivery : null;
+
 claimWatcherLock(process.pid);
 log(`WATCHER started (pid ${process.pid})`);
 
@@ -56,10 +58,10 @@ try {
   const deadline = Date.now() + GIVE_UP_AFTER_MS;
 
   while (Date.now() < deadline) {
-    const asked = readAskedQuestions().length > NOTHING;
+    const asked = telegram === null ? NOTHING : readAskedQuestions().length;
     const queued = readPending().length > NOTHING;
 
-    if (!asked && !queued) {
+    if (asked === NOTHING && !queued) {
       break;
     }
 
@@ -67,8 +69,8 @@ try {
       await flush();
     }
 
-    if (asked) {
-      const outcome = await collectAnswers(config, LONG_POLL_SECONDS);
+    if (telegram !== null && asked > NOTHING) {
+      const outcome = await collectAnswers(telegram, LONG_POLL_SECONDS);
 
       await sleep(outcome === "failed" ? AFTER_A_FAILURE_MS : NOTHING);
       continue;

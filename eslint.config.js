@@ -189,10 +189,12 @@ const IMPURE = [
   "koffi",
   "#app/**",
   "#presence/**",
+  "#relay/**",
   "#state/**",
   "#telegram/**",
   "#usage/**",
   "**/presence/**",
+  "**/relay/**",
   "**/state/**",
   "**/telegram/**",
   "**/usage/**",
@@ -244,9 +246,10 @@ export default [
     ),
   },
   {
-    // The setup CLI, the log writer and the dev scripts are what a person reads
-    // in a terminal: a wizard, the log itself, and a gate reporting what it found.
-    files: ["src/setup.ts", "src/state/log.ts", "scripts/**/*.ts"],
+    // The setup CLI, the relay, the log writer and the dev scripts are what a
+    // person reads in a terminal: a wizard, a server you start and watch, the
+    // log itself, and a gate reporting what it found.
+    files: ["src/setup.ts", "src/relay.ts", "src/state/log.ts", "scripts/**/*.ts"],
     rules: {
       "no-console": "off",
     },

@@ -7,18 +7,23 @@ remembers.
 
 ---
 
-## Four domain files carry almost every surviving mutant
+## Three domain files carry almost every surviving mutant
 
-The total is 87.3% against a break threshold of 85, up from 85.1% before phase
-4 — the new files came in at 86–100%, so the fear recorded here last time, that
-the next `domain/` file would break the gate on its own, was wrong. The
-survivors are concentrated in the files that were already lagging and that
-phase 4 barely touched: `memory-rule.ts` (67%), `env-file.ts` (80%),
-`delivery.ts` (81%). Mostly boundary and string mutants, where a test asserts
-*that* something happened rather than exactly what. `usage.ts` left the list on
-its own when the bars arrived with tests for both ends of the scale.
+The total is 88.8% against a break threshold of 85, up from 87.5% before the
+relay. Two phases running, every new file has arrived at 96–100% and pushed the
+number up, so the old fear — that the next `domain/` file would break the gate
+on its own — can be retired. The survivors stay concentrated in the three files
+that were already lagging and that neither phase touched: `memory-rule.ts`
+(67%), `env-file.ts` (81%), `delivery.ts` (81%). Mostly boundary and string
+mutants, where a test asserts *that* something happened rather than exactly
+what.
 
-**Kill survivors in whichever of those four a phase touches, before adding
+The relay paid its own way here, and the method is worth repeating: the three
+survivors it produced were not gaps in the tests but a `catch` broad enough to
+swallow the difference. Narrowing it to the one thing that can really fail —
+`JSON.parse` — killed two of them and left better code behind.
+
+**Kill survivors in whichever of those three a phase touches, before adding
 anything to it** — the report is at `reports/mutation/` and needs no re-run to
 read, since the json reporter is configured.
 
@@ -105,11 +110,50 @@ file.**
 
 ---
 
+## One e2e scenario fails perhaps one run in five
+
+`takes the keyboard away when nobody answered either` waits out a real
+one-minute window and then asserts the keyboard was removed. It passed nine runs
+out of ten while the relay was being built, and failed the tenth — always in a
+whole-file run, never alone, which points at leftovers from the case before it
+rather than at the assertion. The same file also passed three consecutive runs
+on the commit before this phase, so nothing here is suspected of causing it, and
+nothing here is cleared either.
+
+The suspects, in order: a watcher spawned by an earlier case still polling a
+server that `afterEach` has since closed, and `closeQuestion` swallowing its own
+failure so a refused edit looks like no edit at all.
+
+**Chase it the next time it fails**, with the whole file's log kept — a gate
+that is right four times in five teaches people to re-run it, which is worse
+than not having it.
+
+---
+
+## Nothing restarts a relay that died
+
+The relay is the only process here meant to outlive the event that started it,
+and the only thing that starts it is a login. If it crashes at eleven in the
+morning, it stays down until the machine is logged into again, and the machine
+depending on it learns only through `ERROR send failed` in a log nobody is
+reading — which is the exact failure the watcher's design already refuses to
+allow for polling.
+
+The honest fix is the one Windows already has: a scheduled task with
+`/sc onlogon` and a restart policy, instead of a batch file in the Startup
+folder. It needs elevation to register, which is why setup does not do it today.
+
+**Do it the first time a relay is found dead**, or the first time a ping is lost
+because it was.
+
+---
+
 ## There is no uninstaller
 
-Setup adds hook entries, a config directory and a `CLAUDE.md` section; removing
-them is a by-hand exercise. The installer already knows how to find its own hook
-entries, so `--uninstall` is mostly written.
+Setup adds hook entries, a config directory, a `CLAUDE.md` section, and — on a
+relay host — a batch file in the Startup folder; removing them is a by-hand
+exercise. The installer already knows how to find its own hook entries, so
+`--uninstall` is mostly written.
 
 **Write it the first time the hooks actually need to come off a machine.**
 

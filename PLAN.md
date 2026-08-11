@@ -105,6 +105,51 @@ Two processes are involved, because `getUpdates` tolerates one reader: the hook
 writes the question to a file and waits, the watcher is the only one polling
 Telegram, and it writes the answer back beside the question.
 
+## Relaying from a machine that cannot reach Telegram
+
+A work laptop sits behind a network that blocks Telegram outright, so the whole
+product is unavailable there — and it is precisely the machine that runs the
+long tasks you walk away from. Another of your machines, on the same network,
+already reaches Telegram. It runs `npm run relay`, and the blocked machine
+sends through it.
+
+**Only the last step moves.** The project key, the machine label, presence, the
+rate limit and the limits line are all decided on the machine the event
+happened on, because every one of them is a fact about *that* machine and
+*that* account — your idleness at the work laptop is the question worth asking
+there, and the account whose windows are filling is the one working. What
+crosses the network is the finished message and nothing else; the relay's only
+decision is whether the caller may send at all.
+
+**The token stays on the relay host.** A relayed machine holds a URL and a
+shared secret, and that is deliberately less than a token: the worst a leaked
+secret buys is the ability to write into one chat, never the bot itself. The
+secret rides as a bearer header and is checked before the body is even parsed,
+so a stranger who guesses the port learns nothing from a malformed request that
+they would not have learned from a well-formed one.
+
+The traffic is plain HTTP over the local network, and stays that way on
+purpose: what crosses is a line already judged fit to appear on a phone. That is
+not an assumption but a composition — `QUOTE_QUESTIONS=false` on the sending
+machine keeps a question's text off the wire by the same act that keeps it off
+the phone, because the relay never sees anything the phone would not.
+
+**A relayed machine is never asked a question**, only told about one. The answer
+would have no way home: the return channel is `getUpdates`, which the blocked
+machine cannot reach either, and inventing a second hop back would put a
+question's answer through two failure points to save a walk. So the hook falls
+straight through to a plain ping, exactly as it does when answering is switched
+off.
+
+The relay is the product's first resident process, and everything else here is
+event-driven, so it needs an owner: setup writes a batch file into the Startup
+folder that launches it minimised at login. **The Windows firewall blocks the
+port until told otherwise**, and that is the one step that cannot be automated
+without elevation — setup prints the `netsh` line rather than pretending. A
+relay that never started and a relay that is running are indistinguishable from
+the far machine until a ping is lost, which is why setup checks `/health`
+before it will write a relay's URL into `.env`.
+
 ## The delivery pipeline
 
 Every message, from either source, goes through the same funnel:
@@ -117,7 +162,8 @@ message
        yes -> append to pending queue, ensure a watcher is running, stop
   4. rate limit: this project pinged within the window?
        yes -> drop, logged
-  5. send; write the project's last-sent stamp
+  5. send — to Telegram, or to the relay that can;
+     write the project's last-sent stamp
 ```
 
 The order is the design. Presence outranks the rate limit because a suppressed
@@ -197,7 +243,7 @@ threshold is the knob if it ever is not.
 5. **The token exists only in `.env` on the installed machine.** The repository
    ignores it, `docs:check` fails if that ever stops being true, and the
    installer does not embed it — moving to a new machine means typing it again,
-   by design.
+   by design. A machine sending through a relay never holds one at all.
 6. **A broken presence probe counts as away.** If `GetLastInputInfo` fails the
    ping is sent rather than swallowed — a false ping costs a glance, a
    swallowed one costs hours.
@@ -228,9 +274,15 @@ threshold is the knob if it ever is not.
   question that cannot be delivered falls back to a plain ping, and a poll that
   fails leaves the watcher alive to try again: a dead poller and a quiet one
   look identical from the outside, which is the failure worth preventing.
+- **A relay that is down, or refusing.** It fails exactly the way Telegram
+  failing fails, and lands on the same line — the log names which of the two
+  routes was taken, because a wrong secret and a blocked network need opposite
+  fixes and look the same from the phone.
 - **Two machines, one bot.** Stamps, queue and watcher are all per-machine
   state; the only shared resource is the chat itself, and the machine label
-  keeps the streams readable.
+  keeps the streams readable. A relay adds a second shared thing — the host
+  itself — which is why it decides nothing: it forwards, and every rule that
+  could have gone wrong stayed on the machine that had the event.
 
 ## Tombstones — dead ends already paid for
 
@@ -295,6 +347,11 @@ a deny decision carrying the user's words, and correlation does ride in
 `callback_data`. The choice left open — a blocking hook that polls, or a
 resident poller talking to hooks through files — resolved to the second, because
 the first would have put every waiting hook in the single `getUpdates` slot.
+
+**Phase 4.5 — the relay** — done; it is the section above. It was sized as the
+first thing here to need a resident process and turned out to need nothing else
+new: the delivery funnel already ended in a single send, so the whole feature is
+a discriminated union at that one step, plus a server that decides nothing.
 
 **Phase 3.5 — restarting a loop after the limit resets** — investigated and
 parked. Detecting the reset is solved (`five_hour.resets_at`) and resuming a

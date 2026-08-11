@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { idleSeconds } from "#presence/idle-time.ts";
+import { relayMessage } from "#relay/relay-client.ts";
 import { readConfig, type Config } from "#state/config.ts";
 import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
@@ -17,6 +18,7 @@ vi.mock("#presence/idle-time.ts", () => ({ idleSeconds: vi.fn() }));
 vi.mock("#state/pending-queue.ts", () => ({ appendPending: vi.fn() }));
 vi.mock("#state/last-sent.ts", () => ({ readLastSentAt: vi.fn(), writeLastSentAt: vi.fn() }));
 vi.mock("#telegram/telegram-api.ts", () => ({ sendMessage: vi.fn() }));
+vi.mock("#relay/relay-client.ts", () => ({ relayMessage: vi.fn() }));
 vi.mock("#usage/usage-api.ts", () => ({ fetchUsage: vi.fn() }));
 vi.mock("#app/watcher-process.ts", () => ({
   startWatcher: vi.fn(),
@@ -26,15 +28,25 @@ vi.mock("#app/watcher-process.ts", () => ({
 const AWAY_SECONDS = 600;
 const PRESENT_SECONDS = 5;
 
+const RELAY_PORT = 8787;
+
 const config: Config = {
-  token: "T",
-  chatId: "42",
+  delivery: { kind: "telegram", token: "T", chatId: "42" },
   machineLabel: "home",
   minIdleMinutes: 3,
   staleMinutes: 15,
   includeUsage: false,
   askMinutes: 10,
   quoteQuestions: true,
+  relaySecret: "",
+  relayPort: RELAY_PORT,
+};
+
+const throughARelay: Config = {
+  ...config,
+  machineLabel: "work",
+  delivery: { kind: "relay", url: "http://home-laptop:8787" },
+  relaySecret: "s3cr3t",
 };
 
 const ping = { message: "[job-finder] жду апрув", rateLimitMinutes: 0 };
@@ -47,6 +59,7 @@ describe("deliver", () => {
     vi.mocked(fetchUsage).mockResolvedValue(null);
     vi.mocked(watcherIsRunning).mockReturnValue(false);
     vi.mocked(sendMessage).mockResolvedValue(undefined);
+    vi.mocked(relayMessage).mockResolvedValue(undefined);
     process.exitCode = undefined;
   });
 
@@ -139,6 +152,54 @@ describe("deliver", () => {
 
   it("reports a refused send rather than throwing at the hook", async () => {
     vi.mocked(sendMessage).mockRejectedValue(new Error("429"));
+
+    await deliver(ping);
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("ERROR send failed"));
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("hands the ping to the relay on a machine that cannot reach Telegram", async () => {
+    vi.mocked(readConfig).mockReturnValue(throughARelay);
+
+    await deliver(ping);
+
+    expect(relayMessage).toHaveBeenCalledWith(
+      "http://home-laptop:8787",
+      "s3cr3t",
+      "[job-finder@work] жду апрув"
+    );
+  });
+
+  it("never touches Telegram itself once a relay is configured", async () => {
+    vi.mocked(readConfig).mockReturnValue(throughARelay);
+
+    await deliver(ping);
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("says in the log which way a ping left, since only one of them can be at fault", async () => {
+    vi.mocked(readConfig).mockReturnValue(throughARelay);
+
+    await deliver(ping);
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("SENT via relay"));
+  });
+
+  it("holds a relayed ping back while the user is at the keyboard, exactly as a direct one", async () => {
+    vi.mocked(readConfig).mockReturnValue(throughARelay);
+    vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
+
+    await deliver(ping);
+
+    expect(relayMessage).not.toHaveBeenCalled();
+    expect(appendPending).toHaveBeenCalled();
+  });
+
+  it("reports a relay that refused rather than throwing at the hook", async () => {
+    vi.mocked(readConfig).mockReturnValue(throughARelay);
+    vi.mocked(relayMessage).mockRejectedValue(new Error("401"));
 
     await deliver(ping);
 

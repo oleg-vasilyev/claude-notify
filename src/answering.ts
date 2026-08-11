@@ -1,6 +1,6 @@
 import { answersIn, highestUpdateId } from "#domain/answer.ts";
 import { copy } from "#domain/copy.ts";
-import type { Config } from "#state/config.ts";
+import type { TelegramDelivery } from "#state/config.ts";
 import { readAskedQuestions, writeAnswer } from "#state/asked-question.ts";
 import { log } from "#state/log.ts";
 import { readUpdateOffset, writeUpdateOffset } from "#state/update-offset.ts";
@@ -12,7 +12,7 @@ const NOTHING = 0;
 export type AnsweringOutcome = "nothing-asked" | "collected" | "failed";
 
 export const collectAnswers = async (
-  config: Config,
+  delivery: TelegramDelivery,
   longPollSeconds: number
 ): Promise<AnsweringOutcome> => {
   const questions = readAskedQuestions();
@@ -24,7 +24,7 @@ export const collectAnswers = async (
   let updates;
 
   try {
-    updates = await fetchUpdates(config.token, readUpdateOffset(), longPollSeconds);
+    updates = await fetchUpdates(delivery.token, readUpdateOffset(), longPollSeconds);
   } catch (failure) {
     log(`WARN getUpdates failed: ${String(failure)}`);
 
@@ -37,20 +37,20 @@ export const collectAnswers = async (
     writeUpdateOffset(seen);
   }
 
-  for (const matched of answersIn(updates, questions, config.chatId)) {
+  for (const matched of answersIn(updates, questions, delivery.chatId)) {
     writeAnswer(matched.id, matched.answer);
     log(`ANSWER ${matched.id} | ${matched.answer.said}`);
 
     if (matched.answer.callbackId !== null) {
-      await answerCallback(config.token, matched.answer.callbackId);
+      await answerCallback(delivery.token, matched.answer.callbackId);
     }
 
     const asked = questions.find((question) => question.id === matched.id);
 
     if (asked?.messageId !== null && asked?.messageId !== undefined) {
       await closeQuestion(
-        config.token,
-        config.chatId,
+        delivery.token,
+        delivery.chatId,
         asked.messageId,
         copy.questionClosedWith(asked.headline, matched.answer.said)
       );

@@ -21,8 +21,10 @@ ping waits in a queue until you actually leave.
 
 And when you are away, a question is not merely announced — it is **asked**,
 with a button per option, and an answer typed in your own words accepted just
-as well. [PLAN.md](PLAN.md) explains the machinery and why it is shaped this
-way.
+as well. A machine that cannot reach Telegram at all — a work laptop behind a
+network that blocks it — sends through another of your machines instead, and
+never holds the token. [PLAN.md](PLAN.md) explains the machinery and why it is
+shaped this way.
 
 ## Installing
 
@@ -57,6 +59,44 @@ no questions:
 npm run setup -- --token 123:ABC --label work
 ```
 
+## When a machine cannot reach Telegram
+
+If Telegram is blocked on one of your machines, another one forwards for it.
+Both need to be on the same network, and the forwarding one needs the notifier
+installed normally.
+
+On the machine that **can** reach Telegram, turn it into a relay:
+
+```bash
+npm run setup -- --relay-port 8787
+```
+
+That generates a shared secret, prints it, writes a batch file into your Startup
+folder so the relay comes up at every login, and prints the one command you have
+to run yourself — an elevated `netsh` line letting the port in through the
+Windows firewall. Start it now without waiting for a login:
+
+```bash
+npm run relay
+```
+
+It runs as a minimised console window; closing that window stops it.
+
+Then on the blocked machine, with the secret and the address the relay printed:
+
+```bash
+npm run setup -- --relay-url http://home-laptop:8787 --relay-secret <secret> --label work
+```
+
+No token is asked for and none is stored there. Setup checks the relay answers
+before writing anything, and the test ping at the end goes the whole way, so a
+wrong secret fails here rather than silently three days later.
+
+That machine pings normally — project, label, limits, presence, all of it — but
+is never asked a question, because an answer would have no way back. Add
+`QUOTE_QUESTIONS=false` to its `.env` and the text of a question stays on it
+entirely.
+
 ## Configuration
 
 **`.env`** in this checkout, written by setup and safe to edit by hand:
@@ -69,6 +109,11 @@ npm run setup -- --token 123:ABC --label work
 | `MIN_IDLE_MINUTES` | minutes without keyboard or mouse that count as "away" (default 3) |
 | `STALE_MINUTES` | minutes after which a queued ping expires undelivered (default 15) |
 | `INCLUDE_USAGE` | append the limits line to each ping (default true) |
+| `ASK_MINUTES` | how long a question waits on the phone before going back to the app (default 10; 0 turns answering off) |
+| `QUOTE_QUESTIONS` | whether the text of a question may leave this machine (default true) |
+| `RELAY_URL` | send through another machine instead of Telegram; set this *instead of* the token |
+| `RELAY_SECRET` | the shared secret between a relay and the machines it forwards for |
+| `RELAY_PORT` | the port `npm run relay` listens on, if this machine is the relay (default 8787) |
 
 One bot serves any number of machines; the label is what tells their pings
 apart. Running state — the log, the queue, the per-project stamps — lives in
@@ -82,12 +127,15 @@ Everything the notifier decides is one line in
 | Line | Meaning |
 | --- | --- |
 | `SENT` | delivered |
+| `SENT via relay` | delivered by handing it to another machine, which sends it on |
 | `QUEUED idle=Ns` | you were at the keyboard; the watcher delivers it once you leave |
 | `DROP stale` | it sat queued longer than `stale_minutes` — you were here all along |
 | `SKIP rate-limit [proj]` | that project pinged too recently |
 | `HOOK <event>` | a Claude Code hook fired, with its payload |
+| `RELAY listening on N` | this machine is forwarding for others, on that port |
+| `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
 | `WARN usage unavailable` | the limits line was skipped; the ping itself went out |
-| `ERROR send failed` | the Telegram API refused — the reason follows |
+| `ERROR send failed` | Telegram or the relay refused — the reason follows |
 
 No line at all means nothing called it: the model did not ping and no hook
 fired. To prove the pipe end to end, bypassing the presence filter:
@@ -113,6 +161,9 @@ src/domain/     every decision, pure — no files, no network, no clock
   pending.ts        which queued pings survive, and which one wins per project
   project.ts        the project key and the machine label
   question.ts       a hook payload turned into something answerable by phone
+  relay-protocol.ts what the two ends of a relay agree on, and who may send
+  setup-choice.ts   which way a machine sends, and where its relay secret comes from
+  startup-script.ts the batch file that brings the relay up at login
   usage.ts          the limits line
 src/state/      what this product remembers between runs
   asked-question.ts the question a hook waits on, and the answer it waits for
@@ -124,6 +175,9 @@ src/state/      what this product remembers between runs
   update-offset.ts  how far the watcher has read Telegram
   watcher-lock.ts   who is delivering the queue right now
 src/presence/idle-time.ts   how long since you touched anything (win32 via koffi)
+src/relay/      forwarding a ping through a machine that can reach Telegram
+  relay-client.ts   sending one, from the machine that cannot
+  relay-server.ts   receiving one, on the machine that can
 src/telegram/telegram-api.ts sending a message, and what setup needs to find you
 src/usage/usage-api.ts       the account's own limit windows
 src/deliver.ts          the funnel every ping goes through
@@ -133,6 +187,7 @@ src/watcher-process.ts  is a watcher running, and starting one that outlives us
 src/hook.ts     entry point: one Claude Code event
 src/notify.ts   entry point: one ping, from the model or by hand
 src/watcher.ts  entry point: delivers what presence held back, and collects answers
+src/relay.ts    entry point: the resident forwarder, for other machines
 src/setup.ts    entry point: the installer
 ```
 

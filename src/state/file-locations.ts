@@ -30,6 +30,18 @@ export const answerFile = (id: string): string => join(stateHome(), `answer-${id
 
 export const updateOffsetFile = (): string => join(stateHome(), "update-offset.txt");
 
+export const startupFolder = (): string =>
+  join(
+    process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
+    "Microsoft",
+    "Windows",
+    "Start Menu",
+    "Programs",
+    "Startup"
+  );
+
+export const startupRelayFile = (): string => join(startupFolder(), "claude-notify-relay.cmd");
+
 export const claudeSettingsFile = (): string => join(claudeHome(), "settings.json");
 
 export const claudeMemoryFile = (): string => join(claudeHome(), "CLAUDE.md");

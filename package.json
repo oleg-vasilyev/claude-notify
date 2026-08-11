@@ -10,6 +10,7 @@
     "#app/*": "./src/*",
     "#domain/*": "./src/domain/*",
     "#presence/*": "./src/presence/*",
+    "#relay/*": "./src/relay/*",
     "#state/*": "./src/state/*",
     "#telegram/*": "./src/telegram/*",
     "#usage/*": "./src/usage/*"
@@ -17,6 +18,7 @@
   "scripts": {
     "setup": "node src/setup.ts",
     "ping": "node src/notify.ts",
+    "relay": "node src/relay.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

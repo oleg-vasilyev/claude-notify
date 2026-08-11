@@ -31,6 +31,12 @@ export const ask = async (
     return null;
   }
 
+  const delivery = config.delivery;
+
+  if (delivery.kind !== "telegram") {
+    return null;
+  }
+
   const verdict = decideAsk({
     event,
     payload,
@@ -65,8 +71,8 @@ export const ask = async (
 
   try {
     messageId = await sendQuestion(
-      config.token,
-      config.chatId,
+      delivery.token,
+      delivery.chatId,
       text,
       question.options.map((option) => ({
         text: option.recommended ? `★ ${option.label}` : option.label,
@@ -105,7 +111,7 @@ export const ask = async (
   log(`ASK timed out ${question.id}, handing the question back to the app`);
 
   if (messageId !== null) {
-    await closeQuestion(config.token, config.chatId, messageId, copy.questionExpired(headline));
+    await closeQuestion(delivery.token, delivery.chatId, messageId, copy.questionExpired(headline));
   }
 
   return hookAnswerOutput(event, question, null);

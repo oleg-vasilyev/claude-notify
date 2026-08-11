@@ -6,7 +6,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
-import { readConfig, type Config } from "#state/config.ts";
+import { readConfig, type Config, type TelegramDelivery } from "#state/config.ts";
 import { collectAnswers } from "#app/answering.ts";
 import { ask } from "#app/ask.ts";
 
@@ -42,15 +42,18 @@ const AN_UPDATE = 31;
 const CHAT = 42;
 const A_SHORT_WINDOW_MINUTES = 0.05;
 
+const delivery: TelegramDelivery = { kind: "telegram", token: "T", chatId: `${CHAT}` };
+
 const config: Config = {
-  token: "T",
-  chatId: `${CHAT}`,
+  delivery,
   machineLabel: "home",
   minIdleMinutes: 3,
   staleMinutes: 15,
   includeUsage: false,
   askMinutes: 1,
   quoteQuestions: true,
+  relaySecret: "",
+  relayPort: 8787,
 };
 
 const payload = {
@@ -134,7 +137,7 @@ describe("a question answered from Telegram", () => {
 
     waitingInTelegram = [pressOf(id, "1")];
 
-    await collectAnswers(config, NO_LONG_POLL);
+    await collectAnswers(delivery, NO_LONG_POLL);
 
     await expect(asking).resolves.toMatchObject({
       hookSpecificOutput: {
@@ -150,7 +153,7 @@ describe("a question answered from Telegram", () => {
 
     waitingInTelegram = [pressOf(id, "1")];
 
-    await collectAnswers(config, NO_LONG_POLL);
+    await collectAnswers(delivery, NO_LONG_POLL);
 
     expect(JSON.stringify(await asking)).toContain("Та же");
   });
@@ -161,7 +164,7 @@ describe("a question answered from Telegram", () => {
 
     waitingInTelegram = [pressOf(id, "0")];
 
-    await collectAnswers(config, NO_LONG_POLL);
+    await collectAnswers(delivery, NO_LONG_POLL);
     await asking;
 
     const question = sent.find((call) => call.url.includes("/sendMessage"));
@@ -183,7 +186,7 @@ describe("a question answered from Telegram", () => {
 
     waitingInTelegram = [pressOf(id, "0")];
 
-    await collectAnswers(config, NO_LONG_POLL);
+    await collectAnswers(delivery, NO_LONG_POLL);
     await asking;
 
     expect(sent.some((call) => call.url.includes("/answerCallbackQuery"))).toBe(true);
@@ -195,7 +198,7 @@ describe("a question answered from Telegram", () => {
 
     waitingInTelegram = [pressOf(id, "0")];
 
-    await collectAnswers(config, NO_LONG_POLL);
+    await collectAnswers(delivery, NO_LONG_POLL);
     await asking;
 
     expect(readAskedQuestions()).toEqual([]);
@@ -218,7 +221,7 @@ describe("a question answered from Telegram", () => {
       },
     ];
 
-    await collectAnswers(config, NO_LONG_POLL);
+    await collectAnswers(delivery, NO_LONG_POLL);
 
     await expect(asking).resolves.toEqual({});
   });

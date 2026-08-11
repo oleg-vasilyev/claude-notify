@@ -2,7 +2,8 @@ import { decideDelivery } from "#domain/delivery.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
 import { usageLine } from "#domain/usage.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
-import { readConfig } from "#state/config.ts";
+import { relayMessage } from "#relay/relay-client.ts";
+import { readConfig, type Delivery } from "#state/config.ts";
 import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
@@ -16,6 +17,23 @@ export type PingRequest = {
   rateLimitMinutes: number;
   ignorePresence?: boolean;
 };
+
+const sendVia = async (delivery: Delivery, secret: string, text: string): Promise<void> => {
+  switch (delivery.kind) {
+    case "telegram":
+      await sendMessage(delivery.token, delivery.chatId, text);
+
+      return;
+
+    case "relay":
+      await relayMessage(delivery.url, secret, text);
+
+      return;
+  }
+};
+
+const sentVia = (delivery: Delivery): string =>
+  delivery.kind === "relay" ? "SENT via relay" : "SENT";
 
 const withUsage = async (message: string): Promise<string> => {
   const line = usageLine(await fetchUsage(), new Date());
@@ -70,9 +88,9 @@ export const deliver = async (request: PingRequest): Promise<void> => {
   const text = config.includeUsage ? await withUsage(message) : message;
 
   try {
-    await sendMessage(config.token, config.chatId, text);
+    await sendVia(config.delivery, config.relaySecret, text);
     writeLastSentAt(project, Date.now());
-    log(`SENT | ${text.replaceAll("\n", " | ")}`);
+    log(`${sentVia(config.delivery)} | ${text.replaceAll("\n", " | ")}`);
   } catch (failure) {
     log(`ERROR send failed: ${String(failure)} | ${message}`);
     process.exitCode = 1;

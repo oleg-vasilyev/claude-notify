@@ -135,7 +135,8 @@ Everything the notifier decides is one line in
 | `SENT` | delivered |
 | `SENT via relay` | delivered by handing it to another machine, which sends it on |
 | `QUEUED idle=Ns` | you were at the keyboard; the watcher delivers it once you leave |
-| `DROP stale` | it sat queued longer than `stale_minutes` — you were here all along, or its session never stopped |
+| `DROP stale` | it sat queued longer than `stale_minutes` — its session never stopped waiting |
+| `DROP seen` | you touched the keyboard after it was queued, so you were there when it happened |
 | `SKIP rate-limit [proj]` | that project pinged too recently |
 | `HOOK <event>` | a Claude Code hook fired, with its payload and the entrypoint that ran it |
 | `SKIP a session a script is running` | the hooks fired for a scripted session — no person is waiting, so the mechanical ping stays home |

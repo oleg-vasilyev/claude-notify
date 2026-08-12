@@ -1,7 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { impossible } from "#domain/impossible.ts";
-import { selectPending, sessionsIn, type PendingPing } from "#domain/ping/pending.ts";
+import {
+  DROP,
+  selectPending,
+  sessionsIn,
+  type DroppedPing,
+  type PendingPing,
+} from "#domain/ping/pending.ts";
 import { mayGoOut, wallToCheck } from "#domain/ping/session-activity.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
@@ -21,6 +27,7 @@ const LONG_POLL_SECONDS = 25;
 const AFTER_A_FAILURE_MS = 5_000;
 const GIVE_UP_AFTER_MS = 8 * 60 * 60 * 1000;
 const SECONDS_PER_MINUTE = 60;
+const MILLISECONDS_PER_SECOND = 1000;
 const NO_RATE_LIMIT = 0;
 const IMMEDIATELY = 0;
 
@@ -69,12 +76,27 @@ const sessionsThatMustWait = (pending: readonly PendingPing[]): Set<string> => {
   return waiting;
 };
 
-const flush = async (): Promise<void> => {
+const whyDropped = (dropped: DroppedPing): string => {
+  switch (dropped.kind) {
+    case DROP.stale:
+      return "DROP stale";
+
+    case DROP.seen:
+      return "DROP seen";
+
+    default:
+      return impossible(dropped);
+  }
+};
+
+const flush = async (idleNow: number): Promise<void> => {
+  const now = Date.now();
   const pending = readPending();
 
   const selection = selectPending(pending, {
-    now: Date.now(),
+    now,
     staleMinutes: config.staleMinutes,
+    lastInputAt: now - idleNow * MILLISECONDS_PER_SECOND,
     sessionsThatMustWait: sessionsThatMustWait(pending),
   });
 
@@ -85,9 +107,9 @@ const flush = async (): Promise<void> => {
   }
 
   for (const dropped of selection.dropped) {
-    const queuedAt = new Date(dropped.queuedAt).toISOString();
+    const queuedAt = new Date(dropped.ping.queuedAt).toISOString();
 
-    log(`DROP stale (queued ${queuedAt}) | ${dropped.message}`);
+    log(`${whyDropped(dropped)} (queued ${queuedAt}) | ${dropped.ping.message}`);
   }
 
   for (const message of selection.deliver) {
@@ -106,8 +128,10 @@ try {
       break;
     }
 
-    if (queued && idleSeconds() >= config.minIdleMinutes * SECONDS_PER_MINUTE) {
-      await flush();
+    const idleNow = idleSeconds();
+
+    if (queued && idleNow >= config.minIdleMinutes * SECONDS_PER_MINUTE) {
+      await flush(idleNow);
     }
 
     if (telegram !== null && asked > 0) {

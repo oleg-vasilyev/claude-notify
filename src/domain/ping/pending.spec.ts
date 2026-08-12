@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectPending, sessionsIn, type PendingPing } from "#domain/ping/pending.ts";
+import { DROP, selectPending, sessionsIn, type PendingPing } from "#domain/ping/pending.ts";
 
 
 const NOW = Date.parse("2026-08-07T12:00:00Z");
@@ -9,6 +9,7 @@ const STALE_MINUTES = 15;
 const A_SESSION = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const ANOTHER_SESSION = "11111111-2222-3333-4444-555555555555";
 const NOBODY_WAITS = new Set<string>();
+const LEFT_BEFORE_ANY_PING = NOW - 60 * MINUTE;
 
 const queued = (minutesAgo: number, message: string): PendingPing => ({
   queuedAt: NOW - minutesAgo * MINUTE,
@@ -19,7 +20,12 @@ const queued = (minutesAgo: number, message: string): PendingPing => ({
 const from = (ping: PendingPing, sessionId: string): PendingPing => ({ ...ping, sessionId });
 
 const select = (pending: PendingPing[], sessionsThatMustWait: ReadonlySet<string> = NOBODY_WAITS) =>
-  selectPending(pending, { now: NOW, staleMinutes: STALE_MINUTES, sessionsThatMustWait });
+  selectPending(pending, {
+    now: NOW,
+    staleMinutes: STALE_MINUTES,
+    lastInputAt: LEFT_BEFORE_ANY_PING,
+    sessionsThatMustWait,
+  });
 
 describe("selectPending", () => {
   it("delivers a fresh ping", () => {
@@ -34,7 +40,7 @@ describe("selectPending", () => {
     const selection = select([queued(20, "[a] old news")]);
 
     expect(selection.deliver).toEqual([]);
-    expect(selection.dropped).toEqual([queued(20, "[a] old news")]);
+    expect(selection.dropped).toEqual([{ kind: DROP.stale, ping: queued(20, "[a] old news") }]);
   });
 
   it("keeps a ping that is exactly at the staleness edge", () => {
@@ -83,6 +89,49 @@ describe("selectPending", () => {
   });
 });
 
+describe("selectPending, when the user was still at the keyboard afterwards", () => {
+  const stillTyping = (minutesAgo: number) =>
+    selectPending([queued(5, "[a] the turn ended")], {
+      now: NOW,
+      staleMinutes: STALE_MINUTES,
+      lastInputAt: NOW - minutesAgo * MINUTE,
+      sessionsThatMustWait: NOBODY_WAITS,
+    });
+
+  it("drops a ping the user was present for, because the sound and the screen already told them", () => {
+    const selection = stillTyping(3);
+
+    expect(selection.deliver).toEqual([]);
+    expect(selection.dropped).toEqual([{ kind: DROP.seen, ping: queued(5, "[a] the turn ended") }]);
+  });
+
+  it("delivers a ping raised after the user had already stopped touching anything", () => {
+    expect(stillTyping(9).deliver).toEqual(["[a] the turn ended"]);
+  });
+
+  it("delivers when the last input landed in the same millisecond, since that is not yet afterwards", () => {
+    const selection = selectPending([queued(5, "[a] the turn ended")], {
+      now: NOW,
+      staleMinutes: STALE_MINUTES,
+      lastInputAt: NOW - 5 * MINUTE,
+      sessionsThatMustWait: NOBODY_WAITS,
+    });
+
+    expect(selection.deliver).toEqual(["[a] the turn ended"]);
+  });
+
+  it("counts staleness first, so the older truth is the one logged", () => {
+    const selection = selectPending([queued(20, "[a] old news")], {
+      now: NOW,
+      staleMinutes: STALE_MINUTES,
+      lastInputAt: NOW,
+      sessionsThatMustWait: NOBODY_WAITS,
+    });
+
+    expect(selection.dropped).toEqual([{ kind: DROP.stale, ping: queued(20, "[a] old news") }]);
+  });
+});
+
 describe("selectPending, when a session is not waiting yet", () => {
   const busy = new Set([A_SESSION]);
 
@@ -110,7 +159,7 @@ describe("selectPending, when a session is not waiting yet", () => {
     const selection = select([ping], busy);
 
     expect(selection.held).toEqual([]);
-    expect(selection.dropped).toEqual([ping]);
+    expect(selection.dropped).toEqual([{ kind: DROP.stale, ping }]);
   });
 
   it("lets one project's other session through while this one waits", () => {

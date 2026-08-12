@@ -9,15 +9,22 @@ export type PendingPing = {
   sessionId: string | null;
 };
 
+export const DROP = { stale: "stale", seen: "seen" } as const;
+
+export type DroppedPing =
+  | { kind: typeof DROP.stale; ping: PendingPing }
+  | { kind: typeof DROP.seen; ping: PendingPing };
+
 export type PendingFacts = {
   now: number;
   staleMinutes: number;
+  lastInputAt: number;
   sessionsThatMustWait: ReadonlySet<string>;
 };
 
 export type PendingSelection = {
   deliver: string[];
-  dropped: PendingPing[];
+  dropped: DroppedPing[];
   held: PendingPing[];
 };
 
@@ -28,6 +35,9 @@ export const sessionsIn = (pending: readonly PendingPing[]): string[] => [
 const wentStale = (ping: PendingPing, facts: PendingFacts): boolean =>
   facts.now - ping.queuedAt > facts.staleMinutes * MILLISECONDS_PER_MINUTE;
 
+const wasSeen = (ping: PendingPing, facts: PendingFacts): boolean =>
+  facts.lastInputAt > ping.queuedAt;
+
 const mustWait = (ping: PendingPing, facts: PendingFacts): boolean =>
   ping.sessionId !== null && facts.sessionsThatMustWait.has(ping.sessionId);
 
@@ -35,13 +45,18 @@ export const selectPending = (
   pending: readonly PendingPing[],
   facts: PendingFacts
 ): PendingSelection => {
-  const dropped: PendingPing[] = [];
+  const dropped: DroppedPing[] = [];
   const held: PendingPing[] = [];
   const richestPerProject = new Map<string, string>();
 
   for (const ping of pending) {
     if (wentStale(ping, facts)) {
-      dropped.push(ping);
+      dropped.push({ kind: DROP.stale, ping });
+      continue;
+    }
+
+    if (wasSeen(ping, facts)) {
+      dropped.push({ kind: DROP.seen, ping });
       continue;
     }
 

@@ -245,6 +245,21 @@ user sat through the ping, so they saw the screen — and its premise fails the
 moment the user *acts*: the ping that started this rule was nine minutes old,
 well inside a fifteen-minute window, and false for eight of them.
 
+**And a ping you were present for is a ping you have already read.** The sound
+plays and the screen changes the moment a turn ends; if the keyboard was touched
+at any point *after* the ping was queued, the person doing the touching saw it
+and chose what to do. Delivering it later tells them something they knew twenty
+minutes ago and sends them to a laptop they deliberately closed — measured, and
+the reason the rule exists: a turn ended at 19:55:41 with the user four seconds
+from the keyboard, and the ping arrived at 20:01:52.
+
+This needs no threshold and no setting. At flush time the last input is
+`now − idle`, the ping remembers when it was queued, and the comparison is the
+whole rule. It also says exactly what the queue is *for*: the only ping worth
+holding is one raised inside `min_idle_minutes` of somebody leaving — the blind
+spot where they had already gone but the presence probe had not noticed yet.
+Everything else the queue used to deliver was this case.
+
 **So the queue stops asking whether a ping was true when it was written, and
 asks whether its session is waiting now.** That is the only question worth
 asking at the moment of delivery, and the events that answer it are already

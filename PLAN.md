@@ -47,6 +47,14 @@ The mid-turn events matter because `Stop` cannot see them: a question dialog or
 a permission prompt suspends the turn without ending it. All four have now been
 observed firing in the desktop app; `Notification` alone never has.
 
+**The two answerable events do not take the same answer.** `PreToolUse` reads
+`hookSpecificOutput.permissionDecision` with a reason beside it; `PermissionRequest`
+reads a nested `hookSpecificOutput.decision.{allow, reason}` and honours nothing
+else — not even exit code 2. Answering one in the other's shape is not an error:
+the host ignores the output and the prompt goes on waiting, which is exactly how
+this was found, by a permission answered «Разрешить» on the phone and still
+standing on the screen. The shape is chosen by the event, never by the question.
+
 **A hook says nothing for a session a script is running.** Claude Code is also an
 API: a job that classifies email starts a real session per item, and each one
 takes a prompt and ends its turn seconds later. The hooks fire exactly as they do

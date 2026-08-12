@@ -70,8 +70,7 @@ describe("hookAnswerOutput", () => {
     expect(output).toEqual({
       hookSpecificOutput: {
         hookEventName: "PermissionRequest",
-        permissionDecision: "allow",
-        permissionDecisionReason: "Пользователь ответил из Telegram: «Разрешить».",
+        decision: { allow: true, reason: "Пользователь ответил из Telegram: «Разрешить»." },
       },
     });
   });
@@ -80,8 +79,23 @@ describe("hookAnswerOutput", () => {
     const output = hookAnswerOutput("PermissionRequest", permission, answer({ said: "Запретить", chosenValue: DENY }));
 
     expect(output).toMatchObject({
-      hookSpecificOutput: { permissionDecision: "deny" },
+      hookSpecificOutput: { decision: { allow: false } },
     });
+  });
+
+  it("never answers a permission in the shape PreToolUse uses, which the host ignores in silence", () => {
+    const output = hookAnswerOutput("PermissionRequest", permission, answer({ chosenValue: ALLOW }));
+
+    expect(JSON.stringify(output)).not.toContain("permissionDecision");
+  });
+
+  it("keeps the PreToolUse shape for PreToolUse, whose contract is the other one", () => {
+    const output = hookAnswerOutput("PreToolUse", permission, answer({ chosenValue: ALLOW }));
+
+    expect(output).toMatchObject({
+      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" },
+    });
+    expect(JSON.stringify(output)).not.toContain("decision\":{");
   });
 
   it("hands a permission back rather than guessing when the answer was not a button", () => {

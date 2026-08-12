@@ -177,7 +177,10 @@ describe("a question answered from the phone", () => {
 
     expect(telegram.sentText()).toContain("просит разрешение: Bash");
     expect(JSON.parse(finished.stdout)).toMatchObject({
-      hookSpecificOutput: { permissionDecision: "allow" },
+      hookSpecificOutput: {
+        hookEventName: "PermissionRequest",
+        decision: { allow: true },
+      },
     });
   });
 
@@ -190,7 +193,7 @@ describe("a question answered from the phone", () => {
     const finished = await running;
 
     expect(JSON.parse(finished.stdout)).toMatchObject({
-      hookSpecificOutput: { permissionDecision: "deny" },
+      hookSpecificOutput: { decision: { allow: false } },
     });
   });
 

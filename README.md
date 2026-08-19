@@ -142,7 +142,7 @@ Everything the notifier decides is one line in
 | `SKIP a session a script is running` | the hooks fired for a scripted session — no person is waiting, so the mechanical ping stays home |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
-| `WARN usage unavailable` | the limits line was skipped; the ping itself went out |
+| `WARN usage unavailable: <why>` | the limits line was skipped and the reason named; the ping itself went out |
 | `ERROR send failed` | Telegram or the relay refused — the reason follows |
 
 No line at all means nothing called it: the model did not ping and no hook

@@ -55,7 +55,7 @@ describe("deliver", () => {
     vi.mocked(readConfig).mockReturnValue(config);
     vi.mocked(idleSeconds).mockReturnValue(AWAY_SECONDS);
     vi.mocked(readLastSentAt).mockReturnValue(null);
-    vi.mocked(fetchUsage).mockResolvedValue(null);
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "unavailable", why: "the endpoint answered 500" });
     vi.mocked(watcherIsRunning).mockReturnValue(false);
     vi.mocked(sendMessage).mockResolvedValue(undefined);
     vi.mocked(relayMessage).mockResolvedValue(undefined);
@@ -169,7 +169,7 @@ describe("deliver", () => {
 
   it("appends the limits line when usage is switched on", async () => {
     vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
-    vi.mocked(fetchUsage).mockResolvedValue({ limits: [{ group: "session", percent: 33 }] });
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "read", snapshot: { limits: [{ group: "session", percent: 33 }] } });
 
     await deliver(ping);
 
@@ -182,12 +182,36 @@ describe("deliver", () => {
 
   it("still sends the ping when the limits could not be read", async () => {
     vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
-    vi.mocked(fetchUsage).mockResolvedValue(null);
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "unavailable", why: "the endpoint answered 500" });
 
     await deliver(ping);
 
     expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
-    expect(log).toHaveBeenCalledWith("WARN usage unavailable");
+    expect(log).toHaveBeenCalledWith("WARN usage unavailable: the endpoint answered 500");
+  });
+
+  it("names why the limits were missing, since one line is all the debugging there is", async () => {
+    vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
+    vi.mocked(fetchUsage).mockResolvedValue({
+      kind: "unavailable",
+      why: "TimeoutError: The operation was aborted due to timeout",
+    });
+
+    await deliver(ping);
+
+    expect(log).toHaveBeenCalledWith(
+      "WARN usage unavailable: TimeoutError: The operation was aborted due to timeout"
+    );
+  });
+
+  it("says so when the endpoint answered but named no windows at all", async () => {
+    vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "read", snapshot: { limits: [] } });
+
+    await deliver(ping);
+
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("named no limit windows"));
   });
 
   it("never asks for usage when it is switched off", async () => {

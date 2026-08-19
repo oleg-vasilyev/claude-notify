@@ -147,3 +147,9 @@ export const usageLine = (snapshot: UsageSnapshot | null, now: Date): string => 
 
   return described.join(copy.windowSeparator);
 };
+
+export const USAGE = { read: "read", unavailable: "unavailable" } as const;
+
+export type UsageRead =
+  | { kind: typeof USAGE.read; snapshot: UsageSnapshot }
+  | { kind: typeof USAGE.unavailable; why: string };

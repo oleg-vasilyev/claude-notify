@@ -2,7 +2,7 @@ import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
 import { PING_OUTCOME, type PingOutcome } from "#domain/ping/ping-tool.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
-import { usageLine } from "#domain/ping/usage.ts";
+import { USAGE, usageLine } from "#domain/ping/usage.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { DELIVERY, readConfig, type Delivery } from "#state/config.ts";
@@ -52,10 +52,18 @@ const sentVia = (delivery: Delivery): string => {
 };
 
 const withUsage = async (message: string): Promise<string> => {
-  const line = usageLine(await fetchUsage(), new Date());
+  const read = await fetchUsage();
+
+  if (read.kind === USAGE.unavailable) {
+    log(`WARN usage unavailable: ${read.why}`);
+
+    return message;
+  }
+
+  const line = usageLine(read.snapshot, new Date());
 
   if (line === "") {
-    log("WARN usage unavailable");
+    log("WARN usage unavailable: the endpoint named no limit windows");
 
     return message;
   }

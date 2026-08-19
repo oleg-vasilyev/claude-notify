@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import type { UsageSnapshot } from "#domain/ping/usage.ts";
+import { USAGE, type UsageRead, type UsageSnapshot } from "#domain/ping/usage.ts";
 import { credentialsFile } from "#state/file-locations.ts";
 
 
@@ -27,11 +27,11 @@ const accessToken = (): string | null => {
   return null;
 };
 
-export const fetchUsage = async (): Promise<UsageSnapshot | null> => {
+export const fetchUsage = async (): Promise<UsageRead> => {
   const token = accessToken();
 
   if (token === null) {
-    return null;
+    return { kind: USAGE.unavailable, why: "no OAuth token in the credentials file" };
   }
 
   try {
@@ -41,11 +41,11 @@ export const fetchUsage = async (): Promise<UsageSnapshot | null> => {
     });
 
     if (!response.ok) {
-      return null;
+      return { kind: USAGE.unavailable, why: `the endpoint answered ${response.status}` };
     }
 
-    return (await response.json()) as UsageSnapshot;
-  } catch {
-    return null;
+    return { kind: USAGE.read, snapshot: (await response.json()) as UsageSnapshot };
+  } catch (failure) {
+    return { kind: USAGE.unavailable, why: `${(failure as Error).name}: ${(failure as Error).message}` };
   }
 };

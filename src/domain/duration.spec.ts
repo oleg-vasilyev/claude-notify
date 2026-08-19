@@ -3,31 +3,32 @@ import { describe, expect, it } from "vitest";
 import { humanizeDuration } from "#domain/duration.ts";
 
 
-const MINUTE = 60_000;
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 
 describe("humanizeDuration", () => {
-  it("reports minutes under an hour", () => {
-    expect(humanizeDuration(12 * MINUTE)).toBe("12 мин");
+  it("counts whole hours and minutes", () => {
+    expect(humanizeDuration(4 * HOUR + 2 * MINUTE)).toBe("4h 2m");
   });
 
-  it("reports hours and minutes together", () => {
-    expect(humanizeDuration(HOUR + 12 * MINUTE)).toBe("1 ч 12 мин");
+  it("drops the minutes when there are none", () => {
+    expect(humanizeDuration(3 * HOUR)).toBe("3h");
   });
 
-  it("drops a zero minute part", () => {
-    expect(humanizeDuration(2 * HOUR)).toBe("2 ч");
+  it("counts minutes alone under an hour", () => {
+    expect(humanizeDuration(25 * MINUTE)).toBe("25m");
   });
 
-  it("has a floor below one minute", () => {
-    expect(humanizeDuration(20_000)).toBe("меньше минуты");
+  it("rounds down rather than up, so a countdown never overpromises", () => {
+    expect(humanizeDuration(25 * MINUTE + 59 * SECOND)).toBe("25m");
   });
 
-  it("treats a zero span as below the floor", () => {
-    expect(humanizeDuration(0)).toBe("меньше минуты");
+  it("says less than a minute rather than zero", () => {
+    expect(humanizeDuration(30 * SECOND)).toBe("<1m");
   });
 
-  it("rounds a part-minute down rather than up", () => {
-    expect(humanizeDuration(2 * MINUTE - 1)).toBe("1 мин");
+  it("says less than a minute for nothing at all", () => {
+    expect(humanizeDuration(0)).toBe("<1m");
   });
 });

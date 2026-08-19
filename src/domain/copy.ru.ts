@@ -19,17 +19,6 @@ export const copy = {
 
   installed: (label: string) => `[setup@${label}] claude-notify подключён на этой машине`,
 
-  sessionWindow: "5 часов",
-  weekWindow: "неделя",
-  windowShare: (bar: string, percent: number, label: string) => `${bar} ${percent}% · ${label}`,
-  windowScopedTo: (label: string, model: string) => `${label}/${model}`,
-  windowResetsIn: (left: string) => ` · сброс через ${left}`,
-  windowSeparator: "\n",
-
-  lessThanAMinute: "меньше минуты",
-  hours: (count: number) => `${count} ч`,
-  minutes: (count: number) => `${count} мин`,
-
   pingExample: "[a-project] Закончил фазу 2, жду апрув на миграцию БД",
   toolPingExample: "Закончил фазу 2, жду апрув на миграцию БД",
 } as const;

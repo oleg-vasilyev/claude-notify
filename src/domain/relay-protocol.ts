@@ -11,7 +11,7 @@ export const RELAY_REQUEST = {
 } as const;
 
 export type RelayRequest =
-  | { kind: typeof RELAY_REQUEST.ping; message: string }
+  | { kind: typeof RELAY_REQUEST.ping; message: string; html: boolean }
   | { kind: typeof RELAY_REQUEST.unauthorised }
   | { kind: typeof RELAY_REQUEST.malformed };
 
@@ -20,9 +20,9 @@ export const relayEndpoint = (base: string, path: string): string =>
 
 export const authorizationFor = (secret: string): string => `${BEARER}${secret}`;
 
-const parsedBody = (body: string): { message?: unknown } | null => {
+const parsedBody = (body: string): { message?: unknown; html?: unknown } | null => {
   try {
-    return JSON.parse(body) as { message?: unknown } | null;
+    return JSON.parse(body) as { message?: unknown; html?: unknown } | null;
   } catch {
     return null;
   }
@@ -45,5 +45,9 @@ export const relayRequestFrom = (
 
   const message = messageIn(body);
 
-  return message === null ? { kind: RELAY_REQUEST.malformed } : { kind: RELAY_REQUEST.ping, message };
+  if (message === null) {
+    return { kind: RELAY_REQUEST.malformed };
+  }
+
+  return { kind: RELAY_REQUEST.ping, message, html: parsedBody(body)?.html === true };
 };

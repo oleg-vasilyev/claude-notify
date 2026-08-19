@@ -43,6 +43,13 @@ session that never needed it.
 3. **Write it once, in the home the table names.** If you find yourself
    explaining the same thing in a second file "briefly", stop — that is the
    duplication being born.
+3b. **Regenerate every example, never retype one.** When a rendering
+   changes, each committed sample of it is stale — and prose editing walks past
+   them, because the paragraph you are rewriting sits *below* the code fence.
+   Grep for a character of the **old** rendering to find them all, then print the
+   new one from the real function and splice it in. A redesign of the limits
+   block updated README from the code and left PLAN showing the deleted design
+   five lines above the paragraph arguing against it.
 4. **Run `npm run docs:check`.** It resolves every local link and anchor,
    checks the source tree in `README.md` against the real files, checks the npm
    scripts the README names, and holds `CLAUDE.md` to a line budget.

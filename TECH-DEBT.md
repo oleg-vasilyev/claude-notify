@@ -235,3 +235,44 @@ exercise. The installer already knows how to find its own hook entries, so
 - **`koffi` is a dependency with a native binary.** It ships prebuilt, so
   `npm install` needs no compiler, and it buys a presence probe that costs
   microseconds instead of spawning a shell every 30 seconds while a ping waits.
+
+---
+
+## The two ends of a relay can disagree about markup, and only one half is guarded
+
+A machine that cannot reach Telegram composes the whole message — escaping and
+`<pre>` included — and hands the finished string to a relay host, which posts it.
+The two ends can be on different versions, and the two skews are not symmetric.
+
+**Old client, new host** was the dangerous one: raw text posted with
+`parse_mode: HTML` gets a 400 the first time a model writes `<` or `&`, and the
+ping is swallowed — the failure this product spends everything to avoid. That is
+now closed rather than documented: the ping body carries `html: true`, and a host
+sets `parse_mode` only when the client says the text is ready for it. An old
+client sends no flag, so its text goes out plain and intact.
+
+**New client, old host** is what remains: a host from before this change ignores
+the flag and posts the markup as text, so the user reads `<pre>` in their chat.
+A glance, not a loss, and it ends the moment the host is pulled.
+
+**Delete this entry when the relay protocol grows a version handshake**, which is
+the only thing that would let the far side know rather than assume.
+
+---
+
+## Every ping between token expiry and refresh loses its limits
+
+The OAuth token lives eight hours, and invariant 8 says this product reads it and
+never refreshes it. So from the moment it expires until Claude Code writes a new
+one, `GET /api/oauth/usage` answers 401 and every ping goes out without its
+readout. Seen twice within ten minutes on one afternoon, and only visible at all
+because the log now names the reason.
+
+Refreshing it here is the wrong fix — two processes racing to rotate one
+credential is worse than a missing line — but the file carries `refreshToken` and
+`expiresAt`, so the notifier could at least *say* "the token expired 20 minutes
+ago" rather than "the endpoint answered 401", which reads like a fault.
+
+**Name the expiry in the warning the next time this is noticed**, or drop the
+entry if Claude Code starts refreshing eagerly enough that the window never
+shows.

@@ -43,9 +43,9 @@ const answer = (response: ServerResponse, status: number): void => {
   response.end(JSON.stringify({ ok: status === ACCEPTED }));
 };
 
-const forward = async (host: RelayHost, message: string): Promise<number> => {
+const forward = async (host: RelayHost, message: string, html: boolean): Promise<number> => {
   try {
-    await sendMessage(host.token, host.chatId, message);
+    await sendMessage(host.token, host.chatId, message, html);
     log(`RELAY sent | ${message.replaceAll("\n", " | ")}`);
 
     return ACCEPTED;
@@ -90,7 +90,7 @@ export const startRelay = async (host: RelayHost): Promise<Server> => {
           return;
 
         case RELAY_REQUEST.ping:
-          answer(response, await forward(host, asked.message));
+          answer(response, await forward(host, asked.message, asked.html));
 
           return;
 

@@ -22,6 +22,7 @@ import {
   secretChoice,
   type Inherited,
 } from "#domain/setup/setup-choice.ts";
+import { messageWith } from "#domain/telegram-html.ts";
 import { startupScript } from "#domain/setup/startup-script.ts";
 import { numberOr } from "#domain/written-number.ts";
 import { relayAnswers, relayMessage } from "#relay/relay-client.ts";
@@ -325,11 +326,11 @@ if (!values["skip-test"]) {
 
   switch (delivery.kind) {
     case DELIVERY.telegram:
-      await sendMessage(delivery.token, delivery.chatId, greeting);
+      await sendMessage(delivery.token, delivery.chatId, messageWith(greeting, ""));
       break;
 
     case DELIVERY.relay:
-      await relayMessage(delivery.url, delivery.secret, greeting);
+      await relayMessage(delivery.url, delivery.secret, messageWith(greeting, ""));
       break;
 
     default:

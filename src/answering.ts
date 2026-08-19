@@ -1,4 +1,5 @@
 import { answersIn, highestUpdateId } from "#domain/asking/answer.ts";
+import { messageWith } from "#domain/telegram-html.ts";
 import { copy } from "#domain/copy.ru.ts";
 import type { TelegramDelivery } from "#state/config.ts";
 import { readAskedQuestions, writeAnswer } from "#state/asked-question.ts";
@@ -59,7 +60,7 @@ export const collectAnswers = async (
         delivery.token,
         delivery.chatId,
         asked.messageId,
-        copy.questionClosedWith(asked.headline, matched.answer.said)
+        messageWith(copy.questionClosedWith(asked.headline, matched.answer.said), "")
       );
     }
   }

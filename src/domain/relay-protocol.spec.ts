@@ -38,7 +38,24 @@ describe("relayRequestFrom", () => {
     expect(relayRequestFrom(SECRET, HEADER, bodyWith("[a-project@work] закончил ход"))).toEqual({
       kind: "ping",
       message: "[a-project@work] закончил ход",
+      html: false,
     });
+  });
+
+  it("carries the caller's promise that its text is ready for HTML mode", () => {
+    const body = JSON.stringify({ message: "[a] жду", html: true });
+
+    expect(relayRequestFrom(SECRET, HEADER, body)).toEqual({
+      kind: "ping",
+      message: "[a] жду",
+      html: true,
+    });
+  });
+
+  it("treats anything but a true from an older caller as plain text, which cannot break", () => {
+    const body = JSON.stringify({ message: "[a] жду", html: "yes" });
+
+    expect(relayRequestFrom(SECRET, HEADER, body)).toMatchObject({ html: false });
   });
 
   it("refuses a caller with the wrong secret", () => {

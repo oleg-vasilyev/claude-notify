@@ -2,7 +2,8 @@ import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
 import { PING_OUTCOME, type PingOutcome } from "#domain/ping/ping-tool.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
-import { USAGE, usageLine } from "#domain/ping/usage.ts";
+import { USAGE, usageBlock } from "#domain/ping/usage.ts";
+import { messageWith } from "#domain/telegram-html.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { DELIVERY, readConfig, type Delivery } from "#state/config.ts";
@@ -51,24 +52,22 @@ const sentVia = (delivery: Delivery): string => {
   }
 };
 
-const withUsage = async (message: string): Promise<string> => {
+const limitsBlock = async (): Promise<string> => {
   const read = await fetchUsage();
 
   if (read.kind === USAGE.unavailable) {
     log(`WARN usage unavailable: ${read.why}`);
 
-    return message;
+    return "";
   }
 
-  const line = usageLine(read.snapshot, new Date());
+  const block = usageBlock(read.snapshot, new Date());
 
-  if (line === "") {
+  if (block === "") {
     log("WARN usage unavailable: the endpoint named no limit windows");
-
-    return message;
   }
 
-  return `${message}\n\n${line}`;
+  return block;
 };
 
 export const deliver = async (request: PingRequest): Promise<PingOutcome> => {
@@ -116,12 +115,14 @@ export const deliver = async (request: PingRequest): Promise<PingOutcome> => {
       return impossible(verdict);
   }
 
-  const text = config.includeUsage ? await withUsage(message) : message;
+  const block = config.includeUsage ? await limitsBlock() : "";
+  const text = messageWith(message, block);
+  const written = [message, block].filter((part) => part !== "").join(" | ");
 
   try {
     await sendVia(config.delivery, text);
     writeLastSentAt(project, Date.now());
-    log(`${sentVia(config.delivery)} | ${text.replaceAll("\n", " | ")}`);
+    log(`${sentVia(config.delivery)} | ${written.replaceAll("\n", " | ")}`);
 
     return { kind: PING_OUTCOME.sent };
   } catch (failure) {

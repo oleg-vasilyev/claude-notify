@@ -20,7 +20,7 @@ export const relayMessage = async (
       "Content-Type": "application/json; charset=utf-8",
       Authorization: authorizationFor(secret),
     },
-    body: JSON.stringify({ message: text }),
+    body: JSON.stringify({ message: text, html: true }),
     signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
   });
 

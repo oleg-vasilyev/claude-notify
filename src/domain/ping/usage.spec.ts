@@ -1,147 +1,146 @@
 import { describe, expect, it } from "vitest";
 
-import { usageLine, type UsageLimit, type UsageSnapshot } from "#domain/ping/usage.ts";
+import { usageBlock, type UsageLimit, type UsageSnapshot } from "#domain/ping/usage.ts";
 
 
 const NOW = new Date("2026-08-07T12:00:00Z");
-const AN_HOUR_FROM_NOW = "2026-08-07T13:00:00+00:00";
-const AN_HOUR_AGO = "2026-08-07T11:00:00+00:00";
+const AN_HOUR_FROM_NOW = "2026-08-07T13:00:00Z";
+const AN_HOUR_AGO = "2026-08-07T11:00:00Z";
 const BAR_SEGMENTS = 10;
 
-const session = (percent: number, resetsAt: string | null = null): UsageLimit => ({
+const session = (percent: number, resets?: string): UsageLimit => ({
   group: "session",
   percent,
-  resets_at: resetsAt,
+  resets_at: resets ?? null,
 });
 
-const weekly = (percent: number, model: string | null = null): UsageLimit => ({
+const weekly = (percent: number, model?: string, resets?: string): UsageLimit => ({
   group: "weekly",
   percent,
-  resets_at: null,
-  scope: model === null ? null : { model: { display_name: model } },
+  resets_at: resets ?? null,
+  scope: model === undefined ? null : { model: { display_name: model } },
 });
 
 const snapshot = (limits: UsageLimit[]): UsageSnapshot => ({ limits });
 
-const barOf = (line: string): string => line.split(" ")[0] ?? "";
+const rows = (block: string): string[] => block.split("\n");
+const barOf = (row: string): string => row.split("  ")[1] ?? "";
 
-describe("usageLine", () => {
-  it("reports both windows, one to a line so the bars stack", () => {
-    expect(usageLine(snapshot([session(33), weekly(53)]), NOW)).toBe(
-      "▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов\n▰▰▰▰▰▱▱▱▱▱ 53% · неделя"
+describe("usageBlock", () => {
+  it("draws a row per window, in columns a monospace block can align", () => {
+    expect(usageBlock(snapshot([session(24), weekly(26), weekly(23, "Fable")]), NOW)).toBe(
+      ["5-hour  ━━────────   24%", "weekly  ━━━───────   26%", "fable   ━━────────   23%"].join("\n")
     );
   });
 
-  it("starts every line with the bar, which is what keeps them aligned", () => {
-    const lines = usageLine(snapshot([session(7), weekly(94)]), NOW).split("\n");
+  it("shows every weekly window rather than only the busiest, so no row changes identity", () => {
+    const block = usageBlock(snapshot([session(10), weekly(53), weekly(54, "Fable")]), NOW);
 
-    expect(lines.map((line) => barOf(line).length)).toEqual([BAR_SEGMENTS, BAR_SEGMENTS]);
+    expect(rows(block)).toHaveLength(3);
+    expect(block).toContain("weekly");
+    expect(block).toContain("fable");
   });
 
-  it("names the model a weekly window is scoped to", () => {
-    expect(usageLine(snapshot([session(33), weekly(54, "Fable")]), NOW)).toContain(
-      "54% · неделя/Fable"
+  it("names a window after the model it is scoped to, whatever that model is", () => {
+    expect(usageBlock(snapshot([weekly(54, "Sonnet")]), NOW)).toContain("sonnet");
+  });
+
+  it("pads the label column to the longest name", () => {
+    const block = usageBlock(snapshot([session(10), weekly(20, "Fable")]), NOW);
+
+    expect(rows(block)[0]?.startsWith("5-hour  ")).toBe(true);
+    expect(rows(block)[1]?.startsWith("fable   ")).toBe(true);
+  });
+
+  it("right-aligns the share so the digits line up at any width", () => {
+    const block = usageBlock(snapshot([session(9), weekly(100)]), NOW);
+
+    expect(rows(block)[0]?.endsWith("   9%")).toBe(true);
+    expect(rows(block)[1]?.endsWith(" 100%")).toBe(true);
+  });
+
+  it("says when a busy window resets, since that is when it starts to matter", () => {
+    expect(usageBlock(snapshot([session(92, AN_HOUR_FROM_NOW)]), NOW)).toBe(
+      "5-hour  ━━━━━━━━━─   92%  1h"
     );
   });
 
-  it("shows the countdown once a window is nearly spent", () => {
-    expect(usageLine(snapshot([session(92, AN_HOUR_FROM_NOW), weekly(53)]), NOW)).toBe(
-      "▰▰▰▰▰▰▰▰▰▱ 92% · 5 часов · сброс через 1 ч\n▰▰▰▰▰▱▱▱▱▱ 53% · неделя"
+  it("stays quiet about the reset while a window is roomy", () => {
+    expect(usageBlock(snapshot([session(79, AN_HOUR_FROM_NOW)]), NOW)).toBe(
+      "5-hour  ━━━━━━━━──   79%"
     );
   });
 
-  it("stays quiet about a reset while there is plenty left", () => {
-    expect(usageLine(snapshot([session(79, AN_HOUR_FROM_NOW)]), NOW)).toBe(
-      "▰▰▰▰▰▰▰▰▱▱ 79% · 5 часов"
+  it("counts eighty as busy", () => {
+    expect(usageBlock(snapshot([session(80, AN_HOUR_FROM_NOW)]), NOW)).toContain("1h");
+  });
+
+  it("says nothing about a reset already in the past", () => {
+    expect(usageBlock(snapshot([session(92, AN_HOUR_AGO)]), NOW)).toBe("5-hour  ━━━━━━━━━─   92%");
+  });
+
+  it("says nothing about a reset it cannot read", () => {
+    expect(usageBlock(snapshot([session(92, "not a date")]), NOW)).toBe(
+      "5-hour  ━━━━━━━━━─   92%"
     );
   });
 
-  it("shows the countdown at the threshold itself", () => {
-    expect(usageLine(snapshot([session(80, AN_HOUR_FROM_NOW)]), NOW)).toBe(
-      "▰▰▰▰▰▰▰▰▱▱ 80% · 5 часов · сброс через 1 ч"
+  it("rounds the share rather than printing a fraction", () => {
+    expect(usageBlock(snapshot([session(33.4)]), NOW)).toContain("  33%");
+  });
+
+  it("fills the bar only at a hundred", () => {
+    expect(barOf(usageBlock(snapshot([session(100)]), NOW))).toBe("━".repeat(BAR_SEGMENTS));
+  });
+
+  it("empties the bar only at nothing spent", () => {
+    expect(barOf(usageBlock(snapshot([session(0)]), NOW))).toBe("─".repeat(BAR_SEGMENTS));
+  });
+
+  it("shows a sliver rather than nothing once anything is spent", () => {
+    expect(barOf(usageBlock(snapshot([session(2)]), NOW))).toBe(`━${"─".repeat(BAR_SEGMENTS - 1)}`);
+  });
+
+  it("keeps a gap rather than a full bar just short of the whole", () => {
+    expect(barOf(usageBlock(snapshot([session(97)]), NOW))).toBe(
+      `${"━".repeat(BAR_SEGMENTS - 1)}─`
     );
   });
 
-  it("drops a countdown whose reset has already passed", () => {
-    expect(usageLine(snapshot([session(92, AN_HOUR_AGO)]), NOW)).toBe("▰▰▰▰▰▰▰▰▰▱ 92% · 5 часов");
-  });
-
-  it("drops a countdown it cannot read", () => {
-    expect(usageLine(snapshot([session(92, "not a date")]), NOW)).toBe("▰▰▰▰▰▰▰▰▰▱ 92% · 5 часов");
-  });
-
-  it("picks the busiest of several weekly windows, since that is what stops the work", () => {
-    expect(usageLine(snapshot([session(10), weekly(53), weekly(54, "Fable")]), NOW)).toContain(
-      "54% · неделя/Fable"
-    );
-  });
-
-  it("rounds a fractional percentage", () => {
-    expect(usageLine(snapshot([session(33.4), weekly(53.6)]), NOW)).toBe(
-      "▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов\n▰▰▰▰▰▱▱▱▱▱ 54% · неделя"
-    );
-  });
-
-  it("fills a whole bar only at the very end", () => {
-    expect(barOf(usageLine(snapshot([session(100)]), NOW))).toBe("▰".repeat(BAR_SEGMENTS));
-  });
-
-  it("leaves the bar empty when nothing has been spent", () => {
-    expect(barOf(usageLine(snapshot([session(0)]), NOW))).toBe("▱".repeat(BAR_SEGMENTS));
-  });
-
-  it("shows a sliver rather than nothing for a percentage that would round to zero", () => {
-    expect(barOf(usageLine(snapshot([session(2)]), NOW))).toBe(`▰${"▱".repeat(BAR_SEGMENTS - 1)}`);
-  });
-
-  it("keeps one segment empty until the window is actually spent, so a full bar never lies", () => {
-    expect(barOf(usageLine(snapshot([session(97)]), NOW))).toBe(
-      `${"▰".repeat(BAR_SEGMENTS - 1)}▱`
-    );
-  });
-
-  it("falls back to the flat shape when the limits array is absent", () => {
+  it("falls back to the flat windows when no limits are named", () => {
     const flat: UsageSnapshot = {
-      five_hour: { utilization: 33 },
-      seven_day: { utilization: 53 },
+      limits: [],
+      five_hour: { utilization: 10, resets_at: null },
+      seven_day: { utilization: 20, resets_at: null },
     };
 
-    expect(usageLine(flat, NOW)).toBe(
-      "▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов\n▰▰▰▰▰▱▱▱▱▱ 53% · неделя"
-    );
+    expect(usageBlock(flat, NOW)).toBe(["5-hour  ━─────────   10%", "weekly  ━━────────   20%"].join("\n"));
   });
 
-  it("prefers the limits array over the flat shape", () => {
+  it("prefers the named limits when both shapes arrive", () => {
     const both: UsageSnapshot = {
-      limits: [session(10), weekly(20)],
-      five_hour: { utilization: 90 },
-      seven_day: { utilization: 90 },
+      limits: [session(10)],
+      five_hour: { utilization: 99, resets_at: null },
+      seven_day: null,
     };
 
-    expect(usageLine(both, NOW)).toBe("▰▱▱▱▱▱▱▱▱▱ 10% · 5 часов\n▰▰▱▱▱▱▱▱▱▱ 20% · неделя");
+    expect(usageBlock(both, NOW)).toBe("5-hour  ━─────────   10%");
   });
 
-  it("reports what it has when only one window is known", () => {
-    expect(usageLine(snapshot([session(33)]), NOW)).toBe("▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов");
+  it("says nothing at all when there is nothing to read", () => {
+    expect(usageBlock(null, NOW)).toBe("");
+    expect(usageBlock({ limits: [], five_hour: null, seven_day: null }, NOW)).toBe("");
   });
 
-  it("says nothing when the snapshot could not be fetched", () => {
-    expect(usageLine(null, NOW)).toBe("");
-  });
-
-  it("says nothing when every window is empty", () => {
-    expect(usageLine({ limits: [], five_hour: null, seven_day: null }, NOW)).toBe("");
-  });
-
-  it("ignores a window whose percentage is missing", () => {
-    expect(usageLine(snapshot([{ group: "session", percent: null }, weekly(53)]), NOW)).toBe(
-      "▰▰▰▰▰▱▱▱▱▱ 53% · неделя"
+  it("skips a window with no share, rather than drawing an empty row", () => {
+    expect(usageBlock(snapshot([{ group: "session", percent: null }, weekly(53)]), NOW)).toBe(
+      "weekly  ━━━━━─────   53%"
     );
   });
 
-  it("ignores a group it does not know about", () => {
-    expect(usageLine(snapshot([{ group: "monthly", percent: 99 }, session(33)]), NOW)).toBe(
-      "▰▰▰▱▱▱▱▱▱▱ 33% · 5 часов"
+  it("ignores a window group it does not know", () => {
+    expect(usageBlock(snapshot([{ group: "monthly", percent: 99 }, session(33)]), NOW)).toBe(
+      "5-hour  ━━━───────   33%"
     );
   });
 });

@@ -2,6 +2,7 @@ import type { TelegramUpdate } from "#domain/asking/answer.ts";
 
 
 const TELEGRAM = "https://api.telegram.org";
+const HTML = "HTML";
 const SEND_TIMEOUT_MS = 10_000;
 const POLL_MARGIN_MS = 5_000;
 const MILLISECONDS_PER_SECOND = 1000;
@@ -20,12 +21,13 @@ const drain = async (response: Response): Promise<void> => {
 export const sendMessage = async (
   token: string,
   chatId: string,
-  text: string
+  text: string,
+  html = true
 ): Promise<void> => {
   const response = await fetch(`${apiRoot()}/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: html ? HTML : undefined }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
 
@@ -46,6 +48,7 @@ export const sendQuestion = async (
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      parse_mode: HTML,
       reply_markup: {
         inline_keyboard: buttons.map((button) => [
           { text: button.text, callback_data: button.data },
@@ -73,7 +76,7 @@ export const closeQuestion = async (
   const response = await fetch(`${apiRoot()}/bot${token}/editMessageText`, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text }),
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, parse_mode: HTML }),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
 

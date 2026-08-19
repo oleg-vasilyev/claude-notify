@@ -317,15 +317,25 @@ carries fresh numbers rather than the ones from when it was suppressed:
 ```
 [a-project@home] Закончил фазу 2, жду апрув на миграцию БД
 
-▰▰▰▱▱▱▱▱▱▱ 35% · 5 часов
-▰▰▰▰▰▱▱▱▱▱ 54% · неделя/Fable
+5-hour  ━━━━──────   35%
+weekly  ━━━━━─────   54%
+fable   ━━━───────   28%
 ```
 
-**The bar starts the line, and that is the whole trick.** Telegram renders with
-a proportional font, so a line beginning with a label (`5ч` against `нед`) puts
-the bars at different places and the pair reads as ragged. Beginning with the
-bar costs nothing and aligns them exactly, without `parse_mode` and the
-escaping it would drag in.
+**The limits are a block, not a sentence, and it is monospaced on purpose.**
+Telegram renders ordinary text in a proportional font, where a row beginning
+with a label puts every bar in a different place and three windows read as
+rubble. Sending the block as `<pre>` buys back the column, and the grey slab
+Telegram draws around it does a second job nobody designed: it separates the
+numbers from the message above them, so the ping reads as a note with a readout
+attached rather than as one long string.
+
+That costs an HTML `parse_mode`, which this design refused for a long time and
+was right to until it measured the price. The refusal was written against
+MarkdownV2, where eighteen characters need escaping and a model writing a
+plausible sentence will eventually hit one. HTML mode needs three — `&`, `<`,
+`>` — and one function at the boundary escapes them for every message the
+product sends. What it buys is a readout that lines up.
 
 Two things the bar refuses to do, both so it cannot lie at the ends: it never
 shows empty while anything at all has been spent, and never shows full until the
@@ -334,10 +344,16 @@ moment the honest answer is *nearly*.
 
 The point is deciding whether coming back is worth it. A window under 80% shows
 only its share; at or above 80% it also shows when it resets, because that is
-the moment the number stops being trivia — `▰▰▰▰▰▰▰▰▰▱ 92% · 5 часов · сброс
-через 12 мин` says wait, not hurry. Of several weekly windows the highest is
-shown, named after the model it is scoped to, since that is the one that will
-actually stop the work.
+the moment the number stops being trivia — `5-hour  ━━━━━━━━━─   92%  12m`
+says wait, not hurry. Every window is drawn: showing only the busiest weekly meant the
+second row changed identity between pings, and a row that is sometimes one
+window and sometimes another is worse than a row more.
+
+The labels are English although the ping above them is Russian, and that is not
+an oversight. One of them is the endpoint's own word — a model's
+`display_name`, lowercased — and translating that would mean maintaining a
+Russian gloss of somebody else's vocabulary as it grows. The other two are ours,
+chosen to sit beside it without looking foreign.
 
 **The source is the account's own usage endpoint.** `GET /api/oauth/usage` with
 the OAuth token Claude Code maintains — the same call the CLI's own usage
@@ -459,9 +475,9 @@ threshold is the knob if it ever is not.
 
 ## Telegram Bot API facts this design leans on
 
-- `sendMessage` is one POST; the body is JSON, UTF-8. Messages are sent as
-  plain text with no `parse_mode`, so a hook payload or a question text cannot
-  break markup — nothing needs escaping.
+- `sendMessage` is one POST; the body is JSON, UTF-8, and `parse_mode: HTML`.
+  Three characters carry meaning there, so every message crosses one function
+  that escapes them; nothing else in the product may build wire text.
 - **`getUpdates` has one consumer per token.** Two pollers split the stream
   randomly, so exactly one process listens: the watcher. Hooks never poll — they
   wait on a file. `offset` is remembered on disk so a press is never read twice.

@@ -61,7 +61,14 @@ describe("the relay server", () => {
     const response = await ping(SECRET, A_PING);
 
     expect(response.status).toBe(ACCEPTED);
-    expect(sendMessage).toHaveBeenCalledWith("T", "42", A_PING);
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", A_PING, false);
+  });
+
+  it("posts as HTML only when the caller said its text is ready for it", async () => {
+    const response = await post("/ping", SECRET, JSON.stringify({ message: A_PING, html: true }));
+
+    expect(response.status).toBe(ACCEPTED);
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", A_PING, true);
   });
 
   it("keeps Cyrillic intact across the wire", async () => {

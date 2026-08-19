@@ -10,8 +10,9 @@ sits idle until you happen to come back.
 ```
 [a-project@home] Закончил фазу 2, жду апрув на миграцию БД
 
-▰▰▰▱▱▱▱▱▱▱ 35% · 5 часов
-▰▰▰▰▰▱▱▱▱▱ 54% · неделя/Fable
+5-hour  ━━━━──────   35%
+weekly  ━━━━━─────   54%
+fable   ━━━───────   28%
 ```
 
 A ping carries the project, the machine it came from, what is needed, and where

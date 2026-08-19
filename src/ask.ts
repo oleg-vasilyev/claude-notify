@@ -8,6 +8,7 @@ import { hookAnswerOutput } from "#domain/asking/hook-answer.ts";
 import { impossible } from "#domain/impossible.ts";
 import type { HookEvent, HookPayload } from "#domain/hook-event.ts";
 import { projectPrefixOf, withMachineLabel } from "#domain/project.ts";
+import { messageWith } from "#domain/telegram-html.ts";
 import { questionText } from "#domain/asking/question.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { forgetQuestion, readAnswer, writeAskedQuestion } from "#state/asked-question.ts";
@@ -76,7 +77,7 @@ export const ask = async (
     messageId = await sendQuestion(
       delivery.token,
       delivery.chatId,
-      text,
+      messageWith(text, ""),
       question.options.map((option) => ({
         text: option.recommended ? `★ ${option.label}` : option.label,
         data: callbackDataFor(question.id, option.value),
@@ -114,7 +115,7 @@ export const ask = async (
   log(`ASK timed out ${question.id}, handing the question back to the app`);
 
   if (messageId !== null) {
-    await closeQuestion(delivery.token, delivery.chatId, messageId, copy.questionExpired(headline));
+    await closeQuestion(delivery.token, delivery.chatId, messageId, messageWith(copy.questionExpired(headline), ""));
   }
 
   return hookAnswerOutput(event, question, null);

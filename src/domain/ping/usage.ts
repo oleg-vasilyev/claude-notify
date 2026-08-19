@@ -1,14 +1,21 @@
-import { copy } from "#domain/copy.ru.ts";
 import { humanizeDuration } from "#domain/duration.ts";
 
 
 const RESET_TIME_MATTERS_ABOVE_PERCENT = 80;
 const BAR_SEGMENTS = 10;
 const WHOLE = 100;
-const FILLED = "▰";
-const EMPTY = "▱";
+const FILLED = "━";
+const EMPTY = "─";
 const AT_LEAST_A_SLIVER = 1;
 const NOTHING_SPENT = 0;
+const ALREADY_RESET = 0;
+const NO_WINDOWS = 0;
+const NO_LABEL = 0;
+const PERCENT_COLUMN = 4;
+const SESSION_GROUP = "session";
+const WEEKLY_GROUP = "weekly";
+const SESSION_WINDOW = "5-hour";
+const WEEK_WINDOW = "weekly";
 
 const segmentsFor = (percent: number): number => {
   if (percent <= NOTHING_SPENT) {
@@ -53,51 +60,46 @@ export type UsageSnapshot = {
 };
 
 type Window = {
+  label: string;
   percent: number;
   resetsAt: string | null;
-  model: string | null;
 };
 
-const asWindow = (limit: UsageLimit): Window | null => {
-  if (limit.percent === null || limit.percent === undefined) {
-    return null;
+const labelFor = (limit: UsageLimit): string => {
+  const model = limit.scope?.model?.display_name;
+
+  if (limit.group === SESSION_GROUP) {
+    return SESSION_WINDOW;
   }
 
-  return {
-    percent: limit.percent,
-    resetsAt: limit.resets_at ?? null,
-    model: limit.scope?.model?.display_name ?? null,
-  };
+  return model === null || model === undefined || model === "" ? WEEK_WINDOW : model.toLowerCase();
 };
 
-const asFlatWindow = (flat: UsageFlatWindow | undefined): Window | null => {
-  if (flat === null || flat === undefined) {
-    return null;
+const asWindow = (limit: UsageLimit): Window | null =>
+  limit.percent === null || limit.percent === undefined
+    ? null
+    : { label: labelFor(limit), percent: limit.percent, resetsAt: limit.resets_at ?? null };
+
+const asFlatWindow = (flat: UsageFlatWindow | undefined, label: string): Window | null =>
+  flat === null || flat === undefined || flat.utilization === null || flat.utilization === undefined
+    ? null
+    : { label, percent: flat.utilization, resetsAt: flat.resets_at ?? null };
+
+const windowsIn = (snapshot: UsageSnapshot): Window[] => {
+  const limits = snapshot.limits ?? [];
+  const named = limits
+    .filter((limit) => limit.group === SESSION_GROUP || limit.group === WEEKLY_GROUP)
+    .map(asWindow)
+    .filter((window): window is Window => window !== null);
+
+  if (named.length > NO_WINDOWS) {
+    return named;
   }
 
-  if (flat.utilization === null || flat.utilization === undefined) {
-    return null;
-  }
-
-  return { percent: flat.utilization, resetsAt: flat.resets_at ?? null, model: null };
-};
-
-const busiestOf = (limits: readonly UsageLimit[], group: string): Window | null => {
-  let busiest: Window | null = null;
-
-  for (const limit of limits) {
-    if (limit.group !== group) {
-      continue;
-    }
-
-    const window = asWindow(limit);
-
-    if (window !== null && (busiest === null || window.percent > busiest.percent)) {
-      busiest = window;
-    }
-  }
-
-  return busiest;
+  return [
+    asFlatWindow(snapshot.five_hour, SESSION_WINDOW),
+    asFlatWindow(snapshot.seven_day, WEEK_WINDOW),
+  ].filter((window): window is Window => window !== null);
 };
 
 const resetCountdown = (window: Window, now: Date): string => {
@@ -113,39 +115,25 @@ const resetCountdown = (window: Window, now: Date): string => {
 
   const left = resetsAt - now.getTime();
 
-  if (left <= 0) {
-    return "";
-  }
-
-  return copy.windowResetsIn(humanizeDuration(left));
+  return left <= ALREADY_RESET ? "" : `  ${humanizeDuration(left)}`;
 };
 
-const describe = (window: Window | null, label: string, now: Date): string | null => {
-  if (window === null) {
-    return null;
-  }
-
-  const named = window.model === null ? label : copy.windowScopedTo(label, window.model);
-  const percent = Math.round(window.percent);
-
-  return copy.windowShare(bar(percent), percent, named) + resetCountdown(window, now);
-};
-
-export const usageLine = (snapshot: UsageSnapshot | null, now: Date): string => {
+export const usageBlock = (snapshot: UsageSnapshot | null, now: Date): string => {
   if (snapshot === null) {
     return "";
   }
 
-  const limits = snapshot.limits ?? [];
-  const session = busiestOf(limits, "session") ?? asFlatWindow(snapshot.five_hour);
-  const week = busiestOf(limits, "weekly") ?? asFlatWindow(snapshot.seven_day);
+  const windows = windowsIn(snapshot);
+  const column = Math.max(...windows.map((window) => window.label.length), NO_LABEL);
 
-  const described = [
-    describe(session, copy.sessionWindow, now),
-    describe(week, copy.weekWindow, now),
-  ].filter((part) => part !== null);
+  return windows
+    .map((window) => {
+      const percent = Math.round(window.percent);
+      const share = `${percent}%`.padStart(PERCENT_COLUMN);
 
-  return described.join(copy.windowSeparator);
+      return `${window.label.padEnd(column)}  ${bar(percent)}  ${share}${resetCountdown(window, now)}`;
+    })
+    .join("\n");
 };
 
 export const USAGE = { read: "read", unavailable: "unavailable" } as const;

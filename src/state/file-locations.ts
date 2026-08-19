@@ -31,6 +31,8 @@ export const answerFile = (id: string): string => join(stateHome(), `answer-${id
 export const sessionNoteFile = (sessionId: string): string =>
   join(stateHome(), `session-${sessionId.replace(UNSAFE_IN_A_FILE_NAME, "_")}.json`);
 
+export const lastUsageFile = (): string => join(stateHome(), "last-usage.json");
+
 export const updateOffsetFile = (): string => join(stateHome(), "update-offset.txt");
 
 export const startupFolder = (): string =>

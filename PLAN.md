@@ -355,6 +355,25 @@ an oversight. One of them is the endpoint's own word — a model's
 Russian gloss of somebody else's vocabulary as it grows. The other two are ours,
 chosen to sit beside it without looking foreign.
 
+**A reading survives the token that fetched it.** The OAuth token lives eight
+hours and this product never refreshes it — see invariant 8 — so between the
+moment it expires and the moment Claude Code writes a new one, the endpoint
+answers 401. That gap was measured at four hours on one afternoon, half the
+token's life, and every ping in it arrived bare.
+
+So the last reading that worked is kept, and shown with its age when a fresh one
+cannot be had. A number with "40m old" under it is still worth reading; a number
+silently four hours stale is a lie. **A row disappears once the reading is older
+than a quarter of that row's own window** — 75 minutes for the five-hour, 42
+hours for a weekly. The rule follows from what the rows mean rather than from a
+taste for a number: a five-hour figure from four hours ago describes a window
+that has almost entirely turned over, while a weekly one barely moved.
+
+Refreshing the token here was rejected rather than skipped. Refresh tokens are
+single-use, so a notifier racing the app to rotate one can invalidate the pair
+and log the user out of their own editor — a far worse outcome than a missing
+line, and one the user could not diagnose.
+
 **The source is the account's own usage endpoint.** `GET /api/oauth/usage` with
 the OAuth token Claude Code maintains — the same call the CLI's own usage
 display makes. There is no alternative: the status line's payload carries

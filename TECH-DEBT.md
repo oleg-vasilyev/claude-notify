@@ -258,21 +258,3 @@ A glance, not a loss, and it ends the moment the host is pulled.
 **Delete this entry when the relay protocol grows a version handshake**, which is
 the only thing that would let the far side know rather than assume.
 
----
-
-## Every ping between token expiry and refresh loses its limits
-
-The OAuth token lives eight hours, and invariant 8 says this product reads it and
-never refreshes it. So from the moment it expires until Claude Code writes a new
-one, `GET /api/oauth/usage` answers 401 and every ping goes out without its
-readout. Seen twice within ten minutes on one afternoon, and only visible at all
-because the log now names the reason.
-
-Refreshing it here is the wrong fix — two processes racing to rotate one
-credential is worse than a missing line — but the file carries `refreshToken` and
-`expiresAt`, so the notifier could at least *say* "the token expired 20 minutes
-ago" rather than "the endpoint answered 401", which reads like a fault.
-
-**Name the expiry in the warning the next time this is noticed**, or drop the
-entry if Claude Code starts refreshing eagerly enough that the window never
-shows.

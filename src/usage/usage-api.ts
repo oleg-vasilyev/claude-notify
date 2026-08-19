@@ -1,26 +1,29 @@
 import { readFileSync } from "node:fs";
 
+import { humanizeDuration } from "#domain/duration.ts";
 import { USAGE, type UsageRead, type UsageSnapshot } from "#domain/ping/usage.ts";
 import { credentialsFile } from "#state/file-locations.ts";
 
 
 const USAGE_TIMEOUT_MS = 6000;
 const USAGE_ENDPOINT = "https://api.anthropic.com/api/oauth/usage";
+const ALREADY_GONE = 0;
 
-type CredentialFile = Record<string, { accessToken?: string } | undefined>;
+type StoredCredential = { accessToken?: string; expiresAt?: number };
+type CredentialFile = Record<string, StoredCredential | undefined>;
 
-const accessToken = (): string | null => {
-  let stored: CredentialFile;
+const stored = (): StoredCredential | null => {
+  let file: CredentialFile;
 
   try {
-    stored = JSON.parse(readFileSync(credentialsFile(), "utf8")) as CredentialFile;
+    file = JSON.parse(readFileSync(credentialsFile(), "utf8")) as CredentialFile;
   } catch {
     return null;
   }
 
-  for (const entry of Object.values(stored)) {
+  for (const entry of Object.values(file)) {
     if (entry?.accessToken !== undefined) {
-      return entry.accessToken;
+      return entry;
     }
   }
 
@@ -28,15 +31,25 @@ const accessToken = (): string | null => {
 };
 
 export const fetchUsage = async (): Promise<UsageRead> => {
-  const token = accessToken();
+  const credential = stored();
 
-  if (token === null) {
+  if (credential?.accessToken === undefined) {
     return { kind: USAGE.unavailable, why: "no OAuth token in the credentials file" };
+  }
+
+  const expiredFor =
+    credential.expiresAt === undefined ? ALREADY_GONE : Date.now() - credential.expiresAt;
+
+  if (expiredFor > ALREADY_GONE) {
+    return {
+      kind: USAGE.unavailable,
+      why: `the stored token expired ${humanizeDuration(expiredFor)} ago and only Claude Code may replace it`,
+    };
   }
 
   try {
     const response = await fetch(USAGE_ENDPOINT, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${credential.accessToken}` },
       signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
     });
 
@@ -46,6 +59,9 @@ export const fetchUsage = async (): Promise<UsageRead> => {
 
     return { kind: USAGE.read, snapshot: (await response.json()) as UsageSnapshot };
   } catch (failure) {
-    return { kind: USAGE.unavailable, why: `${(failure as Error).name}: ${(failure as Error).message}` };
+    return {
+      kind: USAGE.unavailable,
+      why: `${(failure as Error).name}: ${(failure as Error).message}`,
+    };
   }
 };

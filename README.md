@@ -144,6 +144,7 @@ Everything the notifier decides is one line in
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
 | `WARN usage unavailable: <why>` | the limits line was skipped and the reason named; the ping itself went out |
+| `WARN usage from a snapshot <age> old` | the endpoint refused, so the last reading was shown with its age |
 | `ERROR send failed` | Telegram or the relay refused — the reason follows |
 
 No line at all means nothing called it: the model did not ping and no hook
@@ -163,12 +164,13 @@ is the same sentence the `ping_user` tool hands back to the agent.
 src/domain/     every decision, pure — no files, no network, no clock
   copy.ru.ts        the one file that may hold Russian: what is sent, and what
                     has to be recognised in a payload
-  duration.ts       "1 ч 12 мин"
+  duration.ts       "4h 2m", for the age under a stale readout
   env-file.ts       reading and updating .env without losing your comments
   hook-event.ts     the Claude Code events this product knows, and their payload
   impossible.ts     the case a union grew and a switch did not
   project.ts        the project key and the machine label
   relay-protocol.ts what the two ends of a relay agree on, and who may send
+  telegram-html.ts  the one place a message becomes wire text, escaped
   written-number.ts a number somebody typed into a settings file
   ping/         what to say, and whether to say it now
     delivery.ts       send, queue, or skip
@@ -176,7 +178,7 @@ src/domain/     every decision, pure — no files, no network, no clock
     pending.ts        which queued pings may go now, and which one wins per project
     ping-tool.ts      what the model's own ping tool says, and how it reports back
     session-activity.ts  whether a session is working, waiting, or stuck at a wall
-    usage.ts          the limits line
+    usage.ts          the limits block, and how old a reading may get
   asking/       putting a question on the phone, and reading the answer
     answer.ts         which Telegram update answers which question
     asking.ts         ask on the phone, or leave it to the app
@@ -193,6 +195,7 @@ src/state/      what this product remembers between runs
   config.ts         the settings, read from .env
   file-locations.ts every path it reads or writes, ours and Claude Code's
   last-sent.ts      one stamp per project, for the rate limit
+  last-usage.ts     the newest limits reading, kept for when the endpoint refuses
   log.ts            the one log file every decision lands in
   pending-queue.ts  pings held back while you were at the keyboard
   session-note.ts   what each session was last seen doing

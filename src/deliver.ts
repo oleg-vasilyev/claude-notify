@@ -2,12 +2,13 @@ import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
 import { PING_OUTCOME, type PingOutcome } from "#domain/ping/ping-tool.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
-import { USAGE, usageBlock } from "#domain/ping/usage.ts";
+import { readoutFor } from "#domain/ping/usage.ts";
 import { messageWith } from "#domain/telegram-html.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { DELIVERY, readConfig, type Delivery } from "#state/config.ts";
 import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
+import { rememberedUsage, rememberUsage } from "#state/last-usage.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
@@ -53,21 +54,18 @@ const sentVia = (delivery: Delivery): string => {
 };
 
 const limitsBlock = async (): Promise<string> => {
-  const read = await fetchUsage();
+  const now = new Date();
+  const readout = readoutFor(await fetchUsage(), rememberedUsage(), now);
 
-  if (read.kind === USAGE.unavailable) {
-    log(`WARN usage unavailable: ${read.why}`);
-
-    return "";
+  if (readout.remember !== null) {
+    rememberUsage(readout.remember, now.getTime());
   }
 
-  const block = usageBlock(read.snapshot, new Date());
-
-  if (block === "") {
-    log("WARN usage unavailable: the endpoint named no limit windows");
+  if (readout.warning !== "") {
+    log(`WARN ${readout.warning}`);
   }
 
-  return block;
+  return readout.block;
 };
 
 export const deliver = async (request: PingRequest): Promise<PingOutcome> => {

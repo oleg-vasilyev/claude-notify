@@ -1,4 +1,5 @@
 import { humanizeDuration } from "#domain/duration.ts";
+import { impossible } from "#domain/impossible.ts";
 
 
 const RESET_TIME_MATTERS_ABOVE_PERCENT = 80;
@@ -16,6 +17,10 @@ const SESSION_GROUP = "session";
 const WEEKLY_GROUP = "weekly";
 const SESSION_WINDOW = "5-hour";
 const WEEK_WINDOW = "weekly";
+const A_QUARTER = 4;
+const SESSION_WINDOW_MS = 5 * 60 * 60 * 1000;
+const WEEK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const FRESH = 0;
 
 const segmentsFor = (percent: number): number => {
   if (percent <= NOTHING_SPENT) {
@@ -63,6 +68,7 @@ type Window = {
   label: string;
   percent: number;
   resetsAt: string | null;
+  windowMs: number;
 };
 
 const labelFor = (limit: UsageLimit): string => {
@@ -75,15 +81,27 @@ const labelFor = (limit: UsageLimit): string => {
   return model === null || model === undefined || model === "" ? WEEK_WINDOW : model.toLowerCase();
 };
 
+const windowLengthOf = (group: string | undefined): number =>
+  group === SESSION_GROUP ? SESSION_WINDOW_MS : WEEK_WINDOW_MS;
+
 const asWindow = (limit: UsageLimit): Window | null =>
   limit.percent === null || limit.percent === undefined
     ? null
-    : { label: labelFor(limit), percent: limit.percent, resetsAt: limit.resets_at ?? null };
+    : {
+        label: labelFor(limit),
+        percent: limit.percent,
+        resetsAt: limit.resets_at ?? null,
+        windowMs: windowLengthOf(limit.group),
+      };
 
-const asFlatWindow = (flat: UsageFlatWindow | undefined, label: string): Window | null =>
+const asFlatWindow = (
+  flat: UsageFlatWindow | undefined,
+  label: string,
+  windowMs: number
+): Window | null =>
   flat === null || flat === undefined || flat.utilization === null || flat.utilization === undefined
     ? null
-    : { label, percent: flat.utilization, resetsAt: flat.resets_at ?? null };
+    : { label, percent: flat.utilization, resetsAt: flat.resets_at ?? null, windowMs };
 
 const windowsIn = (snapshot: UsageSnapshot): Window[] => {
   const limits = snapshot.limits ?? [];
@@ -97,8 +115,8 @@ const windowsIn = (snapshot: UsageSnapshot): Window[] => {
   }
 
   return [
-    asFlatWindow(snapshot.five_hour, SESSION_WINDOW),
-    asFlatWindow(snapshot.seven_day, WEEK_WINDOW),
+    asFlatWindow(snapshot.five_hour, SESSION_WINDOW, SESSION_WINDOW_MS),
+    asFlatWindow(snapshot.seven_day, WEEK_WINDOW, WEEK_WINDOW_MS),
   ].filter((window): window is Window => window !== null);
 };
 
@@ -118,22 +136,35 @@ const resetCountdown = (window: Window, now: Date): string => {
   return left <= ALREADY_RESET ? "" : `  ${humanizeDuration(left)}`;
 };
 
-export const usageBlock = (snapshot: UsageSnapshot | null, now: Date): string => {
+const stillWorthShowing = (window: Window, ageMs: number): boolean =>
+  ageMs * A_QUARTER <= window.windowMs;
+
+export const usageBlock = (
+  snapshot: UsageSnapshot | null,
+  now: Date,
+  ageMs: number
+): string => {
   if (snapshot === null) {
     return "";
   }
 
-  const windows = windowsIn(snapshot);
+  const windows = windowsIn(snapshot).filter((window) => stillWorthShowing(window, ageMs));
+
+  if (windows.length === NO_WINDOWS) {
+    return "";
+  }
+
   const column = Math.max(...windows.map((window) => window.label.length), NO_LABEL);
+  const rows = windows.map((window) => {
+    const percent = Math.round(window.percent);
+    const share = `${percent}%`.padStart(PERCENT_COLUMN);
 
-  return windows
-    .map((window) => {
-      const percent = Math.round(window.percent);
-      const share = `${percent}%`.padStart(PERCENT_COLUMN);
+    return `${window.label.padEnd(column)}  ${bar(percent)}  ${share}${resetCountdown(window, now)}`;
+  });
 
-      return `${window.label.padEnd(column)}  ${bar(percent)}  ${share}${resetCountdown(window, now)}`;
-    })
-    .join("\n");
+  const aged = ageMs > FRESH ? [...rows, `${humanizeDuration(ageMs)} old`] : rows;
+
+  return aged.join("\n");
 };
 
 export const USAGE = { read: "read", unavailable: "unavailable" } as const;
@@ -141,3 +172,66 @@ export const USAGE = { read: "read", unavailable: "unavailable" } as const;
 export type UsageRead =
   | { kind: typeof USAGE.read; snapshot: UsageSnapshot }
   | { kind: typeof USAGE.unavailable; why: string };
+
+export type RememberedUsage = { snapshot: UsageSnapshot; readAt: number };
+
+export type Readout = { block: string; warning: string; remember: UsageSnapshot | null };
+
+const nothingToShow = (warning: string): Readout => ({ block: "", warning, remember: null });
+
+const fromWhatArrived = (snapshot: UsageSnapshot, now: Date): Readout => {
+  const block = usageBlock(snapshot, now, FRESH);
+
+  return block === ""
+    ? nothingToShow("usage unavailable: the endpoint named no limit windows")
+    : { block, warning: "", remember: snapshot };
+};
+
+const fromWhatWasKept = (
+  remembered: RememberedUsage | null,
+  why: string,
+  now: Date
+): Readout => {
+  if (remembered === null) {
+    return nothingToShow(`usage unavailable: ${why}`);
+  }
+
+  const ageMs = now.getTime() - remembered.readAt;
+
+  if (ageMs < FRESH) {
+    return nothingToShow(`usage unavailable: ${why}, and the kept reading is dated in the future`);
+  }
+
+  const block = usageBlock(remembered.snapshot, now, ageMs);
+
+  if (block !== "") {
+    return {
+      block,
+      warning: `usage from a snapshot ${humanizeDuration(ageMs)} old: ${why}`,
+      remember: null,
+    };
+  }
+
+  return nothingToShow(
+    usageBlock(remembered.snapshot, now, FRESH) === ""
+      ? `usage unavailable: ${why}, and the kept reading named no limit windows`
+      : `usage unavailable: ${why}, and the kept reading is too old to show`
+  );
+};
+
+export const readoutFor = (
+  read: UsageRead,
+  remembered: RememberedUsage | null,
+  now: Date
+): Readout => {
+  switch (read.kind) {
+    case USAGE.read:
+      return fromWhatArrived(read.snapshot, now);
+
+    case USAGE.unavailable:
+      return fromWhatWasKept(remembered, read.why, now);
+
+    default:
+      return impossible(read);
+  }
+};

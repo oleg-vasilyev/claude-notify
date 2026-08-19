@@ -111,6 +111,15 @@ rather than only against the rules.
 first.** A new rule is at its least believed by the person who just wrote it,
 because they are still holding the reasoning that made it obvious.
 
+**A fallback is a table, and a table is a domain function.** Two phases running,
+the reviewer has had to send the same shape back: wiring a second source — a
+cache, a stale reading, an alternative endpoint — produces at least three
+outcomes (it arrived / only the kept one is left / neither), each with its own
+thing to say, and writing those branches where the data happens to be puts them
+in an entry point no spec reaches. Both times the cost was the same: a log line
+that named the wrong reason, and a case nobody tested. When a phase adds a
+fallback, write the verdict function first.
+
 **A measured threshold is only licensed over the population it was measured
 on.** The moved-on rule's five seconds came from 46 real `Stop` events, and the
 code then applied it to all four hook events — where the premise is false,

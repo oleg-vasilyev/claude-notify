@@ -7,6 +7,7 @@ import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
+import { rememberedUsage, rememberUsage } from "#state/last-usage.ts";
 import { fetchUsage } from "#usage/usage-api.ts";
 import { deliver } from "#app/deliver.ts";
 import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
@@ -23,6 +24,7 @@ vi.mock("#state/last-sent.ts", () => ({ readLastSentAt: vi.fn(), writeLastSentAt
 vi.mock("#telegram/telegram-api.ts", () => ({ sendMessage: vi.fn() }));
 vi.mock("#relay/relay-client.ts", () => ({ relayMessage: vi.fn() }));
 vi.mock("#usage/usage-api.ts", () => ({ fetchUsage: vi.fn() }));
+vi.mock("#state/last-usage.ts", () => ({ rememberUsage: vi.fn(), rememberedUsage: vi.fn() }));
 vi.mock("#app/watcher-process.ts", () => ({
   startWatcher: vi.fn(),
   watcherIsRunning: vi.fn(),
@@ -56,6 +58,7 @@ describe("deliver", () => {
     vi.mocked(idleSeconds).mockReturnValue(AWAY_SECONDS);
     vi.mocked(readLastSentAt).mockReturnValue(null);
     vi.mocked(fetchUsage).mockResolvedValue({ kind: "unavailable", why: "the endpoint answered 500" });
+    vi.mocked(rememberedUsage).mockReturnValue(null);
     vi.mocked(watcherIsRunning).mockReturnValue(false);
     vi.mocked(sendMessage).mockResolvedValue(undefined);
     vi.mocked(relayMessage).mockResolvedValue(undefined);
@@ -212,6 +215,57 @@ describe("deliver", () => {
 
     expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
     expect(log).toHaveBeenCalledWith(expect.stringContaining("named no limit windows"));
+  });
+
+  it("keeps the reading, so a later ping has something to fall back on", async () => {
+    const snapshot = { limits: [{ group: "session", percent: 33 }] };
+    const before = Date.now();
+
+    vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "read", snapshot });
+
+    await deliver(ping);
+
+    const kept = vi.mocked(rememberUsage).mock.calls[0];
+
+    expect(kept?.[0]).toBe(snapshot);
+    expect(kept?.[1]).toBeGreaterThanOrEqual(before);
+    expect(kept?.[1]).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("shows the last reading with its age when the endpoint refuses", async () => {
+    const A_MINUTE = 60_000;
+
+    vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "unavailable", why: "the endpoint answered 401" });
+    vi.mocked(rememberedUsage).mockReturnValue({
+      snapshot: { limits: [{ group: "weekly", percent: 40 }] },
+      readAt: Date.now() - 40 * A_MINUTE,
+    });
+
+    await deliver(ping);
+
+    const sent = vi.mocked(sendMessage).mock.calls[0]?.[2] ?? "";
+
+    expect(sent).toContain("40%");
+    expect(sent).toContain("40m old");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("from a snapshot 40m old"));
+  });
+
+  it("shows nothing rather than a reading too old to mean anything", async () => {
+    const A_DAY = 24 * 60 * 60_000;
+
+    vi.mocked(readConfig).mockReturnValue({ ...config, includeUsage: true });
+    vi.mocked(fetchUsage).mockResolvedValue({ kind: "unavailable", why: "the endpoint answered 401" });
+    vi.mocked(rememberedUsage).mockReturnValue({
+      snapshot: { limits: [{ group: "weekly", percent: 40 }] },
+      readAt: Date.now() - 3 * A_DAY,
+    });
+
+    await deliver(ping);
+
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("too old to show"));
   });
 
   it("never asks for usage when it is switched off", async () => {

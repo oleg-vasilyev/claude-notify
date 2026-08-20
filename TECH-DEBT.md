@@ -206,6 +206,51 @@ file.**
 
 ---
 
+## The limits describe whichever account the CLI signed in as, not the session's
+
+`usage-api.ts` reads the token from `~/.claude/.credentials.json`, so the block
+belongs to the account that last signed in *there*. The desktop app keeps its own
+per-account auth elsewhere and leaves that file alone when the user switches
+accounts: a switch from a home account to a work one at 17:10 left every ping for
+the next two hours carrying the home account's windows, and carrying them
+*fresh* — 98% frozen while its countdown ticked 3h20m → 2h46m, because the home
+account had stopped spending while the work account spent. Nothing here can
+notice. The age guard and the `WARN` line fire when a reading is old or missing,
+never when it is current and about somebody else.
+
+No exact fix is available. The credentials file holds one unnamed entry —
+`claudeAiOauth`, carrying tokens, expiry, scopes and tier, and no account — and
+the endpoint's answer names no account either. The app does know: its sessions
+live under `%APPDATA%\Claude\claude-code-sessions\<account-id>\`, so a session id
+resolves to an account uuid. But that uuid appears nowhere else readable, while
+`claude auth status --json`, which does name the token's account, answers with an
+email and an org id. Two identities that never meet.
+
+So the diagnostic is a command rather than a line under the block, which was
+built as a mock-up and rejected: an email is too much text for four rows of
+numbers.
+
+```bash
+claude auth status --json
+```
+
+The workaround is to sign the CLI in as the account being worked on, with
+`claude auth login`, which rewrites the file the product reads. It mirrors the
+bug rather than curing it — pings from the other account's sessions then carry
+these numbers instead — but it is one command, and the diagnostic above says
+which way round it currently is.
+
+**Pick it up when either identity becomes reachable from the other**: a hook
+payload that names its account, or a `claude auth status` that reports the uuid
+the app names its session folders with. Then the block can refuse to draw itself
+and say why, which is what this product does everywhere else it cannot be sure.
+Reading the app's own token store to fetch the right account's numbers is the
+other route, and is not recommended: a private layout that changes with the app's
+version, most likely encrypted per user, and the phase parked for depending on
+the app's internals is already in `PLAN.md`.
+
+---
+
 ## One e2e scenario in a whole-suite run hangs, and it is never the same one
 
 Two sightings so far. The first was `takes the keyboard away when nobody

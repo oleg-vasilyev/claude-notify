@@ -224,7 +224,7 @@ genuinely away, so one live check sat waiting six minutes for an untouched
 keyboard and then had to be killed when the review came back with a rename; and
 `e2e` is 3.4 minutes a run, of which two of three runs in one phase were spent on
 code the review then changed. The review is the cheap thing to run early. Order
-the last three gates review → `e2e` → live ping, and run each once.
+the closing gates review → mutation → `e2e` → live ping, and run each once.
 
 If the phase touched the installer, run `npm run setup -- --label home
 --skip-test` **twice** and confirm `~/.claude/settings.json` gained exactly one

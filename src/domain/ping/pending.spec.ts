@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { DROP, selectPending, sessionsIn, type PendingPing } from "#domain/ping/pending.ts";
+import {
+  DROP,
+  projectsIn,
+  selectPending,
+  sessionsIn,
+  type PendingPing,
+  type SentPing,
+} from "#domain/ping/pending.ts";
 
 
 const NOW = Date.parse("2026-08-07T12:00:00Z");
@@ -9,6 +16,7 @@ const STALE_MINUTES = 15;
 const A_SESSION = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const ANOTHER_SESSION = "11111111-2222-3333-4444-555555555555";
 const NOBODY_WAITS = new Set<string>();
+const NOTHING_SENT = new Map<string, SentPing>();
 const LEFT_BEFORE_ANY_PING = NOW - 60 * MINUTE;
 
 const queued = (minutesAgo: number, message: string): PendingPing => ({
@@ -25,6 +33,7 @@ const select = (pending: PendingPing[], sessionsThatMustWait: ReadonlySet<string
     staleMinutes: STALE_MINUTES,
     lastInputAt: LEFT_BEFORE_ANY_PING,
     sessionsThatMustWait,
+    sentPerProject: NOTHING_SENT,
   });
 
 describe("selectPending", () => {
@@ -65,6 +74,10 @@ describe("selectPending", () => {
     expect(selection.deliver).toEqual(["[a] the model's own account of what it is waiting for"]);
   });
 
+  it("keeps the earlier of two the same length, so a re-flush cannot change its mind", () => {
+    expect(select([queued(2, "[a] first"), queued(1, "[a] other")]).deliver).toEqual(["[a] first"]);
+  });
+
   it("delivers one ping per project", () => {
     const selection = select([queued(2, "[a] first"), queued(1, "[b] second")]);
 
@@ -96,6 +109,7 @@ describe("selectPending, when the user was still at the keyboard afterwards", ()
       staleMinutes: STALE_MINUTES,
       lastInputAt: NOW - minutesAgo * MINUTE,
       sessionsThatMustWait: NOBODY_WAITS,
+      sentPerProject: NOTHING_SENT,
     });
 
   it("drops a ping the user was present for, because the sound and the screen already told them", () => {
@@ -115,6 +129,7 @@ describe("selectPending, when the user was still at the keyboard afterwards", ()
       staleMinutes: STALE_MINUTES,
       lastInputAt: NOW - 5 * MINUTE,
       sessionsThatMustWait: NOBODY_WAITS,
+      sentPerProject: NOTHING_SENT,
     });
 
     expect(selection.deliver).toEqual(["[a] the turn ended"]);
@@ -126,6 +141,7 @@ describe("selectPending, when the user was still at the keyboard afterwards", ()
       staleMinutes: STALE_MINUTES,
       lastInputAt: NOW,
       sessionsThatMustWait: NOBODY_WAITS,
+      sentPerProject: NOTHING_SENT,
     });
 
     expect(selection.dropped).toEqual([{ kind: DROP.stale, ping: queued(20, "[a] old news") }]);
@@ -174,6 +190,112 @@ describe("selectPending, when a session is not waiting yet", () => {
     const freePing = from(queued(1, "[a] brief"), ANOTHER_SESSION);
 
     expect(select([busyPing, freePing], busy).deliver).toEqual(["[a] brief"]);
+  });
+});
+
+describe("selectPending, when the same words already went out", () => {
+  const THE_TURN_ENDED = "[a] the turn ended";
+  const alreadySent = (message: string, at: number) => new Map([["a", { at, message }]]);
+
+  const afterSending = (
+    pending: PendingPing[],
+    sent: ReadonlyMap<string, SentPing>,
+    busy = NOBODY_WAITS
+  ) =>
+    selectPending(pending, {
+      now: NOW,
+      staleMinutes: STALE_MINUTES,
+      lastInputAt: LEFT_BEFORE_ANY_PING,
+      sessionsThatMustWait: busy,
+      sentPerProject: sent,
+    });
+
+  it("drops the queued repeat of a message the phone has already shown", () => {
+    const ping = queued(5, THE_TURN_ENDED);
+    const selection = afterSending([ping], alreadySent(THE_TURN_ENDED, NOW - 2 * MINUTE));
+
+    expect(selection.deliver).toEqual([]);
+    expect(selection.dropped).toEqual([{ kind: DROP.repeat, ping }]);
+  });
+
+  it("drops it even while its session works on, rather than holding a repeat for later", () => {
+    const ping = from(queued(5, THE_TURN_ENDED), A_SESSION);
+    const selection = afterSending(
+      [ping],
+      alreadySent(THE_TURN_ENDED, NOW - 2 * MINUTE),
+      new Set([A_SESSION])
+    );
+
+    expect(selection.held).toEqual([]);
+    expect(selection.dropped).toEqual([{ kind: DROP.repeat, ping }]);
+  });
+
+  it("delivers a ping that says something else, since only a repeat is worthless", () => {
+    const selection = afterSending(
+      [queued(5, "[a] needs your call on the schema")],
+      alreadySent(THE_TURN_ENDED, NOW - 2 * MINUTE)
+    );
+
+    expect(selection.deliver).toEqual(["[a] needs your call on the schema"]);
+  });
+
+  it("delivers a repeat raised after that send, since the news happened twice", () => {
+    expect(
+      afterSending([queued(5, THE_TURN_ENDED)], alreadySent(THE_TURN_ENDED, NOW - 9 * MINUTE))
+        .deliver
+    ).toEqual([THE_TURN_ENDED]);
+  });
+
+  it("delivers when the send landed in the same millisecond, since that is not yet afterwards", () => {
+    expect(
+      afterSending([queued(5, THE_TURN_ENDED)], alreadySent(THE_TURN_ENDED, NOW - 5 * MINUTE))
+        .deliver
+    ).toEqual([THE_TURN_ENDED]);
+  });
+
+  it("counts a send stamped this very millisecond, which is a delivery like any other", () => {
+    const ping = queued(5, THE_TURN_ENDED);
+    const selection = afterSending([ping], alreadySent(THE_TURN_ENDED, NOW));
+
+    expect(selection.deliver).toEqual([]);
+    expect(selection.dropped).toEqual([{ kind: DROP.repeat, ping }]);
+  });
+
+  it("ignores a send stamped in the future, which is a broken clock rather than a delivery", () => {
+    expect(
+      afterSending([queued(5, THE_TURN_ENDED)], alreadySent(THE_TURN_ENDED, NOW + MINUTE)).deliver
+    ).toEqual([THE_TURN_ENDED]);
+  });
+
+  it("looks the send up under the project, not the whole message", () => {
+    expect(
+      afterSending([queued(5, "[b] the turn ended")], alreadySent(THE_TURN_ENDED, NOW - 2 * MINUTE))
+        .deliver
+    ).toEqual(["[b] the turn ended"]);
+  });
+
+  it("counts the keyboard first, so the reason logged is the one the user would recognise", () => {
+    const selection = selectPending([queued(5, THE_TURN_ENDED)], {
+      now: NOW,
+      staleMinutes: STALE_MINUTES,
+      lastInputAt: NOW - 3 * MINUTE,
+      sessionsThatMustWait: NOBODY_WAITS,
+      sentPerProject: alreadySent(THE_TURN_ENDED, NOW - 2 * MINUTE),
+    });
+
+    expect(selection.dropped).toEqual([{ kind: DROP.seen, ping: queued(5, THE_TURN_ENDED) }]);
+  });
+});
+
+describe("projectsIn", () => {
+  it("collects every project worth a last-sent lookup, once", () => {
+    expect(
+      projectsIn([queued(1, "[a] one"), queued(1, "[a@home] two"), queued(1, "[b] three")])
+    ).toEqual(["a", "b"]);
+  });
+
+  it("names the catch-all for a ping with no project at all", () => {
+    expect(projectsIn([queued(1, "no prefix")])).toEqual(["global"]);
   });
 });
 

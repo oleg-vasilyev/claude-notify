@@ -3,15 +3,18 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { impossible } from "#domain/impossible.ts";
 import {
   DROP,
+  projectsIn,
   selectPending,
   sessionsIn,
   type DroppedPing,
   type PendingPing,
+  type SentPing,
 } from "#domain/ping/pending.ts";
 import { mayGoOut, wallToCheck } from "#domain/ping/session-activity.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
 import { DELIVERY, readConfig } from "#state/config.ts";
+import { readLastSent } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending, clearPending, readPending } from "#state/pending-queue.ts";
 import { readSessionNote } from "#state/session-note.ts";
@@ -76,6 +79,20 @@ const sessionsThatMustWait = (pending: readonly PendingPing[]): Set<string> => {
   return waiting;
 };
 
+const sentPerProject = (pending: readonly PendingPing[]): Map<string, SentPing> => {
+  const sent = new Map<string, SentPing>();
+
+  for (const project of projectsIn(pending)) {
+    const last = readLastSent(project);
+
+    if (last !== null) {
+      sent.set(project, last);
+    }
+  }
+
+  return sent;
+};
+
 const whyDropped = (dropped: DroppedPing): string => {
   switch (dropped.kind) {
     case DROP.stale:
@@ -83,6 +100,9 @@ const whyDropped = (dropped: DroppedPing): string => {
 
     case DROP.seen:
       return "DROP seen";
+
+    case DROP.repeat:
+      return "DROP repeat";
 
     default:
       return impossible(dropped);
@@ -98,6 +118,7 @@ const flush = async (idleNow: number): Promise<void> => {
     staleMinutes: config.staleMinutes,
     lastInputAt: now - idleNow * MILLISECONDS_PER_SECOND,
     sessionsThatMustWait: sessionsThatMustWait(pending),
+    sentPerProject: sentPerProject(pending),
   });
 
   clearPending();

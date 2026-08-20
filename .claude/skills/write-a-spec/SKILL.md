@@ -152,7 +152,11 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    with a green spec because the fixture path happened to contain the product
    name the code was searching for. When a test and the code under test agree on
    an assumption, the test proves nothing. Vary the fixture along the axis the
-   code claims not to care about.
+   code claims not to care about. **When one value is derived twice in different
+   places, the axis is whatever makes the two derivations disagree** — a project
+   key was taken from the raw message where a ping is sent and from the labelled
+   message where the queue looks it up, and every fixture carried a project
+   prefix, the one shape where both routes give the same answer.
 5. Does any assertion stand on a `filter` or a `find` that could match nothing?
    Assert the selection is non-empty before asserting anything about it.
 6. **When the subject hardens a parser, does the fixture list include the input

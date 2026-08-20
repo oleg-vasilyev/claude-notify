@@ -199,6 +199,13 @@ afterwards exits silently at once. Kill the pid in `watcher.lock` and delete the
 lock between the queueing step and the flushing step — and do not delete
 `log.txt` while wondering why nothing was logged.
 
+**Run it after gate 4, never beside it.** It fires the working tree, so a
+finding that lands mid-run proves nothing about what will be committed — and the
+proof may not be repeatable on demand: a queue drop only happens while the user
+is genuinely away, so the check sat waiting six minutes for an untouched
+keyboard, then had to be killed and started over because the review came back
+with a rename and a key fix. The review is cheap to run early; this is not.
+
 If the phase touched the installer, run `npm run setup -- --label home
 --skip-test` **twice** and confirm `~/.claude/settings.json` gained exactly one
 entry per event. Idempotence is the property that breaks silently.

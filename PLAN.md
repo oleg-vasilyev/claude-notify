@@ -225,9 +225,11 @@ generic fallback pings that have a better sibling.
 line, each carrying the moment it was queued, the message, and the session it
 came from. A single background watcher polls idleness every 30 seconds; once the
 user has been away `min_idle_minutes`, it flushes: entries older than
-`stale_minutes` are dropped, entries whose session is not waiting are **put
-back**, and the rest are deduplicated to **one message per project, keeping the
-longest** — so the model's contextual ping beats the hook's generic one — and
+`stale_minutes` are dropped, entries repeating what the project's last ping
+already said are dropped, entries whose session is not waiting are **put back**,
+and the rest are deduplicated to **one message per project, keeping the
+longest** — so the model's contextual ping beats the hook's generic one, and the
+earlier of two the same length, so a re-flush cannot change its mind — and
 sent. The watcher then exits; it is spawned again by the next suppressed ping.
 An 8-hour deadline bounds a watcher outliving an all-day session; by then every
 entry is stale anyway.
@@ -277,16 +279,26 @@ ping from that session false.
 
 **A ping whose session is busy is held, never dropped.** The agent may stop five
 minutes later and still need somebody — so the entry goes back into the queue and
-is judged again at the next flush, at most thirty seconds later. Only
-`stale_minutes` ends that loop, which is what it was always for.
+is judged again at the next flush, at most thirty seconds later. `stale_minutes`
+ends that loop, which is what it was always for; so does the next rule.
 
-The held ping is not deduplicated against the `Stop` ping that follows it, and on
-the main path it cannot be: with the user away, `Stop` sends immediately rather
-than queueing, so the contextual ping arrives on the next flush as a second
-message. Two messages a few seconds apart, one of which says what is actually
-wanted, beats one that says «закончил ход» — and the alternative, holding the
-generic ping back to see whether a better one is coming, would be guessing about
-the future.
+**A queued ping that repeats what already reached the phone is dropped.** An
+entry waiting on a busy session outlives the moment it describes, while the
+direct path keeps running underneath it: measured, a turn ended at 01:52 with the
+user at the keyboard, the ping was held for six minutes while that session worked
+on, and by the time it was released the identical sentence had gone out at 01:57.
+The rate limit that correctly suppressed two more `Stop` pings in between never
+saw the queued one, because a flush deliberately sends without one. So the
+per-project stamp records **what** was sent as well as when, and the flush drops
+an entry whose message the project has said since it was queued.
+
+Only word for word. A held ping saying something else still goes out as a second
+message, and on the main path it has to: with the user away, `Stop` sends
+immediately rather than queueing, so the model's contextual ping arrives on the
+next flush behind it. Two messages a few seconds apart, one of which says what is
+actually wanted, beats one that says «закончил ход» — and holding the generic
+ping back to see whether a better one is coming would be guessing about the
+future. An exact repeat is the one case with nothing left to guess.
 
 **A wall comes down without an event to say so.** Approving a permission
 produces no hook; the tool simply runs. But the tool call it was blocking has an
@@ -401,8 +413,9 @@ threshold is the knob if it ever is not.
    presence filter and nothing else.
 2. **Presence suppression never discards while the ping is still true.** It
    queues; a queued ping goes out only while its session is waiting, waits in
-   the queue while that session works, and is discarded only by `stale_minutes`
-   — logged, never silent.
+   the queue while that session works, and is discarded only once it has stopped
+   being true — too old, already read at the keyboard, or already said to the
+   phone in the same words — logged, never silent.
 3. **Rate-limit stamps are per project.** One project's ping must not silence
    another's fallback. Paid for once — see tombstones.
 4. **At most one watcher.** A lock file holds the watcher's PID; a dead PID is

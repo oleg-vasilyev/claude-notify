@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
 import { appendPending, clearPending, readPending } from "#state/pending-queue.ts";
 import {
   claimWatcherLock,
@@ -24,7 +23,6 @@ vi.mock("#state/file-locations.ts", () => ({
   stateHome: () => state,
   pendingFile: () => join(state, "pending.jsonl"),
   watcherLockFile: () => join(state, "watcher.lock"),
-  lastSentFile: (project: string) => join(state, `last-sent-${project}.txt`),
 }));
 
 const A_PING = {
@@ -100,22 +98,6 @@ describe("the state files", () => {
     clearPending();
 
     expect(readPending()).toEqual([]);
-  });
-
-  it("remembers when a project was last pinged", () => {
-    writeLastSentAt("a-project", A_PING.queuedAt);
-
-    expect(readLastSentAt("a-project")).toBe(A_PING.queuedAt);
-  });
-
-  it("keeps one stamp per project, so one project cannot silence another", () => {
-    writeLastSentAt("a-project", A_PING.queuedAt);
-
-    expect(readLastSentAt("another-project")).toBeNull();
-  });
-
-  it("reports no stamp for a project that has never been pinged", () => {
-    expect(readLastSentAt("never-seen")).toBeNull();
   });
 
   it("holds and releases the watcher lock", () => {

@@ -132,6 +132,29 @@ stops being enough.
 
 ---
 
+## A ping with no project gets the machine label twice
+
+`withMachineLabel` is idempotent for everything the product normally sends — a
+prefix that already carries an `@` is left alone on a second pass. A ping that
+arrived with **no** project at all is the exception: on a machine labelled
+`proj` it becomes `[proj] …`, which reads as a project of that name, so the
+flush's second pass turns it into `[proj@proj] …`. The message the queue holds
+and the message that finally goes out then differ, and the repeat rule — which
+compares them word for word — misses. Nothing here can tell a project genuinely
+called `proj` from a machine labelled the same, which is why this is a wart
+rather than a bug with a fix.
+
+It needs a payload with no `cwd` to happen at all, and such a ping is already
+worth investigating on its own: see the `finish-phase` skill, where a bare
+`[<label>] просит разрешение: инструмент` is the sign that a payload never
+arrived.
+
+**Fix it by labelling once at the edge, rather than on every pass through
+`deliver`, the first time a prefix repeating its own name — `[proj@proj]` —
+appears in a real log.**
+
+---
+
 ## `log.txt` grows forever
 
 Every decision appends; nothing rotates. Payloads are truncated to 400

@@ -194,7 +194,7 @@ src/state/      what this product remembers between runs
   asked-question.ts the question a hook waits on, and the answer it waits for
   config.ts         the settings, read from .env
   file-locations.ts every path it reads or writes, ours and Claude Code's
-  last-sent.ts      one stamp per project, for the rate limit
+  last-sent.ts      what each project last said, and when
   last-usage.ts     the newest limits reading, kept for when the endpoint refuses
   log.ts            the one log file every decision lands in
   pending-queue.ts  pings held back while you were at the keyboard

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { readConfig, type Config } from "#state/config.ts";
-import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
+import { readLastSent, writeLastSent } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
@@ -20,7 +20,7 @@ vi.mock("#state/config.ts", async (importOriginal) => ({
 vi.mock("#state/log.ts", () => ({ log: vi.fn() }));
 vi.mock("#presence/idle-time.ts", () => ({ idleSeconds: vi.fn() }));
 vi.mock("#state/pending-queue.ts", () => ({ appendPending: vi.fn() }));
-vi.mock("#state/last-sent.ts", () => ({ readLastSentAt: vi.fn(), writeLastSentAt: vi.fn() }));
+vi.mock("#state/last-sent.ts", () => ({ readLastSent: vi.fn(), writeLastSent: vi.fn() }));
 vi.mock("#telegram/telegram-api.ts", () => ({ sendMessage: vi.fn() }));
 vi.mock("#relay/relay-client.ts", () => ({ relayMessage: vi.fn() }));
 vi.mock("#usage/usage-api.ts", () => ({ fetchUsage: vi.fn() }));
@@ -56,7 +56,7 @@ describe("deliver", () => {
   beforeEach(() => {
     vi.mocked(readConfig).mockReturnValue(config);
     vi.mocked(idleSeconds).mockReturnValue(AWAY_SECONDS);
-    vi.mocked(readLastSentAt).mockReturnValue(null);
+    vi.mocked(readLastSent).mockReturnValue(null);
     vi.mocked(fetchUsage).mockResolvedValue({ kind: "unavailable", why: "the endpoint answered 500" });
     vi.mocked(rememberedUsage).mockReturnValue(null);
     vi.mocked(watcherIsRunning).mockReturnValue(false);
@@ -71,10 +71,13 @@ describe("deliver", () => {
     expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
   });
 
-  it("stamps the project it just pinged, so the next fallback can be rate-limited", async () => {
+  it("records what it said and when, so a queued repeat can be recognised", async () => {
     await deliver(ping);
 
-    expect(writeLastSentAt).toHaveBeenCalledWith("a-project", expect.any(Number));
+    expect(writeLastSent).toHaveBeenCalledWith("a-project", {
+      at: expect.any(Number),
+      message: "[a-project@home] жду апрув",
+    });
   });
 
   it("queues instead of sending while the user is at the keyboard", async () => {
@@ -113,7 +116,7 @@ describe("deliver", () => {
   it("reports the rate limit with the age of the stamp that caused it", async () => {
     const A_MINUTE = 60_000;
 
-    vi.mocked(readLastSentAt).mockReturnValue(Date.now() - A_MINUTE);
+    vi.mocked(readLastSent).mockReturnValue({ at: Date.now() - A_MINUTE, message: "" });
 
     const outcome = await deliver({ ...ping, rateLimitMinutes: 10 });
 
@@ -162,7 +165,7 @@ describe("deliver", () => {
   });
 
   it("skips a rate-limited fallback", async () => {
-    vi.mocked(readLastSentAt).mockReturnValue(Date.now());
+    vi.mocked(readLastSent).mockReturnValue({ at: Date.now(), message: "" });
 
     await deliver({ ...ping, rateLimitMinutes: 10 });
 

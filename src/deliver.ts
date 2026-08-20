@@ -7,7 +7,7 @@ import { messageWith } from "#domain/telegram-html.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { DELIVERY, readConfig, type Delivery } from "#state/config.ts";
-import { readLastSentAt, writeLastSentAt } from "#state/last-sent.ts";
+import { readLastSent, writeLastSent } from "#state/last-sent.ts";
 import { rememberedUsage, rememberUsage } from "#state/last-usage.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
@@ -76,13 +76,13 @@ export const deliver = async (request: PingRequest): Promise<PingOutcome> => {
   }
 
   const message = withMachineLabel(request.message, config.machineLabel);
-  const project = projectKeyOf(request.message);
+  const project = projectKeyOf(message);
 
   const verdict = decideDelivery({
     idleSeconds: request.ignorePresence === true ? Number.MAX_SAFE_INTEGER : idleSeconds(),
     minIdleMinutes: config.minIdleMinutes,
     rateLimitMinutes: request.rateLimitMinutes,
-    lastSentAt: readLastSentAt(project),
+    lastSentAt: readLastSent(project)?.at ?? null,
     now: Date.now(),
   });
 
@@ -119,7 +119,7 @@ export const deliver = async (request: PingRequest): Promise<PingOutcome> => {
 
   try {
     await sendVia(config.delivery, text);
-    writeLastSentAt(project, Date.now());
+    writeLastSent(project, { at: Date.now(), message });
     log(`${sentVia(config.delivery)} | ${written.replaceAll("\n", " | ")}`);
 
     return { kind: PING_OUTCOME.sent };

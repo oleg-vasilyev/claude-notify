@@ -94,7 +94,10 @@ ping the whole product exists to send.
 optional path to a png, jpg, jpeg, gif or webp on the same machine and sends it as a
 Telegram document — as a document rather than a photo because Telegram
 re-encodes a photo to JPEG and resizes it, and the reason to send a mockup at all
-is to judge how it looks. The words ride along as the caption when they fit
+is to judge how it looks. That was settled by eye rather than by argument: the
+same test pattern went to the phone both ways, and the photo lost the
+single-pixel detail and smeared the saturated edges, which is exactly where small
+interface text lives. The words ride along as the caption when they fit
 inside Telegram's 1024, and go as their own message first when they do not, so a
 long ping is never swallowed by a 400.
 

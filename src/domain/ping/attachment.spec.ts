@@ -129,10 +129,11 @@ describe("captionFits", () => {
   });
 
   it("counts the markup it is handed, erring toward splitting rather than toward a 400", () => {
-    const nearlyFull = "x".repeat(CAPTION_LIMIT - "<pre></pre>".length);
+    const anyMarkup = "<mark></mark>";
+    const nearlyFull = "x".repeat(CAPTION_LIMIT - anyMarkup.length);
 
-    expect(captionFits(`<pre>${nearlyFull}</pre>`)).toBe(true);
-    expect(captionFits(`<pre>${nearlyFull}x</pre>`)).toBe(false);
+    expect(captionFits(`<mark>${nearlyFull}</mark>`)).toBe(true);
+    expect(captionFits(`<mark>${nearlyFull}x</mark>`)).toBe(false);
   });
 });
 

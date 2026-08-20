@@ -173,6 +173,12 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    key was taken from the raw message where a ping is sent and from the labelled
    message where the queue looks it up, and every fixture carried a project
    prefix, the one shape where both routes give the same answer.
+   **A fixture that hand-copies another module's output is that agreement in its
+   purest form**, and it also rots: `captionFits` was tested with a string wearing
+   the exact wrapper `messageWith` produces, so when the wrapper changed the case
+   kept passing while documenting markup the product no longer sends. A spec that
+   cares only about length says so with markup of its own invention; a spec that
+   really needs the product's rendering composes it by calling the function.
 5. Does any assertion stand on a `filter` or a `find` that could match nothing?
    Assert the selection is non-empty before asserting anything about it.
 5b. **`toHaveBeenCalledWith` cannot see a second call.** When a phase adds a

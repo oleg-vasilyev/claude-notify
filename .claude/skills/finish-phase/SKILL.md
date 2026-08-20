@@ -55,6 +55,14 @@ A file that dropped is a file whose new tests assert too little — strengthen t
 tests, never lower the bar. Load the `write-a-spec` skill rather than reaching
 for the nearest assertion that turns the mutant red.
 
+**It is numbered 3 but it runs after gate 4.** A mutation score is a claim about
+the *specs*, so a review that rewrites one invalidates the run that preceded it.
+Paid for in the phase that renamed the limits block's markup: three mutation runs
+at 2.8 minutes each, of which two were spent on specs the review then changed.
+Run the review first, act on its findings, and let one mutation run measure the
+tree that will be committed — the same argument the last three gates already
+make, extended to this one.
+
 Three rules about running it, and the first is the one that costs money:
 
 - **Never re-run a gate to re-read its output.** Every run writes
@@ -168,6 +176,16 @@ arrived. This is not ceremony. Every bug that has reached a user in this project
 was found here and not by a test: the duplicate hook registrations, the mangled
 Cyrillic, the log stamped in UTC. Tests agree with the assumptions of the code;
 a real ping does not.
+
+**A change to markup is only proved in the narrowest shape the product uses.**
+Telegram validates entities per method and lays them out per bubble, and the fake
+server in `e2e/` refuses nothing — so no gate but this one can see a rendering
+break. A ping's text goes out as a message *or* as a picture caption, and a
+caption is narrower: the phase that moved the limits block from `<pre>` to
+`<blockquote><code>` was settled by three variants sent to the phone as messages,
+where all three fit, and shipped a block that wrapped in a caption — the quote
+wraps where a code block scrolls, and the busy row lost its columns. Send both
+shapes, and send the widest content the block can hold rather than a typical one.
 
 **The payload comes from a file because no shell here delivers it intact.** The
 `echo '{"cwd":"…"}' | node` line this used to print was tried three ways — bash

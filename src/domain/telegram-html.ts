@@ -12,4 +12,6 @@ export const escaped = (text: string): string =>
     .join("&gt;");
 
 export const messageWith = (text: string, block: string): string =>
-  block === "" ? escaped(text) : `${escaped(text)}\n\n<pre>${escaped(block)}</pre>`;
+  block === ""
+    ? escaped(text)
+    : `${escaped(text)}\n\n<blockquote><code>${escaped(block)}</code></blockquote>`;

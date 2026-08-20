@@ -28,8 +28,10 @@ describe("messageWith", () => {
     expect(messageWith("[a] жду апрув", "")).toBe("[a] жду апрув");
   });
 
-  it("puts the limits in a preformatted block, which is what keeps the columns straight", () => {
-    expect(messageWith("[a] жду апрув", BLOCK)).toBe(`[a] жду апрув\n\n<pre>${BLOCK}</pre>`);
+  it("quotes and monospaces the limits, so the columns line up without Telegram reading it as a code block", () => {
+    expect(messageWith("[a] жду апрув", BLOCK)).toBe(
+      `[a] жду апрув\n\n<blockquote><code>${BLOCK}</code></blockquote>`
+    );
   });
 
   it("escapes the block too, since a model name is not ours to trust", () => {

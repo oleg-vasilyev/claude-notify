@@ -120,7 +120,7 @@ const windowsIn = (snapshot: UsageSnapshot): Window[] => {
   ].filter((window): window is Window => window !== null);
 };
 
-const resetCountdown = (window: Window, now: Date): string => {
+const resetLine = (window: Window, now: Date): string => {
   if (window.percent < RESET_TIME_MATTERS_ABOVE_PERCENT || window.resetsAt === null) {
     return "";
   }
@@ -133,7 +133,7 @@ const resetCountdown = (window: Window, now: Date): string => {
 
   const left = resetsAt - now.getTime();
 
-  return left <= ALREADY_RESET ? "" : `  ${humanizeDuration(left)}`;
+  return left <= ALREADY_RESET ? "" : `${window.label} resets in ${humanizeDuration(left)}`;
 };
 
 const stillWorthShowing = (window: Window, ageMs: number): boolean =>
@@ -159,12 +159,13 @@ export const usageBlock = (
     const percent = Math.round(window.percent);
     const share = `${percent}%`.padStart(PERCENT_COLUMN);
 
-    return `${window.label.padEnd(column)}  ${bar(percent)}  ${share}${resetCountdown(window, now)}`;
+    return `${window.label.padEnd(column)}  ${bar(percent)}  ${share}`;
   });
 
-  const aged = ageMs > FRESH ? [...rows, `${humanizeDuration(ageMs)} old`] : rows;
+  const resets = windows.map((window) => resetLine(window, now)).filter((line) => line !== "");
+  const aged = ageMs > FRESH ? [`${humanizeDuration(ageMs)} old`] : [];
 
-  return aged.join("\n");
+  return [...rows, ...resets, ...aged].join("\n");
 };
 
 export const USAGE = { read: "read", unavailable: "unavailable" } as const;

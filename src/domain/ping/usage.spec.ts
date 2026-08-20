@@ -10,6 +10,7 @@ import {
 
 const NOW = new Date("2026-08-07T12:00:00Z");
 const AN_HOUR_FROM_NOW = "2026-08-07T13:00:00Z";
+const TWO_HOURS_FROM_NOW = "2026-08-07T14:00:00Z";
 const AN_HOUR_AGO = "2026-08-07T11:00:00Z";
 const BAR_SEGMENTS = 10;
 const FRESH = 0;
@@ -43,6 +44,23 @@ describe("usageBlock, when the snapshot is not fresh", () => {
 
   it("says nothing about age while the reading is current", () => {
     expect(usageBlock(three, NOW, FRESH)).not.toContain("old");
+  });
+
+  it("puts the rows first, then what resets, then how old the reading is", () => {
+    expect(usageBlock(snapshot([session(92, AN_HOUR_FROM_NOW)]), NOW, 40 * MINUTE)).toBe(
+      "5-hour  ━━━━━━━━━─   92%\n5-hour resets in 1h\n40m old"
+    );
+  });
+
+  it("drops a busy window's countdown with the row it belongs to, since both stand on the same stale percent", () => {
+    const block = usageBlock(
+      snapshot([session(92, AN_HOUR_FROM_NOW), weekly(30)]),
+      NOW,
+      76 * MINUTE
+    );
+
+    expect(block).not.toContain("resets");
+    expect(block).toContain("weekly");
   });
 
   it("keeps the five-hour row while a quarter of its window has not passed", () => {
@@ -109,10 +127,20 @@ describe("usageBlock", () => {
     expect(rows(block)[1]?.endsWith(" 100%")).toBe(true);
   });
 
-  it("says when a busy window resets, since that is when it starts to matter", () => {
+  it("says when a busy window resets on a line of its own, since a wrapped row loses its columns", () => {
     expect(usageBlock(snapshot([session(92, AN_HOUR_FROM_NOW)]), NOW, FRESH)).toBe(
-      "5-hour  ━━━━━━━━━─   92%  1h"
+      "5-hour  ━━━━━━━━━─   92%\n5-hour resets in 1h"
     );
+  });
+
+  it("names the window in the reset line, since two of them can be busy at once", () => {
+    const block = usageBlock(
+      snapshot([session(92, AN_HOUR_FROM_NOW), weekly(88, undefined, TWO_HOURS_FROM_NOW)]),
+      NOW,
+      FRESH
+    );
+
+    expect(rows(block).slice(2)).toEqual(["5-hour resets in 1h", "weekly resets in 2h"]);
   });
 
   it("stays quiet about the reset while a window is roomy", () => {
@@ -122,7 +150,15 @@ describe("usageBlock", () => {
   });
 
   it("counts eighty as busy", () => {
-    expect(usageBlock(snapshot([session(80, AN_HOUR_FROM_NOW)]), NOW, FRESH)).toContain("1h");
+    expect(usageBlock(snapshot([session(80, AN_HOUR_FROM_NOW)]), NOW, FRESH)).toContain(
+      "5-hour resets in 1h"
+    );
+  });
+
+  it("says nothing about a reset landing exactly now, since the window has already turned", () => {
+    expect(usageBlock(snapshot([session(92, NOW.toISOString())]), NOW, FRESH)).toBe(
+      "5-hour  ━━━━━━━━━─   92%"
+    );
   });
 
   it("says nothing about a reset already in the past", () => {

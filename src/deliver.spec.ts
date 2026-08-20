@@ -194,7 +194,7 @@ describe("deliver", () => {
     expect(sendMessage).toHaveBeenCalledWith(
       "T",
       "42",
-      "[a-project@home] жду апрув\n\n<pre>5-hour  ━━━───────   33%</pre>"
+      "[a-project@home] жду апрув\n\n<blockquote><code>5-hour  ━━━───────   33%</code></blockquote>"
     );
   });
 

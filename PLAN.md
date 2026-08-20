@@ -372,10 +372,20 @@ fable   ━━━───────   28%
 **The limits are a block, not a sentence, and it is monospaced on purpose.**
 Telegram renders ordinary text in a proportional font, where a row beginning
 with a label puts every bar in a different place and three windows read as
-rubble. Sending the block as `<pre>` buys back the column, and the grey slab
-Telegram draws around it does a second job nobody designed: it separates the
-numbers from the message above them, so the ping reads as a note with a readout
-attached rather than as one long string.
+rubble. A monospaced run buys back the column, and something around it has to
+separate the numbers from the message above them, or the ping reads as one long
+string rather than as a note with a readout attached.
+
+**The block is a quote, not a code block, because a code block grows a copy
+button.** `<pre>` did both jobs for a while — columns from the monospace, the
+separation from the grey slab Telegram draws around code — until a client started
+offering to copy it. The offer appears by size, not by content: the same three
+windows carried no button until the reset countdown widened the first row, and
+then did. A readout nobody copies does not need a copy button, and the size that
+summons one is the client's business to change. So the block goes as
+`<blockquote><code>` — the quote bar separates, the monospace lines up, and no
+client reads it as a code block. Which of the three candidates looked best on a phone was
+settled by sending all three and looking, not by argument.
 
 That costs an HTML `parse_mode`, which this design refused for a long time and
 was right to until it measured the price. The refusal was written against
@@ -390,11 +400,25 @@ window really is. A rounded 97% drawn as a full bar would say *stop* at the
 moment the honest answer is *nearly*.
 
 The point is deciding whether coming back is worth it. A window under 80% shows
-only its share; at or above 80% it also shows when it resets, because that is
-the moment the number stops being trivia — `5-hour  ━━━━━━━━━─   92%  12m`
-says wait, not hurry. Every window is drawn: showing only the busiest weekly meant the
-second row changed identity between pings, and a row that is sometimes one
-window and sometimes another is worse than a row more.
+only its share; at or above 80% the block also says when it resets, because that
+is the moment the number stops being trivia — it says wait, not hurry:
+
+```
+5-hour  ━━━━━━━━━─   92%
+5-hour resets in 12m
+```
+
+**The countdown is a line of its own, not a tail on the row.** It rode on the row
+until a phone showed the price: a quote has less width than a code block and
+wraps where a code block scrolls, so the one row that mattered broke in half and
+left `2h` and `16m` on different lines — the columns the monospace was bought for,
+destroyed by the row that was busy. Rows now stay at the width they have always
+fitted at, and the sentence beneath them may wrap freely, because nothing in it
+lines up with anything. It names its window, since two can be busy at once.
+
+Every window is drawn: showing only the busiest weekly meant the second row
+changed identity between pings, and a row that is sometimes one window and
+sometimes another is worse than a row more.
 
 The labels are English although the ping above them is Russian, and that is not
 an oversight. One of them is the endpoint's own word — a model's

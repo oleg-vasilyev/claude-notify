@@ -281,8 +281,9 @@ exercise. The installer already knows how to find its own hook entries, so
 ## The two ends of a relay can disagree about markup, and only one half is guarded
 
 A machine that cannot reach Telegram composes the whole message — escaping and
-`<pre>` included — and hands the finished string to a relay host, which posts it.
-The two ends can be on different versions, and the two skews are not symmetric.
+the quoted block included — and hands the finished string to a relay host, which
+posts it. The two ends can be on different versions, and the two skews are not
+symmetric.
 
 **Old client, new host** was the dangerous one: raw text posted with
 `parse_mode: HTML` gets a 400 the first time a model writes `<` or `&`, and the
@@ -292,8 +293,8 @@ sets `parse_mode` only when the client says the text is ready for it. An old
 client sends no flag, so its text goes out plain and intact.
 
 **New client, old host** is what remains: a host from before this change ignores
-the flag and posts the markup as text, so the user reads `<pre>` in their chat.
-A glance, not a loss, and it ends the moment the host is pulled.
+the flag and posts the markup as text, so the user reads `<blockquote>` in their
+chat. A glance, not a loss, and it ends the moment the host is pulled.
 
 **Delete this entry when the relay protocol grows a version handshake**, which is
 the only thing that would let the far side know rather than assume.

@@ -24,7 +24,10 @@ The agent reaches you through a tool it can see, `ping_user` — it writes the o
 line that says what is needed, and the project, the machine and the limits are
 filled in around it. The tool answers back whether the ping went out or is
 waiting for you to leave, so an agent that cannot have you yet keeps working
-instead of stopping. When it does not call, the hooks still do.
+instead of stopping. It can attach a picture too — a mockup, a rendered chart —
+and that one goes out at once rather than waiting, since looking at something on
+a phone is not the same as being called back to the laptop. When it does not
+call, the hooks still do.
 
 And when you are away, a question is not merely announced — it is **asked**,
 with a button per option, and an answer typed in your own words accepted just
@@ -173,6 +176,7 @@ src/domain/     every decision, pure — no files, no network, no clock
   telegram-html.ts  the one place a message becomes wire text, escaped
   written-number.ts a number somebody typed into a settings file
   ping/         what to say, and whether to say it now
+    attachment.ts     whether a picture can go, and what to say when it cannot
     delivery.ts       send, queue, or skip
     hook-ping.ts      what each Claude Code event has to say
     pending.ts        which queued pings may go now, and which one wins per project
@@ -206,7 +210,9 @@ src/presence/idle-time.ts   how long since you touched anything (win32 via koffi
 src/relay/      forwarding a ping through a machine that can reach Telegram
   relay-client.ts   sending one, from the machine that cannot
   relay-server.ts   receiving one, on the machine that can
-src/telegram/telegram-api.ts sending a message, and what setup needs to find you
+src/telegram/    talking to Telegram
+  telegram-api.ts   sending a message, and what setup needs to find you
+  picture.ts        measuring a picture, and uploading one alongside a ping
 src/usage/usage-api.ts       the account's own limit windows
 src/deliver.ts          the funnel every ping goes through
 src/ask.ts              the funnel a question goes through, and waits in

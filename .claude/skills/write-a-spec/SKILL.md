@@ -129,13 +129,29 @@ prove.
 
 ## What is deliberately outside coverage
 
-`vitest.config.ts` excludes the four entry points and four modules —
-`file-locations.ts`, `idle-time.ts`, `telegram-api.ts`, `usage-api.ts` — plus
-`watcher-process.ts`. They hold no decisions: each is the seam with somebody
-else's API or the OS, and a unit
+`vitest.config.ts` excludes every entry point, plus the modules that are pure
+seam — `file-locations.ts`, `idle-time.ts`, `telegram-api.ts`, `picture.ts`,
+`usage-api.ts`, `relay-client.ts`, `watcher-process.ts`. They hold no decisions:
+each is the seam with somebody else's API or the OS, and a unit
 that mocks `fetch` in order to watch `fetch` be called proves nothing about our
 code. What they do is proven by sending a real ping, which the `finish-phase`
 skill makes a gate.
+
+A seam is allowed the branches **translation** needs, and only those: turning an
+OS or API fact into the shape the domain takes (`statSync` answering `null` for
+anything that is not a readable file), turning a domain value into the shape
+somebody else's API wants (a field written only when there is one to write), and
+turning that API's refusal into a throw. The domain may not stat, fetch or
+serialise, so none of these could live there.
+
+What a seam may never hold is a branch that decides **what the product does** —
+whether to send, what to say, which of two things wins. That is a decision, and
+it belongs where it can be tested.
+
+This paragraph was written one version too narrow, licensing only the first of
+the three, and the phase that introduced it was itself in breach on the file it
+was written to bless. **Run a rule against the diff that prompted it before
+committing it** — the `finish-phase` skill says so for a reason.
 
 That list is an argument, not a hiding place. A file joins it only when it has
 nothing to decide — the moment one grows a branch, the branch belongs in
@@ -159,6 +175,11 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    prefix, the one shape where both routes give the same answer.
 5. Does any assertion stand on a `filter` or a `find` that could match nothing?
    Assert the selection is non-empty before asserting anything about it.
+5b. **`toHaveBeenCalledWith` cannot see a second call.** When a phase adds a
+   second place that can report the same fact, the spec has to count: a picture
+   that could not be sent was logged once before the send and again after it, and
+   every spec stayed green because each only asked whether the line appeared at
+   all. The real log showed the duplicate on the first live ping.
 6. **When the subject hardens a parser, does the fixture list include the input
    that parses and *then* explodes?** The queue reader was written to survive
    broken lines and tested against three of them — a truncated object, a missing

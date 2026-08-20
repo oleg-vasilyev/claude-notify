@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { attachmentReport } from "#domain/ping/attachment.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { readConfig, type Config } from "#state/config.ts";
 import { readLastSent, writeLastSent } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
+import { pictureBytes, sendPicture } from "#telegram/picture.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
 import { rememberedUsage, rememberUsage } from "#state/last-usage.ts";
 import { fetchUsage } from "#usage/usage-api.ts";
@@ -29,6 +31,7 @@ vi.mock("#app/watcher-process.ts", () => ({
   startWatcher: vi.fn(),
   watcherIsRunning: vi.fn(),
 }));
+vi.mock("#telegram/picture.ts", () => ({ pictureBytes: vi.fn(), sendPicture: vi.fn() }));
 
 const AWAY_SECONDS = 600;
 const PRESENT_SECONDS = 5;
@@ -52,6 +55,10 @@ const throughARelay: Config = {
 
 const ping = { message: "[a-project] жду апрув", rateLimitMinutes: 0 };
 
+const A_SMALL_PICTURE = 40_000;
+const MOCKUP = "D:/work/mockup.png";
+const withAPicture = { ...ping, imagePath: MOCKUP };
+
 describe("deliver", () => {
   beforeEach(() => {
     vi.mocked(readConfig).mockReturnValue(config);
@@ -62,6 +69,8 @@ describe("deliver", () => {
     vi.mocked(watcherIsRunning).mockReturnValue(false);
     vi.mocked(sendMessage).mockResolvedValue(undefined);
     vi.mocked(relayMessage).mockResolvedValue(undefined);
+    vi.mocked(sendPicture).mockResolvedValue(undefined);
+    vi.mocked(pictureBytes).mockReturnValue(A_SMALL_PICTURE);
     process.exitCode = undefined;
   });
 
@@ -104,13 +113,16 @@ describe("deliver", () => {
   });
 
   it("reports that it reached the phone, so a caller can tell the difference", async () => {
-    expect(await deliver(ping)).toEqual({ kind: "sent" });
+    expect((await deliver(ping)).outcome).toEqual({ kind: "sent" });
   });
 
   it("reports the queue and how long the user has been idle", async () => {
     vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
 
-    expect(await deliver(ping)).toEqual({ kind: "queued", idleSeconds: PRESENT_SECONDS });
+    expect((await deliver(ping)).outcome).toEqual({
+      kind: "queued",
+      idleSeconds: PRESENT_SECONDS,
+    });
   });
 
   it("reports the rate limit with the age of the stamp that caused it", async () => {
@@ -118,7 +130,7 @@ describe("deliver", () => {
 
     vi.mocked(readLastSent).mockReturnValue({ at: Date.now() - A_MINUTE, message: "" });
 
-    const outcome = await deliver({ ...ping, rateLimitMinutes: 10 });
+    const { outcome } = await deliver({ ...ping, rateLimitMinutes: 10 });
 
     expect(outcome.kind).toBe("skipped");
     expect(outcome).toMatchObject({ sinceLastSentMinutes: expect.closeTo(1, 1) });
@@ -127,7 +139,7 @@ describe("deliver", () => {
   it("reports a failed send with the reason, rather than swallowing it", async () => {
     vi.mocked(sendMessage).mockRejectedValue(new Error("Telegram refused with 404"));
 
-    expect(await deliver(ping)).toEqual({
+    expect((await deliver(ping)).outcome).toEqual({
       kind: "failed",
       why: "Error: Telegram refused with 404",
     });
@@ -136,7 +148,7 @@ describe("deliver", () => {
   it("reports an unconfigured machine instead of pretending it sent something", async () => {
     vi.mocked(readConfig).mockReturnValue(null);
 
-    expect(await deliver(ping)).toEqual({ kind: "unconfigured" });
+    expect((await deliver(ping)).outcome).toEqual({ kind: "unconfigured" });
   });
 
   it("starts a watcher for the queued ping", async () => {
@@ -341,5 +353,115 @@ describe("deliver", () => {
 
     expect(sendMessage).not.toHaveBeenCalled();
     expect(appendPending).not.toHaveBeenCalled();
+  });
+
+  it("sends a picture with the message as its caption, so one buzz carries both", async () => {
+    await deliver(withAPicture);
+
+    expect(sendPicture).toHaveBeenCalledWith(
+      "T",
+      "42",
+      { kind: "ready", path: MOCKUP, name: "mockup.png" },
+      "[a-project@home] жду апрув"
+    );
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("sends the picture even while the user sits at the keyboard, since that is the point", async () => {
+    vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
+
+    await deliver(withAPicture);
+
+    expect(sendPicture).toHaveBeenCalled();
+    expect(appendPending).not.toHaveBeenCalled();
+  });
+
+  it("splits the message off when it is too long to ride as a caption", async () => {
+    const CAPTION_LIMIT = 1024;
+
+    await deliver({ ...withAPicture, message: `[a-project] ${"я".repeat(CAPTION_LIMIT)}` });
+
+    expect(sendMessage).toHaveBeenCalled();
+    expect(sendPicture).toHaveBeenCalledWith("T", "42", expect.anything(), "");
+  });
+
+  it("still sends the words when the picture is not there, and says why it did not go", async () => {
+    vi.mocked(pictureBytes).mockReturnValue(null);
+
+    const { picture } = await deliver(withAPicture);
+
+    expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
+    expect(sendPicture).not.toHaveBeenCalled();
+    expect(picture).toEqual({ kind: "missing", path: MOCKUP });
+    expect(
+      vi.mocked(log).mock.calls.filter(([line]) => line.includes("The picture did not go"))
+    ).toHaveLength(1);
+  });
+
+  it("queues a ping whose picture never made it, since only a picture goes out now", async () => {
+    vi.mocked(pictureBytes).mockReturnValue(null);
+    vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
+
+    const { outcome, picture } = await deliver(withAPicture);
+
+    expect(outcome.kind).toBe("queued");
+    expect(picture?.kind).toBe("missing");
+  });
+
+  it("refuses a picture on a machine that forwards through a relay", async () => {
+    vi.mocked(readConfig).mockReturnValue(throughARelay);
+
+    const { picture } = await deliver(withAPicture);
+
+    expect(picture).toEqual({ kind: "no-channel", path: MOCKUP });
+    expect(relayMessage).toHaveBeenCalled();
+    expect(sendPicture).not.toHaveBeenCalled();
+  });
+
+  it("names the picture in the log line, so a send can be told from a plain ping", async () => {
+    await deliver(withAPicture);
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("picture mockup.png"));
+  });
+
+  it("keeps the words when only the second half fails, so the model does not send them twice", async () => {
+    const CAPTION_LIMIT = 1024;
+
+    vi.mocked(sendPicture).mockRejectedValue(new Error("Telegram refused the picture with 413"));
+
+    const { outcome, picture } = await deliver({
+      ...withAPicture,
+      message: `[a-project] ${"я".repeat(CAPTION_LIMIT)}`,
+    });
+
+    expect(outcome).toEqual({ kind: "sent" });
+    expect(picture?.kind).toBe("refused");
+    expect(attachmentReport(picture)).toContain("Do not send the words again");
+    expect(writeLastSent).toHaveBeenCalled();
+  });
+
+  it("fails the whole ping when the one message carrying both was refused", async () => {
+    vi.mocked(sendPicture).mockRejectedValue(new Error("Telegram refused the picture with 413"));
+
+    const { outcome } = await deliver(withAPicture);
+
+    expect(outcome.kind).toBe("failed");
+    expect(writeLastSent).not.toHaveBeenCalled();
+  });
+
+  it("says the picture went nowhere when the rate limit swallowed the ping under it", async () => {
+    vi.mocked(readLastSent).mockReturnValue({ at: Date.now(), message: "" });
+
+    const { outcome, picture } = await deliver({ ...withAPicture, rateLimitMinutes: 10 });
+
+    expect(outcome.kind).toBe("skipped");
+    expect(attachmentReport(picture)).toContain("rate limit");
+  });
+
+  it("leaves a ping with no picture asking for nothing", async () => {
+    const { picture } = await deliver(ping);
+
+    expect(picture).toBeNull();
+    expect(pictureBytes).not.toHaveBeenCalled();
   });
 });

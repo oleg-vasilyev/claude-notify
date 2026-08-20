@@ -4,6 +4,7 @@ import {
   notifyArgv,
   nothingWasSent,
   outcomeReport,
+  pingReport,
   PING_OUTCOME,
   PING_TOOL,
   PING_TOOL_DESCRIPTION,
@@ -129,6 +130,62 @@ describe("notifyArgv", () => {
       "--message",
       "жду выбор",
     ]);
+  });
+
+  it("carries the picture the model attached, as one argument whatever is in the path", () => {
+    const argv = notifyArgv(
+      ENTRY,
+      "вот мокап",
+      { id: undefined, projectDirectory: undefined },
+      "D:\\Temp\\a-project\\out\\the mockup.png"
+    );
+
+    expect(argv).toEqual([
+      ENTRY,
+      "--message",
+      "вот мокап",
+      "--image",
+      "D:\\Temp\\a-project\\out\\the mockup.png",
+    ]);
+  });
+
+  it("asks for no picture when the model attached none", () => {
+    const argv = notifyArgv(ENTRY, "жду выбор", { id: undefined, projectDirectory: undefined }, "");
+
+    expect(argv).not.toContain("--image");
+  });
+});
+
+describe("pingReport", () => {
+  const sent = { kind: "sent" } as const;
+
+  it("says only how the ping went when no picture was asked for", () => {
+    expect(pingReport(sent, null)).toBe("Delivered to their phone.");
+  });
+
+  it("says nothing extra when the picture went with it", () => {
+    expect(pingReport(sent, { kind: "ready", path: "/tmp/a.png", name: "a.png" })).toBe(
+      "Delivered to their phone."
+    );
+  });
+
+  it("says both when the words went and the picture did not, one fact to a line", () => {
+    const said = pingReport(sent, { kind: "missing", path: "/tmp/a.png" });
+
+    expect(said.split("\n")).toEqual([
+      "Delivered to their phone.",
+      "The picture did not go: there is nothing at /tmp/a.png.",
+    ]);
+  });
+
+  it("says both when neither went, so the model is not left guessing", () => {
+    const said = pingReport(
+      { kind: "failed", why: "Error: 404" },
+      { kind: "no-channel", path: "/tmp/a.png" }
+    );
+
+    expect(said).toContain("Could not reach Telegram");
+    expect(said).toContain("relay");
   });
 });
 

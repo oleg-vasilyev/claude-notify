@@ -21,12 +21,17 @@ const COULD_NOT_RUN_IT = 1;
 
 const notifyEntry = fileURLToPath(new URL("./notify.ts", import.meta.url));
 
-const spokenBy = async (message: string): Promise<ToolAnswer> =>
+const spokenBy = async (message: string, imagePath?: string): Promise<ToolAnswer> =>
   new Promise((settle) => {
-    const argv = notifyArgv(notifyEntry, message, {
-      id: process.env.CLAUDE_CODE_SESSION_ID,
-      projectDirectory: process.env.CLAUDE_PROJECT_DIR,
-    });
+    const argv = notifyArgv(
+      notifyEntry,
+      message,
+      {
+        id: process.env.CLAUDE_CODE_SESSION_ID,
+        projectDirectory: process.env.CLAUDE_PROJECT_DIR,
+      },
+      imagePath
+    );
 
     const notify = spawn(process.execPath, argv, {
       cwd: process.cwd(),
@@ -64,10 +69,16 @@ server.registerTool(
       message: z
         .string()
         .describe("What is needed, in Russian, one short line under about 200 characters"),
+      image: z
+        .string()
+        .optional()
+        .describe(
+          "Absolute path to a picture on this machine to send along — png, jpg, jpeg, gif or webp"
+        ),
     },
   },
-  async ({ message }) => {
-    const spoken = await spokenBy(message);
+  async ({ message, image }) => {
+    const spoken = await spokenBy(message, image);
 
     return { content: [{ type: "text", text: spoken.said }], isError: spoken.failed };
   }

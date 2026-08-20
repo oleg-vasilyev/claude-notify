@@ -13,6 +13,8 @@ const TOKEN = "424242:AAH-nothing-here-reaches-telegram";
 const ALWAYS_AWAY = 0;
 const NEVER_AWAY = 999;
 const NO_ANSWERING = 0;
+const A_REAL_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 describe("the ping tool a model calls", () => {
   let telegram: FakeTelegram;
@@ -136,6 +138,37 @@ describe("the ping tool a model calls", () => {
     const answer = await (await started(ALWAYS_AWAY)).callByName("ping_everyone", { message: "x" });
 
     expect(answer.failed).toBe(true);
+  });
+
+  it("sends a picture the model attached, with the words riding as its caption", async () => {
+    const mockup = join(state, "mockup.png");
+
+    writeFileSync(mockup, Buffer.from(A_REAL_PNG, "base64"));
+
+    const answer = await (await started(NEVER_AWAY)).callByName("ping_user", {
+      message: "вот мокап, как он смотрится с телефона?",
+      image: mockup,
+    });
+
+    await telegram.whenPictureSent();
+
+    expect(answer.failed).toBe(false);
+    expect(telegram.sentPicture()?.filename).toBe("mockup.png");
+    expect(telegram.sentPicture()?.caption).toContain("вот мокап");
+    expect(telegram.sentPicture()?.bytes).toBe(Buffer.from(A_REAL_PNG, "base64").length);
+  });
+
+  it("says the words anyway when the picture is not there, and tells the model why", async () => {
+    const answer = await (await started(ALWAYS_AWAY)).callByName("ping_user", {
+      message: "вот мокап",
+      image: join(state, "never-rendered.png"),
+    });
+
+    await telegram.whenAsked();
+
+    expect(telegram.sentText()).toContain("вот мокап");
+    expect(answer.said).toContain("The picture did not go");
+    expect(telegram.sentPicture()).toBeNull();
   });
 
   it("survives a call with nothing to say", async () => {

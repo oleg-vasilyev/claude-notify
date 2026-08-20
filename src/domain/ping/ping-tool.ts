@@ -1,3 +1,4 @@
+import { attachmentReport, type Attachment } from "#domain/ping/attachment.ts";
 import { copy } from "#domain/copy.ru.ts";
 import { impossible } from "#domain/impossible.ts";
 
@@ -32,6 +33,8 @@ Call this whenever you are about to stop and wait for them: you asked a question
 Do NOT try to judge whether they are at the keyboard. You cannot see that, and guessing wrong costs them hours of an idle agent. Always just call this: it measures their idle time itself, holds the ping in a queue while they are still at the machine, and delivers it the moment they step away.
 
 Do NOT call it for progress reports or for turn endings where nothing is needed from them.
+
+An optional \`image\` takes an absolute path to a picture on this machine — png, jpg, jpeg, gif or webp — and sends it along, so they can look at it on the phone rather than walk to the screen. Attach only something you have just produced yourself and want judged: a mockup, a rendered chart, a screenshot of what you built. Never attach a file merely because it is lying around, and never attach one you have not looked at. A ping carrying a picture goes out immediately rather than waiting for them to step away, since the point of it is the picture and not the summons.
 
 Write one short line in Russian saying what is needed. The [project] prefix, the machine name and the account's limit windows are added for you — never write them yourself. Example: ${copy.toolPingExample}`;
 
@@ -75,7 +78,12 @@ export const nothingWasSent = (outcome: PingOutcome): boolean => {
 
 export type Session = { id: string | undefined; projectDirectory: string | undefined };
 
-export const notifyArgv = (entryPoint: string, message: string, session: Session): string[] => {
+export const notifyArgv = (
+  entryPoint: string,
+  message: string,
+  session: Session,
+  imagePath?: string
+): string[] => {
   const argv = [entryPoint, "--message", message];
 
   if (session.id !== undefined && session.id !== "") {
@@ -86,8 +94,15 @@ export const notifyArgv = (entryPoint: string, message: string, session: Session
     argv.push("--project", session.projectDirectory);
   }
 
+  if (imagePath !== undefined && imagePath !== "") {
+    argv.push("--image", imagePath);
+  }
+
   return argv;
 };
+
+export const pingReport = (outcome: PingOutcome, picture: Attachment | null): string =>
+  [outcomeReport(outcome), attachmentReport(picture)].filter((line) => line !== "").join("\n");
 
 export type ToolAnswer = { said: string; failed: boolean };
 

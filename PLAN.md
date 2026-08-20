@@ -90,6 +90,38 @@ the *only* one: the tool description forbids the model from judging presence
 itself, since a model that guesses "they are probably still here" swallows the
 ping the whole product exists to send.
 
+**A ping may carry a picture, and a picture is not a summons.** The tool takes an
+optional path to a png, jpg, jpeg, gif or webp on the same machine and sends it as a
+Telegram document — as a document rather than a photo because Telegram
+re-encodes a photo to JPEG and resizes it, and the reason to send a mockup at all
+is to judge how it looks. The words ride along as the caption when they fit
+inside Telegram's 1024, and go as their own message first when they do not, so a
+long ping is never swallowed by a 400.
+
+Everything else about a picture follows from one observation: the presence filter
+exists to avoid *summoning* somebody who is already at the screen, and a picture
+asks them to look at a phone rather than to walk to a laptop. The case that
+prompted this was the user sitting at the keyboard wanting to see a mockup on a
+phone. So **a ping carrying a picture goes out immediately**, and the queue never
+holds one — which also disposes of the questions a queued picture would have
+raised, since a mockup written to a temporary directory need not still be there
+fifteen minutes later.
+
+A picture that cannot go does not take the words down with it. The path is judged
+before anything is sent — missing, empty, not a kind Telegram renders, past the
+50 MB it accepts, or bound for a relay that carries text only — and each verdict
+is a sentence the model reads in the tool's answer, next to what happened to the
+ping itself. The model can then fix its own call rather than believing a picture
+arrived.
+
+**And the split path can half-fail, so it says which half.** When the words went
+as their own message and the upload behind them was refused, the ping *did* reach
+the phone: reporting it as a failure invites the model to send the same words
+again, unthrottled, because no stamp was written for a ping that failed. So the
+refusal is recorded against the picture rather than the ping, and its sentence
+says outright not to send the words again. The one-message path needs none of
+this — it is atomic, and a refusal there really is the whole ping failing.
+
 The cost is a resident process per open session, which is how MCP works. It is
 kept honest by making it thin: the server holds no delivery logic and spawns
 `notify.ts` per call, so an edit to the funnel takes effect on the next ping

@@ -13,10 +13,18 @@ export interface Call {
   readonly body: Record<string, unknown>;
 }
 
+export interface Upload {
+  readonly filename: string;
+  readonly caption: string;
+  readonly bytes: number;
+}
+
 export interface FakeTelegram {
   readonly apiRoot: string;
   calls(): Call[];
   whenAsked(): Promise<void>;
+  whenPictureSent(): Promise<void>;
+  sentPicture(): Upload | null;
   whenAcknowledged(): Promise<void>;
   sentText(): string;
   keyboard(): { text: string; callback_data: string }[];
@@ -29,21 +37,68 @@ export interface FakeTelegram {
   stop(): Promise<void>;
 }
 
-const bodyOf = async (stream: AsyncIterable<Buffer>): Promise<Record<string, unknown>> => {
+const BYTE_FOR_BYTE = "latin1";
+const HEADERS_END = "\r\n\r\n";
+const AFTER_THE_HEADERS = HEADERS_END.length;
+const TRAILING_BREAK = 2;
+const NAMED = /name="([^"]*)"/;
+const FILENAMED = /filename="([^"]*)"/;
+const NOTHING = 0;
+
+const readMultipart = (raw: Buffer, boundary: string): Record<string, unknown> => {
+  const body: Record<string, unknown> = {};
+
+  for (const part of raw.toString(BYTE_FOR_BYTE).split(`--${boundary}`)) {
+    const breakAt = part.indexOf(HEADERS_END);
+
+    if (breakAt < NOTHING) {
+      continue;
+    }
+
+    const headers = part.slice(NOTHING, breakAt);
+    const name = NAMED.exec(headers)?.[1];
+
+    if (name === undefined) {
+      continue;
+    }
+
+    const content = part.slice(breakAt + AFTER_THE_HEADERS, part.length - TRAILING_BREAK);
+    const filename = FILENAMED.exec(headers)?.[1];
+
+    body[name] =
+      filename === undefined
+        ? Buffer.from(content, BYTE_FOR_BYTE).toString("utf8")
+        : { filename, bytes: content.length };
+  }
+
+  return body;
+};
+
+const bodyOf = async (
+  stream: AsyncIterable<Buffer>,
+  contentType: string
+): Promise<Record<string, unknown>> => {
   const chunks: Buffer[] = [];
 
   for await (const chunk of stream) {
     chunks.push(chunk);
   }
 
-  const raw = Buffer.concat(chunks).toString("utf8");
+  const raw = Buffer.concat(chunks);
+  const boundary = /boundary=(.+)$/.exec(contentType)?.[1];
 
-  if (raw === "") {
+  if (boundary !== undefined) {
+    return readMultipart(raw, boundary);
+  }
+
+  const text = raw.toString("utf8");
+
+  if (text === "") {
     return {};
   }
 
   try {
-    return JSON.parse(raw) as Record<string, unknown>;
+    return JSON.parse(text) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -78,7 +133,7 @@ export const startFakeTelegram = async (): Promise<FakeTelegram> => {
   const server: Server = createServer((request, response) => {
     void (async () => {
       const method = (request.url ?? "").split("/").pop()?.split("?")[0] ?? "";
-      const body = await bodyOf(request);
+      const body = await bodyOf(request, request.headers["content-type"] ?? "");
 
       calls.push({ method, body });
       announce(method);
@@ -126,6 +181,23 @@ export const startFakeTelegram = async (): Promise<FakeTelegram> => {
     calls: () => [...calls],
 
     whenAsked: () => when("sendMessage"),
+
+    whenPictureSent: () => when("sendDocument"),
+
+    sentPicture: () => {
+      const sent = calls.find((call) => call.method === "sendDocument");
+      const document = sent?.body.document as { filename?: string; bytes?: number } | undefined;
+
+      if (document === undefined) {
+        return null;
+      }
+
+      return {
+        filename: document.filename ?? "",
+        caption: `${sent?.body.caption ?? ""}`,
+        bytes: document.bytes ?? 0,
+      };
+    },
 
     whenAcknowledged: () => when("answerCallbackQuery"),
 

@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-import { nothingWasSent, outcomeReport } from "#domain/ping/ping-tool.ts";
+import { nothingWasSent, pingReport } from "#domain/ping/ping-tool.ts";
 import { projectPrefixOf, underProject } from "#domain/project.ts";
 import { numberOr } from "#domain/written-number.ts";
 import { deliver } from "#app/deliver.ts";
@@ -16,6 +16,7 @@ const { values } = parseArgs({
     session: { type: "string" },
     "rate-limit-minutes": { type: "string", default: "0" },
     now: { type: "boolean", default: false },
+    image: { type: "string" },
   },
 });
 
@@ -27,14 +28,15 @@ if (said === "") {
   );
 }
 
-const outcome = await deliver({
+const { outcome, picture } = await deliver({
   message: underProject(said, projectPrefixOf(values.project ?? process.cwd())),
   rateLimitMinutes: numberOr(values["rate-limit-minutes"], NEVER_RATE_LIMITED),
   sessionId: values.session ?? null,
   ignorePresence: values.now,
+  imagePath: values.image ?? null,
 });
 
-console.log(outcomeReport(outcome));
+console.log(pingReport(outcome, picture));
 
 if (nothingWasSent(outcome)) {
   process.exitCode = NOTHING_WAS_SENT;

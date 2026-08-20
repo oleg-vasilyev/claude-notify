@@ -132,6 +132,23 @@ stops being enough.
 
 ---
 
+## The relay carries text, so a machine behind one cannot send a picture
+
+`relay-protocol.ts` moves a ping as JSON with the message in it, and the picture
+is bytes. A machine that forwards its pings — the one case where the sender
+cannot reach Telegram itself — therefore refuses an attachment and says so in
+the tool's answer, which is honest but is still a machine where the feature does
+not exist. Carrying the bytes means either base64 in the body, which triples
+them, or a second multipart route through the relay, which is a second thing to
+authenticate.
+
+**Do it the first time a picture is actually wanted from a machine behind a
+relay.** Until then this is a feature nobody has missed on the machine that
+lacks it, and `The picture did not go: this machine forwards its pings through a
+relay` names its own absence.
+
+---
+
 ## A ping with no project gets the machine label twice
 
 `withMachineLabel` is idempotent for everything the product normally sends — a

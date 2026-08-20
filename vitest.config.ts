@@ -23,6 +23,7 @@ export default defineConfig({
         "src/presence/idle-time.ts",
         "src/relay/relay-client.ts",
         "src/state/file-locations.ts",
+        "src/telegram/picture.ts",
         "src/telegram/telegram-api.ts",
         "src/usage/usage-api.ts",
       ],

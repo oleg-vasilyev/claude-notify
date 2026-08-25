@@ -12,6 +12,7 @@ const NOTHING_WENT_WRONG = 0;
 export const PING_OUTCOME = {
   sent: "sent",
   queued: "queued",
+  retrying: "retrying",
   skipped: "skipped",
   failed: "failed",
   unconfigured: "unconfigured",
@@ -20,6 +21,7 @@ export const PING_OUTCOME = {
 export type PingOutcome =
   | { kind: typeof PING_OUTCOME.sent }
   | { kind: typeof PING_OUTCOME.queued; idleSeconds: number }
+  | { kind: typeof PING_OUTCOME.retrying; why: string }
   | { kind: typeof PING_OUTCOME.skipped; sinceLastSentMinutes: number }
   | { kind: typeof PING_OUTCOME.failed; why: string }
   | { kind: typeof PING_OUTCOME.unconfigured };
@@ -49,8 +51,11 @@ export const outcomeReport = (outcome: PingOutcome): string => {
     case PING_OUTCOME.skipped:
       return `Not sent: this project already pinged ${Math.floor(outcome.sinceLastSentMinutes)} minute(s) ago and the rate limit swallowed this one.`;
 
+    case PING_OUTCOME.retrying:
+      return `Not delivered yet — ${outcome.why}. The ping went back into the queue, and the watcher will try again once they are away. Carry on rather than waiting for them.`;
+
     case PING_OUTCOME.failed:
-      return `Could not reach Telegram: ${outcome.why}. The ping is lost, though the mechanical hook may still reach them when the turn ends.`;
+      return `Could not reach Telegram: ${outcome.why}. Trying again would not help, so the ping is lost, though the mechanical hook may still reach them when the turn ends.`;
 
     case PING_OUTCOME.unconfigured:
       return "claude-notify is not configured on this machine, so nothing was sent.";
@@ -68,6 +73,7 @@ export const nothingWasSent = (outcome: PingOutcome): boolean => {
 
     case PING_OUTCOME.sent:
     case PING_OUTCOME.queued:
+    case PING_OUTCOME.retrying:
     case PING_OUTCOME.skipped:
       return false;
 

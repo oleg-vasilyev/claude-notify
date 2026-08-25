@@ -177,7 +177,7 @@ src/domain/     every decision, pure — no files, no network, no clock
   written-number.ts a number somebody typed into a settings file
   ping/         what to say, and whether to say it now
     attachment.ts     whether a picture can go, and what to say when it cannot
-    delivery.ts       send, queue, or skip
+    delivery.ts       send, queue or skip, and whether a refusal is worth retrying
     hook-ping.ts      what each Claude Code event has to say
     pending.ts        which queued pings may go now, and which one wins per project
     ping-tool.ts      what the model's own ping tool says, and how it reports back

@@ -95,6 +95,11 @@ Three rules about running it, and the first is the one that costs money:
   a `rateLimitMinutes > 0` that turned out to be load-bearing; the score rose
   because the mutants went with it. Nothing here can catch that — only the
   review did.
+- **Narrowing a `try` deletes a guard too.** A review asked for a `try` around a
+  send to stop wrapping the two statements after it; narrowing it left a failing
+  stamp write uncaught at the top of an entry point. Whatever a `try` was
+  accidentally catching still needs catching somewhere — usually in the module
+  that can fail, beside its siblings that already guard themselves.
 
 ## 3b. `npm run e2e`
 
@@ -224,6 +229,15 @@ hook run that queues a ping starts a detached watcher, which claims the lock in
 afterwards exits silently at once. Kill the pid in `watcher.lock` and delete the
 lock between the queueing step and the flushing step — and do not delete
 `log.txt` while wondering why nothing was logged.
+
+**And it inherits the environment you broke on purpose.** Proving a retry means
+pointing `BOT_API_ROOT` at somewhere dead — and the detached watcher that failure
+spawns carries that variable with it, so every retry it makes goes to the same
+dead address while your own watcher exits on the lock. Two rounds of a check were
+read as "the network is flaky" before a plain send from the same sandbox
+succeeded and named the harness. **When a live check forces a failure, kill the
+watcher that failure started before flushing** — and if a result blames the
+world, reproduce it by hand outside the harness before believing it.
 
 **Run it after gate 4, never beside it — and the same goes for `e2e`.** Both
 fire the working tree, so a finding that lands mid-run proves nothing about what

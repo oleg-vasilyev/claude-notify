@@ -1,6 +1,7 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 
 import { impossible } from "#domain/impossible.ts";
+import { statusIn } from "#domain/ping/delivery.ts";
 import {
   HEALTH_PATH,
   PING_PATH,
@@ -52,7 +53,7 @@ const forward = async (host: RelayHost, message: string, html: boolean): Promise
   } catch (failure) {
     log(`ERROR relay send failed: ${String(failure)} | ${message}`);
 
-    return TELEGRAM_REFUSED;
+    return statusIn(String(failure)) ?? TELEGRAM_REFUSED;
   }
 };
 

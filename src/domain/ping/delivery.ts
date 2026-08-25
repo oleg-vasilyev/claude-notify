@@ -1,6 +1,25 @@
 const SECONDS_PER_MINUTE = 60;
 const MILLISECONDS_PER_MINUTE = 60_000;
 const NOT_YET_SENT = 0;
+const REFUSED_WITH = /refused with (\d{3})/;
+const STATUS = 1;
+const RATE_LIMITED = 429;
+const THEIR_END_BROKE = 500;
+
+export const refusedWith = (what: string, status: number, detail: string): string =>
+  detail === "" ? `${what} refused with ${status}` : `${what} refused with ${status}: ${detail}`;
+
+export const statusIn = (failure: string): number | null => {
+  const refusal = REFUSED_WITH.exec(failure)?.[STATUS];
+
+  return refusal === undefined ? null : Number(refusal);
+};
+
+export const worthAnotherTry = (failure: string): boolean => {
+  const status = statusIn(failure);
+
+  return status === null || status === RATE_LIMITED || status >= THEIR_END_BROKE;
+};
 
 export type DeliveryFacts = {
   idleSeconds: number;

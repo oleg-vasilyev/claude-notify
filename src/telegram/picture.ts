@@ -1,11 +1,13 @@
 import { openAsBlob, statSync } from "node:fs";
 
 import type { ReadyPicture } from "#domain/ping/attachment.ts";
+import { refusedWith } from "#domain/ping/delivery.ts";
 
 
 const TELEGRAM = "https://api.telegram.org";
 const HTML = "HTML";
 const UPLOAD_TIMEOUT_MS = 60_000;
+const THE_PICTURE = "Telegram, over the picture,";
 
 const apiRoot = (): string => process.env.BOT_API_ROOT ?? TELEGRAM;
 
@@ -42,6 +44,6 @@ export const sendPicture = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Telegram refused the picture with ${response.status}: ${await response.text()}`);
+    throw new Error(refusedWith(THE_PICTURE, response.status, await response.text()));
   }
 };

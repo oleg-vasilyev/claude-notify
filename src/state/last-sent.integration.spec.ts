@@ -63,6 +63,11 @@ describe("the last-sent stamp", () => {
     expect(readLastSent("upgraded")).toEqual({ at: AT, message: "" });
   });
 
+  it("survives a stamp it cannot write, since a ping already delivered must not be undone", () => {
+    expect(() => writeLastSent("a|b", { at: AT, message: A_MESSAGE })).not.toThrow();
+    expect(readLastSent("a|b")).toBeNull();
+  });
+
   it("reports no stamp when the file says something that is not a moment", () => {
     writeRaw("torn", `${AT}\n${A_MESSAGE}`);
 

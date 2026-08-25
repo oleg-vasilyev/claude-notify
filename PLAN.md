@@ -300,6 +300,39 @@ sent. The watcher then exits; it is spawned again by the next suppressed ping.
 An 8-hour deadline bounds a watcher outliving an all-day session; by then every
 entry is stale anyway.
 
+**A send that failed goes back into the queue rather than being lost.** The queue
+was built for presence, but a ping that reached Telegram and bounced is in
+exactly the same position — raised, true, and not yet delivered — so it re-enters
+the same machinery and the watcher tries again on its next poll. Measured: a
+`fetch failed` at 20:09 took a whole turn-end ping with it, and that session did
+not end another turn for the rest of the evening, so nothing ever replaced it.
+One unlucky second cost the notification the product exists to send.
+
+**It keeps the moment it was first raised, which is what stops the retrying.**
+Re-queueing with a fresh timestamp would make a ping immortal: every failure
+would reset `stale_minutes`, and a network down for the night would deliver
+«закончил ход» at three in the morning. Carrying the original moment through
+means the existing staleness rule is also the give-up rule, and no second
+threshold has to be invented.
+
+**A ping carrying a picture is not retried at all.** The queue holds a message
+and nothing else — which is the same reason a picture never waits for presence —
+so re-queueing one would promise a delivery the queue cannot make, and the model
+would read "the watcher will try again" about something that can only arrive as
+words. It is reported as lost instead, with the picture's own line saying why.
+
+**Only a refusal that might not happen again is retried.** A network that never
+answered, a timeout, a 5xx, a 429 — all worth another poll. A 4xx is the request
+itself being wrong: a bad token, a chat that does not exist, a picture too large.
+Retrying those is thirty attempts at the same mistake, so they are logged as
+`ERROR send failed for good` and dropped. Both halves of that judgement live in
+`domain/ping/delivery.ts` — the sentence an edge throws is *built* there and read
+back there, the same arrangement as the Russian copy, because a string one
+module writes and another parses belongs to neither of them alone. The relay
+passes the status it was given rather than flattening every failure into one, so
+a machine sending through it gives up on a bad token exactly like a machine
+sending directly.
+
 **A queued ping describes a moment, and the moment can end before it is
 delivered.** "Закончил ход, ждёт тебя" is queued because the user is at the
 keyboard — and a user at the keyboard is exactly the one who answers, so the
@@ -517,9 +550,9 @@ threshold is the knob if it ever is not.
 6. **A broken presence probe counts as away.** If `GetLastInputInfo` fails the
    ping is sent rather than swallowed — a false ping costs a glance, a
    swallowed one costs hours.
-7. **Every outcome is one log line** — `SENT`, `QUEUED`, `SKIP`, `DROP`,
-   `ERROR`, `HOOK`, `WATCHER` — because the first real debugging session was
-   blind without it.
+7. **Every outcome is one log line** — `SENT`, `QUEUED`, `RETRY`, `SKIP`,
+   `DROP`, `WARN`, `ERROR`, `BACKGROUND`, `RELAY`, `HOOK`, `WATCHER` — because
+   the first real debugging session was blind without it.
 8. **The OAuth token is read, never written, never logged, never refreshed.**
    It appears in exactly one function, lives in one local variable, and leaves
    the machine only as an `Authorization` header to its own issuer.

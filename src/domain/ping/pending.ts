@@ -27,7 +27,7 @@ export type PendingFacts = {
 };
 
 export type PendingSelection = {
-  deliver: string[];
+  deliver: PendingPing[];
   dropped: DroppedPing[];
   held: PendingPing[];
 };
@@ -66,7 +66,7 @@ export const selectPending = (
 ): PendingSelection => {
   const dropped: DroppedPing[] = [];
   const held: PendingPing[] = [];
-  const richestPerProject = new Map<string, string>();
+  const richestPerProject = new Map<string, PendingPing>();
 
   for (const ping of pending) {
     const project = projectKeyOf(ping.message);
@@ -93,8 +93,8 @@ export const selectPending = (
 
     const richest = richestPerProject.get(project);
 
-    if (richest === undefined || richest.length < ping.message.length) {
-      richestPerProject.set(project, ping.message);
+    if (richest === undefined || richest.message.length < ping.message.length) {
+      richestPerProject.set(project, ping);
     }
   }
 

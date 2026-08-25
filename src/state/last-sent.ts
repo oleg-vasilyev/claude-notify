@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { SentPing } from "#domain/ping/pending.ts";
 import { numberIn } from "#domain/written-number.ts";
 import { lastSentFile, stateHome } from "#state/file-locations.ts";
+import { log } from "#state/log.ts";
 
 
 const THE_STAMP = 0;
@@ -24,6 +25,10 @@ export const readLastSent = (project: string): SentPing | null => {
 };
 
 export const writeLastSent = (project: string, sent: SentPing): void => {
-  mkdirSync(stateHome(), { recursive: true });
-  writeFileSync(lastSentFile(project), `${sent.at}\n${sent.message}`, "utf8");
+  try {
+    mkdirSync(stateHome(), { recursive: true });
+    writeFileSync(lastSentFile(project), `${sent.at}\n${sent.message}`, "utf8");
+  } catch (failure) {
+    log(`WARN could not stamp [${project}]: ${String(failure)}`);
+  }
 };

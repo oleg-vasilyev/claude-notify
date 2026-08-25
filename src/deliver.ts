@@ -9,7 +9,7 @@ import {
   WORDS_ARRIVED_WITHOUT_IT,
   type Attachment,
 } from "#domain/ping/attachment.ts";
-import { decideDelivery, DELIVERY_VERDICT } from "#domain/ping/delivery.ts";
+import { decideDelivery, DELIVERY_VERDICT, worthAnotherTry } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
 import { PING_OUTCOME, type PingOutcome } from "#domain/ping/ping-tool.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
@@ -34,11 +34,13 @@ export type PingRequest = {
   sessionId?: string | null;
   ignorePresence?: boolean;
   imagePath?: string | null;
+  raisedAt?: number;
 };
 
 export type PingResult = { outcome: PingOutcome; picture: Attachment | null };
 
 const NO_CAPTION = "";
+const FAILED = 1;
 
 const pictureFor = (imagePath: string | null, delivery: Delivery): Attachment | null =>
   imagePath === null || imagePath === ""
@@ -124,6 +126,43 @@ const limitsBlock = async (): Promise<string> => {
   return readout.block;
 };
 
+const whenTheSendFailed = (
+  why: string,
+  request: PingRequest,
+  message: string,
+  picture: Attachment | null
+): PingResult => {
+  if (wasAttached(picture)) {
+    log(`ERROR send failed carrying a picture: ${why} | ${message}`);
+    process.exitCode = FAILED;
+
+    return {
+      outcome: { kind: PING_OUTCOME.failed, why },
+      picture: refusedPicture(picture, `${why}, and the queue carries words alone`),
+    };
+  }
+
+  if (!worthAnotherTry(why)) {
+    log(`ERROR send failed for good: ${why} | ${message}`);
+    process.exitCode = FAILED;
+
+    return { outcome: { kind: PING_OUTCOME.failed, why }, picture };
+  }
+
+  appendPending({
+    queuedAt: request.raisedAt ?? Date.now(),
+    message,
+    sessionId: request.sessionId ?? null,
+  });
+  log(`RETRY send failed, back in the queue: ${why} | ${message}`);
+
+  if (!watcherIsRunning()) {
+    startWatcher();
+  }
+
+  return { outcome: { kind: PING_OUTCOME.retrying, why }, picture };
+};
+
 export const deliver = async (request: PingRequest): Promise<PingResult> => {
   const config = readConfig();
 
@@ -190,23 +229,23 @@ export const deliver = async (request: PingRequest): Promise<PingResult> => {
   const block = config.includeUsage ? await limitsBlock() : "";
   const text = messageWith(message, block);
 
+  let carriedPicture: Attachment | null;
+
   try {
-    const carriedPicture = await sendVia(config.delivery, text, picture);
-    const carried = wasAttached(carriedPicture) ? `picture ${carriedPicture.name}` : "";
-    const written = [message, block, carried].filter((part) => part !== "").join(" | ");
-
-    writeLastSent(project, { at: Date.now(), message });
-    log(`${sentVia(config.delivery)} | ${written.replaceAll("\n", " | ")}`);
-
-    if (carriedPicture?.kind === ATTACHMENT.refused) {
-      log(`WARN ${attachmentReport(carriedPicture)}`);
-    }
-
-    return { outcome: { kind: PING_OUTCOME.sent }, picture: carriedPicture };
+    carriedPicture = await sendVia(config.delivery, text, picture);
   } catch (failure) {
-    log(`ERROR send failed: ${String(failure)} | ${message}`);
-    process.exitCode = 1;
-
-    return { outcome: { kind: PING_OUTCOME.failed, why: String(failure) }, picture };
+    return whenTheSendFailed(String(failure), request, message, picture);
   }
+
+  const carried = wasAttached(carriedPicture) ? `picture ${carriedPicture.name}` : "";
+  const written = [message, block, carried].filter((part) => part !== "").join(" | ");
+
+  writeLastSent(project, { at: Date.now(), message });
+  log(`${sentVia(config.delivery)} | ${written.replaceAll("\n", " | ")}`);
+
+  if (carriedPicture?.kind === ATTACHMENT.refused) {
+    log(`WARN ${attachmentReport(carriedPicture)}`);
+  }
+
+  return { outcome: { kind: PING_OUTCOME.sent }, picture: carriedPicture };
 };

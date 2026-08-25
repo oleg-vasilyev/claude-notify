@@ -4,10 +4,12 @@ import {
   PING_PATH,
   relayEndpoint,
 } from "#domain/relay-protocol.ts";
+import { refusedWith } from "#domain/ping/delivery.ts";
 
 
 const RELAY_TIMEOUT_MS = 10_000;
 const HEALTH_TIMEOUT_MS = 3_000;
+const THE_RELAY = "the relay";
 
 export const relayMessage = async (
   url: string,
@@ -25,7 +27,7 @@ export const relayMessage = async (
   });
 
   if (!response.ok) {
-    throw new Error(`the relay refused with ${response.status}: ${await response.text()}`);
+    throw new Error(refusedWith(THE_RELAY, response.status, await response.text()));
   }
 };
 

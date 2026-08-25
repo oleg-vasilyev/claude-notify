@@ -1,4 +1,5 @@
 import type { TelegramUpdate } from "#domain/asking/answer.ts";
+import { refusedWith } from "#domain/ping/delivery.ts";
 
 
 const TELEGRAM = "https://api.telegram.org";
@@ -7,6 +8,9 @@ const SEND_TIMEOUT_MS = 10_000;
 const POLL_MARGIN_MS = 5_000;
 const MILLISECONDS_PER_SECOND = 1000;
 const NEXT_UPDATE = 1;
+const TELEGRAM_SAID = "Telegram";
+const NO_DETAIL = "";
+const OVER_THE_TOKEN = "Telegram, over the token,";
 
 const apiRoot = (): string => process.env.BOT_API_ROOT ?? TELEGRAM;
 
@@ -32,7 +36,7 @@ export const sendMessage = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Telegram refused with ${response.status}: ${await response.text()}`);
+    throw new Error(refusedWith(TELEGRAM_SAID, response.status, await response.text()));
   }
 };
 
@@ -59,7 +63,7 @@ export const sendQuestion = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Telegram refused with ${response.status}: ${await response.text()}`);
+    throw new Error(refusedWith(TELEGRAM_SAID, response.status, await response.text()));
   }
 
   const body = (await response.json()) as { result?: { message_id?: number } };
@@ -102,7 +106,7 @@ export const fetchUpdates = async (
   );
 
   if (!response.ok) {
-    throw new Error(`Telegram refused with ${response.status}`);
+    throw new Error(refusedWith(TELEGRAM_SAID, response.status, NO_DETAIL));
   }
 
   const body = (await response.json()) as { result?: TelegramUpdate[] };
@@ -147,7 +151,7 @@ export const botName = async (token: string): Promise<string> => {
   });
 
   if (!response.ok) {
-    throw new Error(`the token was refused with ${response.status}`);
+    throw new Error(refusedWith(OVER_THE_TOKEN, response.status, NO_DETAIL));
   }
 
   const me = (await response.json()) as { result?: { username?: string } };

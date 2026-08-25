@@ -40,18 +40,6 @@ is logged; the phone just shows three equal options.
 question arrives on the phone with no star where one was meant.** Matching more
 spellings is not the fix — that is the same guess with more branches.
 
-## A failed send is lost
-
-`deliver.ts` logs `ERROR send failed`, sets a non-zero exit code, and drops the
-ping. A flaky moment at the exact second of a send loses it, and the fallback
-hooks may be rate-limited when the next event fires. The honest fix is to
-re-queue the message with its original timestamp so the watcher retries it,
-reusing the staleness rule as the give-up rule.
-
-**Pick it up when `ERROR send failed` appears in a real log.**
-
----
-
 ## A session note is written and never swept up
 
 Every hook writes `session-<id>.json` into the state directory, and nothing
@@ -195,6 +183,27 @@ monitor never appears there; it is judged, not unknown.
 ping while an agent was plainly still working is the symptom, and the log line
 under it is the evidence. Guessing at kinds nobody has observed is how the
 counting rule got written in the first place.
+
+---
+
+## `deliver.spec.ts` runs the real domain functions it is supposed to mock
+
+The `write-a-spec` skill says an edge spec mocks our own modules too, and names
+this exact case: "`deliver.ts` is not tested by letting `decideDelivery` really
+run — mock it, drive the funnel by what it returns." It never has. `deliver.spec`
+lets `decideDelivery`, `attachmentFor` and now `worthAnotherTry` run for real,
+and feeds them fixtures built with their own helpers.
+
+The coverage is honest — every assertion would fail if either half broke — but
+when the parser breaks, `deliver.spec` goes red beside `delivery.spec` and points
+at the wrong file, which is the whole reason the rule exists. Two ways out, and
+they are opposite: mock the domain in this one spec and lose the integration
+truth, or admit in the skill that a pure, fast, deterministic domain function may
+run live and only edges must be mocked.
+
+**Decide it the next time this spec has to change for a reason that is not its
+own** — that is when the misdirection costs something. It is a convention
+question, so it belongs to whoever owns the conventions, not to whoever noticed.
 
 ---
 

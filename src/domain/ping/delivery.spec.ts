@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { decideDelivery, type DeliveryFacts } from "#domain/ping/delivery.ts";
+import {
+  decideDelivery,
+  refusedWith,
+  worthAnotherTry,
+  type DeliveryFacts,
+} from "#domain/ping/delivery.ts";
 
 
 const NOW = Date.parse("2026-08-07T12:00:00Z");
@@ -88,5 +93,53 @@ describe("decideDelivery", () => {
     expect(decideDelivery(facts({ idleSeconds: Number.MAX_SAFE_INTEGER }))).toEqual({
       kind: "send",
     });
+  });
+});
+
+describe("refusedWith", () => {
+  it("names who refused, with what, and what they said about it", () => {
+    expect(refusedWith("Telegram", 400, "bad markup")).toBe("Telegram refused with 400: bad markup");
+  });
+
+  it("leaves off a colon when there is nothing after it", () => {
+    expect(refusedWith("Telegram", 400, "")).toBe("Telegram refused with 400");
+  });
+});
+
+describe("worthAnotherTry", () => {
+  it("tries again when nothing refused at all — the network never answered", () => {
+    expect(worthAnotherTry("Error: TypeError: fetch failed")).toBe(true);
+  });
+
+  it("tries again on a timeout, which is the same kind of nothing", () => {
+    expect(worthAnotherTry("Error: TimeoutError: The operation was aborted")).toBe(true);
+  });
+
+  it("tries again when their end broke, since it may be mended by the next poll", () => {
+    expect(worthAnotherTry(refusedWith("Telegram", 502, "bad gateway"))).toBe(true);
+  });
+
+  it("tries again when told there were too many, which is a request to wait, not a refusal", () => {
+    expect(worthAnotherTry(refusedWith("Telegram", 429, "retry after 30"))).toBe(true);
+  });
+
+  it("gives up on a wrong token, because the next attempt is wrong in the same way", () => {
+    expect(worthAnotherTry(refusedWith("Telegram", 401, "unauthorized"))).toBe(false);
+  });
+
+  it("gives up on a chat that does not exist", () => {
+    expect(worthAnotherTry(refusedWith("Telegram", 400, "chat not found"))).toBe(false);
+  });
+
+  it("gives up on a picture too large, whoever phrased the refusal", () => {
+    expect(worthAnotherTry(refusedWith("Telegram, over the picture,", 413, "too big"))).toBe(false);
+  });
+
+  it("gives up on a relay that refused the secret", () => {
+    expect(worthAnotherTry(refusedWith("the relay", 401, "wrong secret"))).toBe(false);
+  });
+
+  it("reads the status of the refusal, not a number that happens to be in the detail", () => {
+    expect(worthAnotherTry(refusedWith("Telegram", 400, "expected 500 bytes"))).toBe(false);
   });
 });

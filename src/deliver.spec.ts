@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { attachmentReport } from "#domain/ping/attachment.ts";
+import { refusedWith } from "#domain/ping/delivery.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { relayMessage } from "#relay/relay-client.ts";
 import { readConfig, type Config } from "#state/config.ts";
@@ -137,11 +138,11 @@ describe("deliver", () => {
   });
 
   it("reports a failed send with the reason, rather than swallowing it", async () => {
-    vi.mocked(sendMessage).mockRejectedValue(new Error("Telegram refused with 404"));
+    vi.mocked(sendMessage).mockRejectedValue(new Error(refusedWith("Telegram", 404, "chat not found")));
 
     expect((await deliver(ping)).outcome).toEqual({
       kind: "failed",
-      why: "Error: Telegram refused with 404",
+      why: "Error: Telegram refused with 404: chat not found",
     });
   });
 
@@ -289,13 +290,40 @@ describe("deliver", () => {
     expect(fetchUsage).not.toHaveBeenCalled();
   });
 
-  it("reports a refused send rather than throwing at the hook", async () => {
-    vi.mocked(sendMessage).mockRejectedValue(new Error("429"));
+  it("puts a send Telegram may yet accept back in the queue rather than losing it", async () => {
+    vi.mocked(sendMessage).mockRejectedValue(new Error(refusedWith("Telegram", 500, "bad gateway")));
 
-    await deliver(ping);
+    const { outcome } = await deliver(ping);
 
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("ERROR send failed"));
-    expect(process.exitCode).toBe(1);
+    expect(outcome.kind).toBe("retrying");
+    expect(appendPending).toHaveBeenCalledWith({
+      queuedAt: expect.any(Number),
+      message: "[a-project@home] жду апрув",
+      sessionId: null,
+    });
+    expect(startWatcher).toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("RETRY send failed"));
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("loses a picture ping rather than pretending the queue can carry it back", async () => {
+    vi.mocked(sendPicture).mockRejectedValue(new Error(refusedWith("Telegram", 502, "bad gateway")));
+
+    const { outcome, picture } = await deliver(withAPicture);
+
+    expect(outcome.kind).toBe("failed");
+    expect(appendPending).not.toHaveBeenCalled();
+    expect(attachmentReport(picture)).toContain("the queue carries words alone");
+  });
+
+  it("keeps the moment a retried ping was first raised, so staleness cannot be reset forever", async () => {
+    const RAISED = 1_700_000_000_000;
+
+    vi.mocked(sendMessage).mockRejectedValue(new Error(refusedWith("Telegram", 500, "bad gateway")));
+
+    await deliver({ ...ping, raisedAt: RAISED });
+
+    expect(appendPending).toHaveBeenCalledWith(expect.objectContaining({ queuedAt: RAISED }));
   });
 
   it("hands the ping to the relay on a machine that cannot reach Telegram", async () => {
@@ -338,11 +366,13 @@ describe("deliver", () => {
 
   it("reports a relay that refused rather than throwing at the hook", async () => {
     vi.mocked(readConfig).mockReturnValue(throughARelay);
-    vi.mocked(relayMessage).mockRejectedValue(new Error("401"));
+    vi.mocked(relayMessage).mockRejectedValue(new Error(refusedWith("the relay", 401, "wrong secret")));
 
-    await deliver(ping);
+    const { outcome } = await deliver(ping);
 
-    expect(log).toHaveBeenCalledWith(expect.stringContaining("ERROR send failed"));
+    expect(outcome.kind).toBe("failed");
+    expect(appendPending).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("ERROR send failed for good"));
     expect(process.exitCode).toBe(1);
   });
 
@@ -427,7 +457,7 @@ describe("deliver", () => {
   it("keeps the words when only the second half fails, so the model does not send them twice", async () => {
     const CAPTION_LIMIT = 1024;
 
-    vi.mocked(sendPicture).mockRejectedValue(new Error("Telegram refused the picture with 413"));
+    vi.mocked(sendPicture).mockRejectedValue(new Error(refusedWith("Telegram, over the picture,", 413, "too big")));
 
     const { outcome, picture } = await deliver({
       ...withAPicture,
@@ -441,7 +471,7 @@ describe("deliver", () => {
   });
 
   it("fails the whole ping when the one message carrying both was refused", async () => {
-    vi.mocked(sendPicture).mockRejectedValue(new Error("Telegram refused the picture with 413"));
+    vi.mocked(sendPicture).mockRejectedValue(new Error(refusedWith("Telegram, over the picture,", 413, "too big")));
 
     const { outcome } = await deliver(withAPicture);
 

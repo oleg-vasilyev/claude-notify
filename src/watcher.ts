@@ -133,8 +133,14 @@ const flush = async (idleNow: number): Promise<void> => {
     log(`${whyDropped(dropped)} (queued ${queuedAt}) | ${dropped.ping.message}`);
   }
 
-  for (const message of selection.deliver) {
-    await deliver({ message, rateLimitMinutes: NO_RATE_LIMIT, ignorePresence: true });
+  for (const ping of selection.deliver) {
+    await deliver({
+      message: ping.message,
+      rateLimitMinutes: NO_RATE_LIMIT,
+      ignorePresence: true,
+      sessionId: ping.sessionId,
+      raisedAt: ping.queuedAt,
+    });
   }
 };
 

@@ -10,6 +10,11 @@ export const HOOK_EVENTS = Object.values(HOOK_EVENT);
 
 export type HookEvent = (typeof HOOK_EVENT)[keyof typeof HOOK_EVENT];
 
+export type BackgroundTask = {
+  type?: string;
+  status?: string;
+};
+
 export type HookPayload = {
   cwd?: string;
   tool_name?: string;
@@ -17,7 +22,7 @@ export type HookPayload = {
   transcript_path?: string;
   session_id?: string;
   tool_use_id?: string;
-  background_tasks?: unknown[];
+  background_tasks?: unknown;
   tool_input?: {
     questions?: {
       question?: string;

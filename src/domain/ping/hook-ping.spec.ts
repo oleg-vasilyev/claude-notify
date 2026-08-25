@@ -4,7 +4,8 @@ import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
 import {
   nobodyIsWatching,
   pingFor as maybePing,
-  stillWorking,
+  unfamiliarWork,
+  willCarryOn,
   type HookPing,
 } from "#domain/ping/hook-ping.ts";
 import type { HookEvent } from "#domain/hook-event.ts";
@@ -176,28 +177,118 @@ describe("pingFor", () => {
   });
 });
 
-describe("stillWorking", () => {
-  it("is true when the turn ended while a background task is still running", () => {
-    expect(stillWorking("Stop", { background_tasks: [{}] })).toBe(true);
+describe("willCarryOn", () => {
+  const AGENT = { type: "subagent", status: "running" };
+  const COMMAND = { type: "shell", status: "running" };
+  const WATCHER = { type: "monitor", status: "running" };
+
+  it("is true while a subagent runs, since it will hand the turn back itself", () => {
+    expect(willCarryOn("Stop", { background_tasks: [AGENT] })).toBe(true);
+  });
+
+  it("is true while a background command runs, for the same reason", () => {
+    expect(willCarryOn("Stop", { background_tasks: [COMMAND] })).toBe(true);
+  });
+
+  it("is false for a monitor, which watches for as long as it is armed and hands nothing back", () => {
+    expect(willCarryOn("Stop", { background_tasks: [WATCHER] })).toBe(false);
+  });
+
+  it("is false for a kind nobody has measured, so an unknown task pings rather than silences", () => {
+    expect(willCarryOn("Stop", { background_tasks: [{ type: "seance", status: "running" }] })).toBe(
+      false
+    );
+  });
+
+  it("is false for work that has stopped running, whatever kind it was", () => {
+    expect(willCarryOn("Stop", { background_tasks: [{ ...AGENT, status: "completed" }] })).toBe(
+      false
+    );
+  });
+
+  it("is false for a task that names no status at all", () => {
+    expect(willCarryOn("Stop", { background_tasks: [{ type: "subagent" }] })).toBe(false);
   });
 
   it("is false once nothing is running, which is the turn that really waits on the user", () => {
-    expect(stillWorking("Stop", { background_tasks: [] })).toBe(false);
+    expect(willCarryOn("Stop", { background_tasks: [] })).toBe(false);
   });
 
   it("is false for a payload that never mentioned background work", () => {
-    expect(stillWorking("Stop", {})).toBe(false);
+    expect(willCarryOn("Stop", {})).toBe(false);
   });
 
-  it("counts every running task, not just the first", () => {
-    expect(stillWorking("Stop", { background_tasks: [{}, {}, {}] })).toBe(true);
+  it("pings rather than dying when a task is not an object at all", () => {
+    expect(willCarryOn("Stop", { background_tasks: [null, 7, "busy"] })).toBe(false);
+  });
+
+  it("pings rather than dying when the field is not even a list", () => {
+    expect(willCarryOn("Stop", { background_tasks: { running: true } })).toBe(false);
+  });
+
+  it("looks past a monitor to the agent behind it, rather than judging the first task", () => {
+    expect(willCarryOn("Stop", { background_tasks: [WATCHER, AGENT] })).toBe(true);
   });
 
   it("says nothing about a question, which waits on the user whatever else is running", () => {
-    expect(stillWorking("PreToolUse", { background_tasks: [{}] })).toBe(false);
+    expect(willCarryOn("PreToolUse", { background_tasks: [AGENT] })).toBe(false);
   });
 
   it("says nothing about a permission, for the same reason", () => {
-    expect(stillWorking("PermissionRequest", { background_tasks: [{}] })).toBe(false);
+    expect(willCarryOn("PermissionRequest", { background_tasks: [AGENT] })).toBe(false);
+  });
+});
+
+describe("unfamiliarWork", () => {
+  it("names a kind nobody has measured, so a fourth one is not invisible", () => {
+    expect(unfamiliarWork({ background_tasks: [{ type: "seance", status: "running" }] })).toEqual([
+      "seance/running",
+    ]);
+  });
+
+  it("says nothing about work that was judged — counted, or a watcher deliberately not counted", () => {
+    expect(
+      unfamiliarWork({
+        background_tasks: [
+          { type: "shell", status: "running" },
+          { type: "monitor", status: "running" },
+          { type: "monitor", status: "whatever a watcher does" },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it("names a known kind in a status nobody has measured, since that is the half that guesses", () => {
+    expect(
+      unfamiliarWork({ background_tasks: [{ type: "subagent", status: "pending" }] })
+    ).toEqual(["subagent/pending"]);
+  });
+
+  it("names a task that is not an object, rather than dropping it", () => {
+    expect(unfamiliarWork({ background_tasks: [null] })).toEqual(["/"]);
+  });
+
+  it("says nothing when the field is not a list", () => {
+    expect(unfamiliarWork({ background_tasks: "busy" })).toEqual([]);
+  });
+
+  it("names each kind once, however many of them were running", () => {
+    expect(
+      unfamiliarWork({
+        background_tasks: [
+          { type: "seance", status: "running" },
+          { type: "seance", status: "running" },
+          { type: "ouija", status: "waiting" },
+        ],
+      })
+    ).toEqual(["seance/running", "ouija/waiting"]);
+  });
+
+  it("stands in for a missing field rather than dropping the task", () => {
+    expect(unfamiliarWork({ background_tasks: [{}] })).toEqual(["/"]);
+  });
+
+  it("says nothing when there was no background work at all", () => {
+    expect(unfamiliarWork({})).toEqual([]);
   });
 });

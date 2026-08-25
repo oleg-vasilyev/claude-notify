@@ -172,6 +172,32 @@ appears in a real log.**
 
 ---
 
+## The kinds of background work are known only from what has been seen
+
+`willCarryOn` decides whether a turn end is real by matching `type` against
+`subagent` and `shell`. Those two, plus `monitor`, are every kind that has
+appeared in a logged payload — three from seventeen probes across five days.
+Claude Code documents none of them, so the list is a measurement with no promise
+behind it, and a rename on their side turns both of ours into unknowns.
+
+The statuses are thinner still: every sighting said `running`, so the rule's
+`status === RUNNING` clause has never been observed doing anything and is the
+one reasoned guess left in it.
+
+Failing that way is cheap by design — anything unjudged pings — so this is not
+urgent. It is also not silent: on every hook event the log names whatever was
+running and was neither counted as work nor deliberately dismissed, as
+`BACKGROUND not counted as work | <type>/<status>`. That covers an unknown kind
+*and* a known kind in an unmeasured status, which is the half that guesses. A
+monitor never appears there; it is judged, not unknown.
+
+**Add a kind when that line names one that should have held the ping** — a false
+ping while an agent was plainly still working is the symptom, and the log line
+under it is the evidence. Guessing at kinds nobody has observed is how the
+counting rule got written in the first place.
+
+---
+
 ## `log.txt` grows forever
 
 Every decision appends; nothing rotates. Payloads are truncated to 400

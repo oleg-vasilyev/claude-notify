@@ -49,10 +49,22 @@ describe("activityAfter", () => {
     });
   });
 
-  it("reads a turn that ended with background work still running as working", () => {
-    const stillBusy: HookPayload = { ...payload, background_tasks: [{ id: "one" }] };
+  it("reads a turn that ended with a subagent still running as working", () => {
+    const stillBusy: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "subagent", status: "running" }],
+    };
 
     expect(activityAfter("Stop", stillBusy)).toEqual({ kind: SESSION_ACTIVITY.working });
+  });
+
+  it("reads a turn that ended with only a monitor armed as waiting, since nothing will resume it", () => {
+    const watched: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "monitor", status: "running" }],
+    };
+
+    expect(activityAfter("Stop", watched)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
   });
 
   it("survives a wall whose payload names no tool call", () => {

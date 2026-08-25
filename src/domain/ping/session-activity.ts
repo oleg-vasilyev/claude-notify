@@ -1,5 +1,5 @@
 import { HOOK_EVENT, type HookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { stillWorking } from "#domain/ping/hook-ping.ts";
+import { willCarryOn } from "#domain/ping/hook-ping.ts";
 import { impossible } from "#domain/impossible.ts";
 
 
@@ -28,7 +28,7 @@ export const isSessionActivity = (candidate: unknown): candidate is SessionActiv
   ACTIVITY_KINDS.has((candidate as { kind?: unknown }).kind as string);
 
 export const activityAfter = (event: HookEvent, payload: HookPayload): SessionActivity => {
-  if (stillWorking(event, payload)) {
+  if (willCarryOn(event, payload)) {
     return { kind: SESSION_ACTIVITY.working };
   }
 

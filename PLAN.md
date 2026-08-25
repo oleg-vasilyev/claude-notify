@@ -132,13 +132,44 @@ rather than at the next restart. A resident process serving stale code is the
 same trap as the stale config in the tombstones below, and this is the shape
 that refuses it.
 
-**`Stop` says nothing while background work is still running.** The event fires
-every time the agent hands the turn back, including the hand-backs it makes
-while a long task keeps going in the background — and «закончил ход, ждёт тебя»
-is then a lie that costs a walk to the machine. The payload carries
-`background_tasks`, and an empty array is what actually means the turn is
-waiting on the user. Found by a real ping arriving during a build, not by a
-test.
+**`Stop` says nothing while background work will hand the turn back by itself.**
+The event fires every time the agent returns the turn, including the returns it
+makes while a long task keeps going — and «закончил ход, ждёт тебя» is then a lie
+that costs a walk to the machine. Found by a real ping arriving during a build,
+not by a test.
+
+**But "something is running" is not the same as "it will come back", and reading
+the first as the second silenced a session for a whole day.** The rule counted
+the length of `background_tasks`, so anything in that array meant *wait*.
+Publishing an artifact arms a `monitor` — a standing subscription to live
+updates, `status: "running"` for as long as it is armed and answering to nobody.
+From that moment every turn end in that session was swallowed. Measured, not
+guessed: seventeen payloads logged, and three of them were a lone monitor with no
+agent behind it, each followed by silence.
+
+So the rule reads the tasks rather than counting them, and only two measured
+kinds mean the session will resume on its own:
+
+| `type` | What it is | Counts as work |
+| --- | --- | --- |
+| `subagent` | an agent working on its own; it finishes and returns a turn | yes |
+| `shell` | a background command; it exits and returns a turn | yes |
+| `monitor` | a standing watcher, armed until something disarms it | no |
+
+`status` must be `running` too, since the field carries one and a finished task
+should never hold a ping.
+
+**Anything unmeasured counts as no work, and pings** — a fourth kind, an
+unmeasured status, a task that is not an object, a `background_tasks` that is not
+a list. The payload is somebody else's JSON and the type says `unknown`, because
+the version of this rule that trusted its shape is the one being replaced. That
+direction is chosen, not accidental: the same trade as the presence probe below —
+a ping nobody needed costs a glance, a swallowed one costs hours.
+
+The log says so rather than letting it pass — `BACKGROUND not counted as work`
+names whatever was running and was neither counted nor deliberately dismissed. It
+is written before the decision, not inside one of its branches, so a sighting
+survives even on the turns that are held back.
 
 **`PreToolUse` and `PermissionRequest` both fire for `AskUserQuestion`, in the
 same second.** Left alone that is two messages for one question and two hooks

@@ -67,6 +67,14 @@ Three rules about running it, and the first is the one that costs money:
 
 - **Never re-run a gate to re-read its output.** Every run writes
   `reports/mutation/`. Read the report.
+- **Read the error column, not only the score.** A run once left twelve mutants
+  unclassified — `RuntimeError`, all saying the vitest worker failed to start,
+  scattered across seven files including ones the phase never touched. Those
+  mutants count toward neither number, so a green score can be silent about
+  exactly the lines a review asked to have protected. Three of them were that
+  phase's new guard. Apply an unclassified mutant by hand, watch the spec fail,
+  put it back: three edits beat another 2.8-minute run that may flake the
+  same way.
 - **Never pipe a gate through `Select-Object -First`.** It closes the pipe, npm
   dies at exit 255 partway through, and the summary you were filtering for never
   prints — so the run is lost and the only way to see the number is to run it

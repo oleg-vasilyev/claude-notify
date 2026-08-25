@@ -52,6 +52,23 @@ Cyrillic question shipped as mojibake while every test passed.
 
 Copy `payload.json` and edit the copy for an event that needs a different shape.
 
+**And the field's TypeScript type must stay as loose as the JSON is.** A payload
+is somebody else's parsed JSON reached through a bare cast, so a type on it is a
+wish, not a check — `unknown` where the shape is not guaranteed, narrowed inside
+`domain/` where a spec can pass it a `null` and watch what happens. Paid for
+twice over in one phase: `background_tasks` was widened from an opaque
+`unknown[]` to a typed array, which let the code read `task.status` off whatever
+arrived, so a task that was not an object would throw at the top level of
+`hook.ts` and swallow the ping — and the same narrowing made the crash impossible
+to write a fixture for, since the type forbade the bad value. The looser type
+also *reads* as the truth: this is what came over the wire.
+
+**The truncation cuts at 400 characters, so a field near the end is invisible.**
+A field after `last_assistant_message` will never appear in the log at all. Add a
+temporary `log()` naming that field alone, leave it for as many days as it takes
+to see the shapes vary — one phase needed seventeen payloads over five days —
+and delete it in the same diff that uses what it found.
+
 ## When the log cannot answer, build a throwaway and ask
 
 The log only shows events already registered, and shows nothing at all about

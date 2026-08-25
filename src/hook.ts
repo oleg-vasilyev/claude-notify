@@ -1,5 +1,10 @@
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
-import { nobodyIsWatching, pingFor, stillWorking } from "#domain/ping/hook-ping.ts";
+import {
+  nobodyIsWatching,
+  pingFor,
+  unfamiliarWork,
+  willCarryOn,
+} from "#domain/ping/hook-ping.ts";
 import { noteAfter } from "#domain/ping/session-activity.ts";
 import { readConfig } from "#state/config.ts";
 import { flattenPayload, log } from "#state/log.ts";
@@ -52,8 +57,14 @@ if (payload.session_id !== undefined) {
   writeSessionNote(payload.session_id, noteAfter(event, payload, Date.now()));
 }
 
-if (stillWorking(event, payload)) {
-  log(`SKIP the turn ended but background work is still running | ${event}`);
+const unfamiliar = unfamiliarWork(payload);
+
+if (unfamiliar.length > NOTHING_TO_SAY) {
+  log(`BACKGROUND not counted as work | ${unfamiliar.join(" ")}`);
+}
+
+if (willCarryOn(event, payload)) {
+  log(`SKIP the turn ended but the agent will carry on | ${event}`);
 } else {
   const ping = pingFor(event, payload, readConfig()?.quoteQuestions === true);
 

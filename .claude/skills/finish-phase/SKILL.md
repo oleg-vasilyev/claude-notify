@@ -248,6 +248,14 @@ keyboard and then had to be killed when the review came back with a rename; and
 code the review then changed. The review is the cheap thing to run early. Order
 the closing gates review → mutation → `e2e` → live ping, and run each once.
 
+**Coverage belongs in that order too, and "it runs in parallel" is not a reason
+to exempt it.** A number measured before the review is a number about a tree that
+no longer exists — the review moves code by design. One phase ran coverage
+alongside the reviewer to save time and threw the result away twenty minutes
+later, together with a live check fired before the review that proved a verdict
+the rework then renamed. Neither run cost wall-clock; both cost a number that
+could not be quoted.
+
 If the phase touched the installer, run `npm run setup -- --label home
 --skip-test` **twice** and confirm `~/.claude/settings.json` gained exactly one
 entry per event. Idempotence is the property that breaks silently.

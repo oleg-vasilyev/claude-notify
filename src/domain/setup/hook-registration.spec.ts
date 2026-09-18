@@ -9,6 +9,7 @@ import {
 
 
 const OURS = ["claude-notify", "telegram-notify"];
+const NOTHING_RETIRED: string[] = [];
 
 const ping: HookCommand = {
   type: "command",
@@ -16,26 +17,25 @@ const ping: HookCommand = {
   args: ["D:\\somewhere\\t-claude\\src\\hook.ts", "Stop", "claude-notify"],
 };
 
-const chime: HookCommand = {
-  type: "command",
-  command: '(New-Object Media.SoundPlayer "C:\\Windows\\Media\\chimes.wav").PlaySync()',
-  shell: "powershell",
-};
+const CHIME = '(New-Object Media.SoundPlayer "C:\\Windows\\Media\\chimes.wav").PlaySync()';
+const RETIRED = [CHIME];
 
-const registration: Registration = { event: "Stop", command: ping, sound: chime };
+const chime: HookCommand = { type: "command", command: CHIME, shell: "powershell" };
+
+const registration: Registration = { event: "Stop", command: ping };
 
 describe("registerHooks", () => {
   it("adds the hook to settings that had none", () => {
-    const registered = registerHooks({}, [registration], OURS);
+    const registered = registerHooks({}, [registration], OURS, NOTHING_RETIRED);
 
     expect(registered.hooks?.Stop).toHaveLength(1);
-    expect(registered.hooks?.Stop?.[0]?.hooks).toContainEqual(ping);
+    expect(registered.hooks?.Stop?.[0]?.hooks).toEqual([ping]);
   });
 
   it("keeps every unrelated setting untouched", () => {
     const settings: ClaudeSettings = { model: "opus", enabledPlugins: { a: true } };
 
-    expect(registerHooks(settings, [registration], OURS).model).toBe("opus");
+    expect(registerHooks(settings, [registration], OURS, NOTHING_RETIRED).model).toBe("opus");
   });
 
   it("keeps hooks somebody else registered", () => {
@@ -43,15 +43,15 @@ describe("registerHooks", () => {
       hooks: { Stop: [{ hooks: [{ type: "command", command: "prettier --write ." }] }] },
     };
 
-    const registered = registerHooks(settings, [registration], OURS);
+    const registered = registerHooks(settings, [registration], OURS, NOTHING_RETIRED);
 
     expect(registered.hooks?.Stop?.[0]?.hooks?.[0]?.command).toBe("prettier --write .");
     expect(registered.hooks?.Stop).toHaveLength(2);
   });
 
   it("replaces its own previous entry instead of stacking a second one", () => {
-    const once = registerHooks({}, [registration], OURS);
-    const twice = registerHooks(once, [registration], OURS);
+    const once = registerHooks({}, [registration], OURS, NOTHING_RETIRED);
+    const twice = registerHooks(once, [registration], OURS, NOTHING_RETIRED);
 
     expect(twice.hooks?.Stop).toHaveLength(1);
   });
@@ -66,8 +66,8 @@ describe("registerHooks", () => {
       },
     };
 
-    const once = registerHooks({}, [installedElsewhere], OURS);
-    const moved = registerHooks(once, [registration], OURS);
+    const once = registerHooks({}, [installedElsewhere], OURS, NOTHING_RETIRED);
+    const moved = registerHooks(once, [registration], OURS, NOTHING_RETIRED);
 
     expect(moved.hooks?.Stop).toHaveLength(1);
     expect(JSON.stringify(moved)).not.toContain("projects");
@@ -90,32 +90,46 @@ describe("registerHooks", () => {
       },
     };
 
-    const registered = registerHooks(settings, [registration], OURS);
+    const registered = registerHooks(settings, [registration], OURS, NOTHING_RETIRED);
 
     expect(JSON.stringify(registered)).not.toContain("telegram-notify");
     expect(registered.hooks?.Stop).toHaveLength(1);
   });
 
-  it("adds a sound when the event has none", () => {
-    expect(registerHooks({}, [registration], OURS).hooks?.Stop?.[0]?.hooks).toContainEqual(chime);
+  it("registers no sound of its own, since the hook decides whether one is deserved", () => {
+    const registered = registerHooks({}, [registration], OURS, RETIRED);
+
+    expect(JSON.stringify(registered)).not.toContain("SoundPlayer");
   });
 
-  it("leaves the sound alone when the user already has one", () => {
-    const settings: ClaudeSettings = {
-      hooks: {
-        Stop: [
-          {
-            hooks: [
-              { type: "command", command: '(New-Object Media.SoundPlayer "beep.wav").PlaySync()' },
-            ],
-          },
-        ],
-      },
+  it("takes back the sound it planted in an earlier version, group and all", () => {
+    const settings: ClaudeSettings = { hooks: { Stop: [{ hooks: [chime] }] } };
+
+    const registered = registerHooks(settings, [registration], OURS, RETIRED);
+
+    expect(registered.hooks?.Stop).toEqual([{ hooks: [ping] }]);
+  });
+
+  it("takes it back without disturbing what sits beside it", () => {
+    const alongside: HookCommand = { type: "command", command: "prettier --write ." };
+    const settings: ClaudeSettings = { hooks: { Stop: [{ hooks: [chime, alongside] }] } };
+
+    const registered = registerHooks(settings, [registration], OURS, RETIRED);
+
+    expect(registered.hooks?.Stop?.[0]?.hooks).toEqual([alongside]);
+  });
+
+  it("leaves a sound the user chose themselves, since only our own is retired", () => {
+    const theirs: HookCommand = {
+      type: "command",
+      command: '(New-Object Media.SoundPlayer "beep.wav").PlaySync()',
     };
+    const settings: ClaudeSettings = { hooks: { Stop: [{ hooks: [theirs] }] } };
 
-    const registered = registerHooks(settings, [registration], OURS);
+    const registered = registerHooks(settings, [registration], OURS, RETIRED);
 
-    expect(registered.hooks?.Stop?.[1]?.hooks).toEqual([ping]);
+    expect(registered.hooks?.Stop?.[0]?.hooks).toEqual([theirs]);
+    expect(registered.hooks?.Stop).toHaveLength(2);
   });
 
   it("carries a matcher when the event needs one", () => {
@@ -125,30 +139,34 @@ describe("registerHooks", () => {
       command: ping,
     };
 
-    expect(registerHooks({}, [scoped], OURS).hooks?.PreToolUse?.[0]?.matcher).toBe(
-      "AskUserQuestion|ExitPlanMode"
-    );
+    expect(registerHooks({}, [scoped], OURS, NOTHING_RETIRED).hooks?.PreToolUse?.[0]).toEqual({
+      matcher: "AskUserQuestion|ExitPlanMode",
+      hooks: [ping],
+    });
   });
 
   it("leaves out the matcher key entirely when there is none", () => {
-    expect(registerHooks({}, [registration], OURS).hooks?.Stop?.[0]).not.toHaveProperty("matcher");
+    expect(
+      registerHooks({}, [registration], OURS, NOTHING_RETIRED).hooks?.Stop?.[0]
+    ).not.toHaveProperty("matcher");
   });
 
   it("registers several events in one pass", () => {
     const registered = registerHooks(
       {},
       [registration, { event: "Notification", command: ping }],
-      OURS
+      OURS,
+      NOTHING_RETIRED
     );
 
     expect(Object.keys(registered.hooks ?? {})).toEqual(["Stop", "Notification"]);
   });
 
   it("does not mutate the settings it was given", () => {
-    const settings: ClaudeSettings = { hooks: { Stop: [] } };
+    const settings: ClaudeSettings = { hooks: { Stop: [{ hooks: [chime] }] } };
 
-    registerHooks(settings, [registration], OURS);
+    registerHooks(settings, [registration], OURS, RETIRED);
 
-    expect(settings.hooks?.Stop).toEqual([]);
+    expect(settings.hooks?.Stop).toEqual([{ hooks: [chime] }]);
   });
 });

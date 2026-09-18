@@ -31,5 +31,9 @@ export type HookPayload = {
   };
 };
 
+const ASK_TOOL = "AskUserQuestion";
+
+export const isTheAskTool = (payload: HookPayload): boolean => payload.tool_name === ASK_TOOL;
+
 export const isHookEvent = (candidate: string): candidate is HookEvent =>
   (HOOK_EVENTS as readonly string[]).includes(candidate);

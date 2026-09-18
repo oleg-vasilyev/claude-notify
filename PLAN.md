@@ -34,14 +34,14 @@ Two sources, deliberately redundant:
    nature.
 2. **Hooks**, the mechanical fallback for turns where the model did not call:
 
-| Event | Fires when | Message |
-| --- | --- | --- |
-| `Stop` | the turn ended; the ball is in the user's court | `закончил ход, ждёт тебя` |
-| `PreToolUse` on `AskUserQuestion` | a question dialog opened mid-turn | `вопрос: <the question itself>` |
-| `PreToolUse` on `ExitPlanMode` | a plan awaits approval mid-turn | `план готов, жду апрув` |
-| `PermissionRequest` | a permission prompt is about to show | `просит разрешение: <tool>` |
-| `Notification` | permission prompts and idle waiting, per the docs | never observed to fire — see tombstones |
-| `UserPromptSubmit` | the user wrote into the session | nothing — it only records that work resumed |
+| Event | Fires when | Message | Sound |
+| --- | --- | --- | --- |
+| `Stop` | the turn ended; the ball is in the user's court | `закончил ход, ждёт тебя` | turn ended |
+| `PreToolUse` on `AskUserQuestion` | a question dialog opened mid-turn | `вопрос: <the question itself>` | waiting |
+| `PreToolUse` on `ExitPlanMode` | a plan awaits approval mid-turn | `план готов, жду апрув` | waiting |
+| `PermissionRequest` | a permission prompt is about to show | `просит разрешение: <tool>` | waiting, unless `PreToolUse` owns the tool |
+| `Notification` | permission prompts and idle waiting, per the docs | never observed to fire — see tombstones | waiting |
+| `UserPromptSubmit` | the user wrote into the session | nothing — it only records that work resumed | none |
 
 The mid-turn events matter because `Stop` cannot see them: a question dialog or
 a permission prompt suspends the turn without ending it. All four have now been
@@ -170,6 +170,24 @@ The log says so rather than letting it pass — `BACKGROUND not counted as work`
 names whatever was running and was neither counted nor deliberately dismissed. It
 is written before the decision, not inside one of its branches, so a sighting
 survives even on the turns that are held back.
+
+**The sound is decided here too, and not in `settings.json`.** A Windows sound
+was this product's first phase, and it outlived its reason by sitting in the
+settings file as a second hook beside the ping: a bare PowerShell line that
+knew none of the rules above and fired on every `Stop` there was. Measured in one
+log — 1277 `Stop` events, of which 233 came from sessions a script was running
+and 245 were turns handed straight back to a working subagent, about forty a day
+between them, every one of them a chime for a turn that had not ended. The hook
+process plays the sound now, after the two silences above and before everything
+below, so a sound means what a ping means. The two the table names are different
+files on purpose: which one played says whether the turn ended, without looking
+at the screen.
+
+**Presence is where the sound and the ping part.** Telegram waits until the user
+has actually left; the sound plays whether or not they are there, because being
+at the keyboard is exactly when a sound is the whole notification — the window
+may be behind another one, or on another tab. It carries no rate limit either: a
+chime costs a second of attention and cannot pile up unread the way a chat does.
 
 **`PreToolUse` and `PermissionRequest` both fire for `AskUserQuestion`, in the
 same second.** Left alone that is two messages for one question and two hooks
@@ -682,8 +700,8 @@ dispatcher, not a notifier) and now inherits phase 4's watcher as its poller.
 - **Detecting presence by audio playback.** Watching a video without touching
   anything reads as absence; the `min_idle_minutes` knob is the accepted
   answer. Reconsider only if a real ping-during-video annoys in practice.
-- **Anything but Windows.** Presence is win32 `GetLastInputInfo` and the sound
-  hook is a PowerShell one-liner in `settings.json`. A macOS port is two files
-  in `edges/` — the domain and this document already carry over, which the
-  rewrite from PowerShell demonstrated.
+- **Anything but Windows.** Presence is win32 `GetLastInputInfo` and the sound is
+  a PowerShell one-liner spawned by the hook. A macOS port is those two files —
+  the domain and this document already carry over, which the rewrite from
+  PowerShell demonstrated.
 - **Multiple users or chats.** One person, their machines, one bot.

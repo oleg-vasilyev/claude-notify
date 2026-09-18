@@ -1,7 +1,7 @@
 import type { HookEvent } from "#domain/hook-event.ts";
 
 
-const PLAYS_A_SOUND = /SoundPlayer|PlaySync|afplay|\.wav/i;
+const NOTHING_LEFT = 0;
 
 export type HookCommand = {
   type: "command";
@@ -26,7 +26,6 @@ export type Registration = {
   event: HookEvent;
   matcher?: string;
   command: HookCommand;
-  sound?: HookCommand;
 };
 
 const isOurs = (group: HookGroup, ownedMarkers: readonly string[]): boolean => {
@@ -35,30 +34,31 @@ const isOurs = (group: HookGroup, ownedMarkers: readonly string[]): boolean => {
   return ownedMarkers.some((marker) => written.includes(marker));
 };
 
-const alreadyMakesNoise = (groups: readonly HookGroup[]): boolean =>
-  groups.some((group) => group.hooks.some((hook) => PLAYS_A_SOUND.test(hook.command)));
+const withoutRetired = (group: HookGroup, retiredCommands: readonly string[]): HookGroup => ({
+  ...group,
+  hooks: group.hooks.filter((hook) => !retiredCommands.includes(hook.command)),
+});
+
+const stillRuns = (group: HookGroup): boolean => group.hooks.length > NOTHING_LEFT;
 
 export const registerHooks = (
   settings: ClaudeSettings,
   registrations: readonly Registration[],
-  ownedMarkers: readonly string[]
+  ownedMarkers: readonly string[],
+  retiredCommands: readonly string[]
 ): ClaudeSettings => {
   const hooks: Record<string, HookGroup[]> = { ...(settings.hooks ?? {}) };
 
   for (const registration of registrations) {
-    const kept = (hooks[registration.event] ?? []).filter((group) => !isOurs(group, ownedMarkers));
-    const added: HookCommand[] = [];
-
-    if (registration.sound !== undefined && !alreadyMakesNoise(kept)) {
-      added.push(registration.sound);
-    }
-
-    added.push(registration.command);
+    const kept = (hooks[registration.event] ?? [])
+      .filter((group) => !isOurs(group, ownedMarkers))
+      .map((group) => withoutRetired(group, retiredCommands))
+      .filter(stillRuns);
 
     const group: HookGroup =
       registration.matcher === undefined
-        ? { hooks: added }
-        : { matcher: registration.matcher, hooks: added };
+        ? { hooks: [registration.command] }
+        : { matcher: registration.matcher, hooks: [registration.command] };
 
     hooks[registration.event] = [...kept, group];
   }

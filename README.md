@@ -50,8 +50,8 @@ npm install && npm run setup
 ```
 
 Setup asks for the token and a machine label, writes them to **`.env`** in the
-checkout, resolves your chat id, registers the Claude Code hooks (Telegram and
-sound), gives the agent a **`ping_user` tool** for every project on this machine,
+checkout, resolves your chat id, registers the Claude Code hooks that ping and
+sound, gives the agent a **`ping_user` tool** for every project on this machine,
 and sends a test message. The hooks and the tool point at this checkout, so keep
 it where it is — moving it means running setup again.
 
@@ -143,6 +143,7 @@ Everything the notifier decides is one line in
 | `DROP seen` | you touched the keyboard after it was queued, so you were there when it happened |
 | `SKIP rate-limit [proj]` | that project pinged too recently |
 | `HOOK <event>` | a Claude Code hook fired, with its payload and the entrypoint that ran it |
+| `SOUND <which>` | this machine made a noise: `turnEnded` when a turn really ended, `waitingOnYou` for a question or a permission mid-turn |
 | `SKIP a session a script is running` | the hooks fired for a scripted session — no person is waiting, so the mechanical ping stays home |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
@@ -179,6 +180,7 @@ src/domain/     every decision, pure — no files, no network, no clock
     attachment.ts     whether a picture can go, and what to say when it cannot
     delivery.ts       send, queue or skip, and whether a refusal is worth retrying
     hook-ping.ts      what each Claude Code event has to say
+    hook-sound.ts     which sound an event deserves, and which gets none
     pending.ts        which queued pings may go now, and which one wins per project
     ping-tool.ts      what the model's own ping tool says, and how it reports back
     session-activity.ts  whether a session is working, waiting, or stuck at a wall
@@ -193,6 +195,7 @@ src/domain/     every decision, pure — no files, no network, no clock
     memory-rule.ts    the rule setup retires once the tool describes itself
     setup-choice.ts   which way a machine sends, and where its relay secret comes from
     startup-script.ts the batch file that brings the relay up at login
+    retired-hooks.ts  the hook commands old versions wrote, so setup takes them back
     tool-permission.ts the exact name Claude Code must allow for the ping tool
 src/state/      what this product remembers between runs
   asked-question.ts the question a hook waits on, and the answer it waits for
@@ -207,6 +210,7 @@ src/state/      what this product remembers between runs
   update-offset.ts  how far the watcher has read Telegram
   watcher-lock.ts   who is delivering the queue right now
 src/presence/idle-time.ts   how long since you touched anything (win32 via koffi)
+src/sound/play-sound.ts     the wav each sound is, and playing it where you are
 src/relay/      forwarding a ping through a machine that can reach Telegram
   relay-client.ts   sending one, from the machine that cannot
   relay-server.ts   receiving one, on the machine that can

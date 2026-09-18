@@ -13,6 +13,7 @@ import { impossible } from "#domain/impossible.ts";
 import { memoryAfterSetup } from "#domain/setup/memory-rule.ts";
 import { MCP_SERVER_NAME, PING_TOOL } from "#domain/ping/ping-tool.ts";
 import { forgetToolCommand, registerToolCommand } from "#domain/setup/registration-command.ts";
+import { RETIRED_HOOK_COMMANDS } from "#domain/setup/retired-hooks.ts";
 import { PING_TOOL_PERMISSION, withToolAllowed } from "#domain/setup/tool-permission.ts";
 import {
   hostingWanted,
@@ -45,7 +46,6 @@ import { botName, resolveChatId, sendMessage } from "#telegram/telegram-api.ts";
 
 const HOOK_TIMEOUT_SECONDS = 30;
 const ASK_HOOK_TIMEOUT_SECONDS = 900;
-const SOUND_TIMEOUT_SECONDS = 15;
 const DEFAULT_MIN_IDLE_MINUTES = 3;
 const DEFAULT_STALE_MINUTES = 15;
 const DEFAULT_ASK_MINUTES = 10;
@@ -87,25 +87,9 @@ const askCommand = (event: HookEvent): HookCommand => ({
   timeout: ASK_HOOK_TIMEOUT_SECONDS,
 });
 
-const soundOf = (wav: string): HookCommand => ({
-  type: "command",
-  command: `(New-Object Media.SoundPlayer "${wav}").PlaySync()`,
-  shell: "powershell",
-  timeout: SOUND_TIMEOUT_SECONDS,
-  async: true,
-});
-
 const REGISTRATIONS: Registration[] = [
-  {
-    event: HOOK_EVENT.stop,
-    command: pingCommand(HOOK_EVENT.stop),
-    sound: soundOf("C:\\Windows\\Media\\Windows Notify.wav"),
-  },
-  {
-    event: HOOK_EVENT.notification,
-    command: pingCommand(HOOK_EVENT.notification),
-    sound: soundOf("C:\\Windows\\Media\\chimes.wav"),
-  },
+  { event: HOOK_EVENT.stop, command: pingCommand(HOOK_EVENT.stop) },
+  { event: HOOK_EVENT.notification, command: pingCommand(HOOK_EVENT.notification) },
   {
     event: HOOK_EVENT.preToolUse,
     matcher: "AskUserQuestion|ExitPlanMode",
@@ -279,7 +263,7 @@ if (toolRegistered) {
 }
 
 const settings = readJsonFile<ClaudeSettings>(claudeSettingsFile(), {});
-const hooked = registerHooks(settings, REGISTRATIONS, OWNED_MARKERS);
+const hooked = registerHooks(settings, REGISTRATIONS, OWNED_MARKERS, RETIRED_HOOK_COMMANDS);
 const permitted = toolRegistered ? withToolAllowed(hooked, PING_TOOL_PERMISSION) : hooked;
 
 mkdirSync(claudeHome(), { recursive: true });

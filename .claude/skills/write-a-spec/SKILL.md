@@ -131,8 +131,8 @@ prove.
 
 `vitest.config.ts` excludes every entry point, plus the modules that are pure
 seam — `file-locations.ts`, `idle-time.ts`, `telegram-api.ts`, `picture.ts`,
-`usage-api.ts`, `relay-client.ts`, `watcher-process.ts`. They hold no decisions:
-each is the seam with somebody else's API or the OS, and a unit
+`usage-api.ts`, `relay-client.ts`, `watcher-process.ts`, `play-sound.ts`. They hold
+no decisions: each is the seam with somebody else's API or the OS, and a unit
 that mocks `fetch` in order to watch `fetch` be called proves nothing about our
 code. What they do is proven by sending a real ping, which the `finish-phase`
 skill makes a gate.
@@ -147,6 +147,15 @@ serialise, so none of these could live there.
 What a seam may never hold is a branch that decides **what the product does** —
 whether to send, what to say, which of two things wins. That is a decision, and
 it belongs where it can be tested.
+
+**And a seam the delivery funnel calls may never throw.** It is the one place a
+crash costs a ping and no gate can see it coming: the file is outside coverage by
+construction, so nothing runs it, and `hook.ts` has the ping half-made when it
+happens. `play-sound.ts` spawns PowerShell before the funnel reaches Telegram, and
+a `spawn` with no `error` listener takes the whole hook down with it — the ping
+included — the first time a machine has no `powershell` on its path. Every such
+edge turns its own failure into a `log()` line and returns; whatever it was for
+is the thing allowed to be lost.
 
 This paragraph was written one version too narrow, licensing only the first of
 the three, and the phase that introduced it was itself in breach on the file it

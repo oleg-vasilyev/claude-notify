@@ -46,6 +46,7 @@ src/
     ping/ asking/ setup/   one folder per thing being decided about
   state/      what is remembered between runs: settings, log, queue, stamps, lock
   presence/   whether the user is at the keyboard
+  sound/      the notification the machine itself makes
   telegram/   talking to Telegram
   relay/      forwarding for a machine that cannot reach Telegram
   usage/      the account's limit windows

@@ -22,6 +22,7 @@ export default defineConfig({
         "src/watcher-process.ts",
         "src/presence/idle-time.ts",
         "src/relay/relay-client.ts",
+        "src/sound/play-sound.ts",
         "src/state/file-locations.ts",
         "src/telegram/picture.ts",
         "src/telegram/telegram-api.ts",

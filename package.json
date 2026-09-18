@@ -11,6 +11,7 @@
     "#domain/*": "./src/domain/*",
     "#presence/*": "./src/presence/*",
     "#relay/*": "./src/relay/*",
+    "#sound/*": "./src/sound/*",
     "#state/*": "./src/state/*",
     "#telegram/*": "./src/telegram/*",
     "#usage/*": "./src/usage/*"

@@ -5,7 +5,9 @@ import {
   unfamiliarWork,
   willCarryOn,
 } from "#domain/ping/hook-ping.ts";
+import { soundFor } from "#domain/ping/hook-sound.ts";
 import { noteAfter } from "#domain/ping/session-activity.ts";
+import { playSound } from "#sound/play-sound.ts";
 import { readConfig } from "#state/config.ts";
 import { flattenPayload, log } from "#state/log.ts";
 import { writeSessionNote } from "#state/session-note.ts";
@@ -66,6 +68,13 @@ if (unfamiliar.length > NOTHING_TO_SAY) {
 if (willCarryOn(event, payload)) {
   log(`SKIP the turn ended but the agent will carry on | ${event}`);
 } else {
+  const sound = soundFor(event, payload);
+
+  if (sound !== null) {
+    playSound(sound);
+    log(`SOUND ${sound} | ${event}`);
+  }
+
   const ping = pingFor(event, payload, readConfig()?.quoteQuestions === true);
 
   if (ping !== null) {

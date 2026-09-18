@@ -1,22 +1,29 @@
 ---
 name: add-a-hook-event
-description: Teach claude-notify to ping on another Claude Code event, or change what an existing event says. Covers the five places an event is named, the rate limit to choose, and the two hazards the installer exists to prevent. Use when adding or changing a hook event.
+description: Teach claude-notify to ping or sound on another Claude Code event, or change what an existing event says. Covers the seven places an event is named, the rate limit to choose, and the two hazards the installer exists to prevent. Use when adding or changing a hook event.
 ---
 
 # Adding a hook event
 
-An event is named in five places, and missing one is the whole failure mode:
+An event is named in seven places, and missing one is the whole failure mode:
 
-1. **`HOOK_EVENTS`** in `domain/hook-ping.ts` — the union. Adding a member makes
-   the `switch` below it a compile error until the new case is written, which is
-   the point of dispatching on a union.
-2. **`pingFor`** — the case: what the ping says, and its rate limit.
-3. **`copy.ru.ts`** — the Russian the user reads. No string a user sees may appear
+1. **`HOOK_EVENTS`** in `domain/hook-event.ts` — the union. Adding a member makes
+   all three switches below a compile error until the new cases are written,
+   which is the point of dispatching on a union.
+2. **`pingFor`** in `domain/ping/hook-ping.ts` — the case: what the ping says, and
+   its rate limit.
+3. **`soundFor`** in `domain/ping/hook-sound.ts` — whether the machine itself
+   makes a noise, and which of the two it is. An event that does not mean
+   *waiting on the user* returns `null` here.
+4. **`activityAfter`** in `domain/ping/session-activity.ts` — what the event says
+   the session is now doing, which decides whether a ping held in the queue is
+   still worth delivering.
+5. **`copy.ru.ts`** — the Russian the user reads. No string a user sees may appear
    anywhere else.
-4. **`REGISTRATIONS`** in `setup.ts` — the event, its matcher if it needs one,
-   and a sound if the event deserves one.
-5. **`PLAN.md`** — the row in the hook table, saying when it fires and what it
-   says. That table is the contract; the code is its implementation.
+6. **`REGISTRATIONS`** in `setup.ts` — the event, and its matcher if it needs one.
+7. **`PLAN.md`** — the row in the hook table, saying when it fires, what it says
+   and which sound it makes. That table is the contract; the code is its
+   implementation.
 
 Then run `npm run setup -- --label home --skip-test` and restart Claude Code.
 
@@ -50,7 +57,13 @@ so the command exits 0 and logs a ping naming no project and no tool. A shell
 that re-encodes the bytes is testing the shell, and that is exactly how a
 Cyrillic question shipped as mojibake while every test passed.
 
-Copy `payload.json` and edit the copy for an event that needs a different shape.
+Copy `payload.json` and edit the copy for an **editor**, not with a shell. The
+trap is not only the pipe: a fixture *authored* by `printf`, a heredoc or
+`node -e` loses exactly the same backslash, and `{"cwd":"D:\live-check"}` is
+invalid JSON that `hook.ts` reads as an empty payload — so the check passes while
+proving nothing about the field it was written for. Four payloads were written
+that way in one phase and caught only by printing them back. Print the file back
+before you fire it.
 
 **And the field's TypeScript type must stay as loose as the JSON is.** A payload
 is somebody else's parsed JSON reached through a bare cast, so a type on it is a
@@ -95,9 +108,16 @@ fact was measured rather than read — the next person will want to know which.
   marker argument it writes into every hook command. The marker is a constant,
   never anything derived from the path — deriving it from the checkout's name is
   what shipped duplicate hooks once already.
-- **Somebody else's hooks.** A group that is not ours is kept untouched, and the
-  sound hook is added only when the event has none. Both are covered in
-  `hook-registration.spec.ts`; a change to that merge starts there.
+- **Somebody else's hooks.** A group that is not ours is kept untouched, down to
+  a sound the user planted themselves — unless they wrote, byte for byte, the
+  command an old version of setup wrote. Those are listed in
+  `domain/setup/retired-hooks.ts` as frozen literals, never derived from what the
+  product does today, because what an old installer wrote is a fact about the
+  past: the day somebody changes a wav, a derived list stops matching and the
+  orphan survives every future `npm run setup`. Retiring a hook of ours means
+  adding its exact command there, never a pattern that could match somebody
+  else's. Covered in `retired-hooks.spec.ts` against both shapes seen in the
+  wild; a change to the merge itself starts in `hook-registration.spec.ts`.
 
 ## What earns a new event at all
 

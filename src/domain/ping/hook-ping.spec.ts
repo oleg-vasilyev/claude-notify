@@ -217,7 +217,12 @@ describe("willCarryOn", () => {
   const AGENT = { type: "subagent", status: "running" };
   const COMMAND = { type: "shell", status: "running" };
   const WATCHER = { type: "monitor", status: "running", server: "an-mcp-server", tool: "subscribe" };
-  const MONITOR_TOOL = { type: "monitor", status: "running", description: "the gate's verdict" };
+  const MONITOR_TOOL = {
+    type: "shell",
+    status: "running",
+    description: "the gate's verdict",
+    command: 'tail -n +1 -F logs/gate.log | grep --line-buffered "^verdict:"',
+  };
 
   it("is true while a subagent runs, since it will hand the turn back itself", () => {
     expect(willCarryOn("Stop", { background_tasks: [AGENT] })).toBe(true);
@@ -227,28 +232,18 @@ describe("willCarryOn", () => {
     expect(willCarryOn("Stop", { background_tasks: [COMMAND] })).toBe(true);
   });
 
-  it("is true while the Monitor tool watches, since it wakes the agent on each event and at its deadline", () => {
+  it("is true while the Monitor tool follows a log, which arrives as a shell and wakes the agent", () => {
     expect(willCarryOn("Stop", { background_tasks: [MONITOR_TOOL] })).toBe(true);
   });
 
-  it("reads a server only on a monitor, so a shell carrying one still holds the turn", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ ...COMMAND, server: "an-mcp-server" }] })).toBe(true);
-  });
-
-  it("is false for a monitor an MCP server holds, which stays armed and hands nothing back", () => {
+  it("is false for a monitor, which stays armed and hands nothing back", () => {
     expect(willCarryOn("Stop", { background_tasks: [WATCHER] })).toBe(false);
   });
 
-  it("reads a monitor naming an empty server as the Monitor tool", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ ...MONITOR_TOOL, server: "" }] })).toBe(true);
-  });
+  it("is false for a monitor whatever server it names, or none", () => {
+    const { server: _none, ...unnamed } = WATCHER;
 
-  it("reads a monitor naming a server that is not text as the Monitor tool", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ ...MONITOR_TOOL, server: 7 }] })).toBe(true);
-  });
-
-  it("is false for a Monitor tool that has stopped watching", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ ...MONITOR_TOOL, status: "completed" }] })).toBe(false);
+    expect(willCarryOn("Stop", { background_tasks: [unnamed] })).toBe(false);
   });
 
   it("is false for a kind nobody has measured, so an unknown task pings rather than silences", () => {
@@ -360,7 +355,6 @@ describe("unfamiliarWork", () => {
           { type: "shell", status: "running" },
           { type: "monitor", status: "running" },
           { type: "monitor", status: "whatever a watcher does" },
-          { type: "monitor", status: "running", server: "an-mcp-server" },
         ],
       })
     ).toEqual([]);
@@ -414,21 +408,32 @@ describe("unfamiliarWork", () => {
 });
 
 describe("monitorsIn", () => {
-  it("names each monitor's server, status and description, so the log can tell the two kinds apart", () => {
+  it("names each monitor's server, status and description, so its shape can be measured", () => {
     expect(
       monitorsIn({
         background_tasks: [
           { type: "monitor", status: "running", server: "an-mcp-server", description: "live updates" },
-          { type: "monitor", status: "running", description: "the gate's verdict" },
+          { type: "monitor", status: "running", description: "page edits" },
         ],
       })
-    ).toEqual(["an-mcp-server | running | live updates", "no server | running | the gate's verdict"]);
+    ).toEqual(["an-mcp-server | running | live updates", "no server | running | page edits"]);
   });
 
   it("stands in for fields that are missing or not text", () => {
     expect(monitorsIn({ background_tasks: [{ type: "monitor", description: 7 }] })).toEqual([
       "no server | no status | ",
     ]);
+  });
+
+  it("reads an empty server, or one that is not text, as no server", () => {
+    expect(
+      monitorsIn({
+        background_tasks: [
+          { type: "monitor", status: "running", server: "", description: "a" },
+          { type: "monitor", status: "running", server: 7, description: "b" },
+        ],
+      })
+    ).toEqual(["no server | running | a", "no server | running | b"]);
   });
 
   it("names nothing but monitors", () => {

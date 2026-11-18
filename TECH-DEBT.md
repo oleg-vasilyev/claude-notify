@@ -163,35 +163,41 @@ appears in a real log.**
 ## The kinds of background work are known only from what has been seen
 
 `willCarryOn` decides whether a turn end is real by matching `type` against
-`subagent`, `shell` and `monitor`. Those three are every kind that has appeared
-in a logged payload — three from seventeen probes across five days.
+`subagent` and `shell`. Those two, plus `monitor`, are every kind that has
+appeared in a logged payload — three from seventeen probes across five days.
 Claude Code's types now name more (`workflow`, `teammate`, `cloud session`,
 `MCP task`) but say nothing about which of them return a turn, so a rename on
 their side still turns ours into unknowns.
 
 **The servers a shell is recognised by are a token list**, in
 `domain/ping/endless-command.ts`. A server it lacks — `npx vite` with no
-subcommand, `node server.js`, `docker logs -f` — holds its session's turn ends
+subcommand, `node server.js`, `python manage.py runserver` — holds its session's turn ends
 until the thirty-minute net rings: late, not lost. Add one when the log shows
 `SOUND turnEnded | the safety net` for a session that was running a server, and
 add the commands that exit beside it in the spec first: every loosening so far
 was caught matching a build. The `command` field has since been measured: the
 first `ENDLESS not counted as work` lines in the real log carry it.
 
-**The two kinds of `monitor` are told apart by a field nobody has logged yet.**
-A monitor naming a `server` is read as an MCP subscription and one without as the
-Monitor tool — from the engine's types alone. The hook writes a `MONITOR` line for
-every monitor it sees; once a published artifact's subscription and an armed
-Monitor tool have each appeared there, the split is measured. If the subscription
-turns out to carry no server, its sessions wait thirty minutes for the net on
-every turn end — the symptom to look for is `SOUND turnEnded | the safety net` in
-a session that published an artifact.
+**A Monitor armed on a server's output rings at once.** The Monitor tool arrives
+as a `shell` carrying its command, so `npm run dev | grep ready` under a Monitor
+looks exactly like a background dev server, though the Monitor's deadline would
+end it. The symptom is a false «закончил ход» next to an `ENDLESS` line whose
+command pipes a server into `grep`. Count the fifth of Monitor calls that do not
+follow a file before acting: if this shape is common, a pipe into `grep` may be
+the tell.
 
-**A persistent Monitor is counted as work and never hands a turn back.** Nothing
-in the payload tells it from one with a deadline, and none of 1,231 measured
-Monitor calls was persistent, so the net covers it. Look for the same symptom in
-a session whose `MONITOR` line describes a session-long watch; the fix then needs
-a field from Claude Code, or a note of when each monitor was first seen.
+**What arrives as `monitor` today is unknown.** August's payloads showed one when
+an artifact was published; the Monitor tool arrives as `shell`. The hook writes a
+`MONITOR` line for every monitor it sees, which is how the next sighting gets
+measured instead of read from a type file — the mistake that cost one phase.
+Delete the line once a few have been seen and the table in `PLAN.md` agrees.
+
+**A persistent Monitor is counted as work and never hands a turn back.** It
+arrives as a shell like any Monitor, nothing in the payload tells it from one
+with a deadline, and none of 1,231 measured Monitor calls was persistent, so the
+net covers it. The symptom is `SOUND turnEnded | the safety net` in a session
+that armed a session-long watch; the fix then needs a field from Claude Code, or
+a note of when each task id was first seen.
 
 The statuses are thinner still: every sighting said `running`, so the rule's
 `status === RUNNING` clause has never been observed doing anything and is the
@@ -202,9 +208,8 @@ urgent. It is also not silent: on every hook event the log names whatever was
 running and was neither counted as work nor deliberately dismissed, as
 `BACKGROUND not counted as work | <type>/<status>`. That covers an unknown kind
 *and* a known kind in an unmeasured status, which is the half that guesses. A
-monitor never appears there, in any status — every one is named by its own
-`MONITOR` line instead, so drop that line only after `BACKGROUND` learns to name a
-Monitor tool in an unmeasured status.
+monitor never appears there; it is judged, not unknown, and has its own `MONITOR`
+line.
 
 **Add a kind when that line names one that should have held the ping** — a false
 ping while an agent was plainly still working is the symptom, and the log line

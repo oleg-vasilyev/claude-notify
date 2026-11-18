@@ -176,36 +176,32 @@ the session will resume on its own:
 | `type` | What it is | Counts as work |
 | --- | --- | --- |
 | `subagent` | an agent working on its own; it finishes and returns a turn | yes |
-| `shell` | a background command; it exits and returns a turn | yes, unless it is a server |
-| `monitor` with no `server` | the Monitor tool: wakes the agent on each event, and at its deadline | yes |
-| `monitor` naming a `server` | an MCP subscription, armed until something disarms it | no |
+| `shell` | a background command, or the Monitor tool watching one; it exits and returns a turn | yes, unless it is a server |
+| `monitor` | a standing watcher an artifact arms, until something disarms it | no |
 
 `status` must be `running` too, since the field carries one and a finished task
 should never hold a ping.
 
-**Two different things arrive as `monitor`, and treating them as one rang a false
-turn end.** The rule above was measured in August on the one an artifact arms — a
-subscription through an MCP server that never hands anything back. Claude Code
-also has a Monitor tool: the agent watches a command's output, is woken on every
-matching line, and is woken once more at its deadline — five minutes by default,
-an hour at most. An agent that started a gate outside the task registry and armed
-a Monitor on its log said «Жду вердикт», ended its turn, and rang «закончил ход»
-a minute before the verdict woke it. The engine's types give `server` (and
-`tool`) only to MCP tasks, so a monitor naming a server is the subscription and
-one without is the tool. That split is read from the types, not a logged payload,
-so the hook logs every monitor it sees as `MONITOR <server> | <status> |
-<description>`; should a subscription arrive without a server after all, the
-thirty-minute net below turns its silence into a late sound, not a lost one.
+**The Monitor tool arrives as a `shell`, not as a `monitor`.** The agent arms it on
+a command — four times in five `tail -f <log> | grep <verdict>` — and is woken on every
+matching line and once more at its deadline: five minutes by default, an hour at
+most, or none if armed `persistent`. Its task in the payload carries that command
+under type `shell`. Measured the hard way: a phase that read the engine's types
+assumed the tool came as `monitor`, taught the rule to count such a monitor as
+work, and the real log then showed no `monitor` at all while two chats rang
+«закончил ход» waiting on a Monitor's `tail -f`. That phase is undone; the hook
+still logs every `monitor` it sees as `MONITOR <server> | <status> |
+<description>`, so the next one has evidence instead of a type file. Of 1,231
+Monitor calls in three weeks none was persistent: 1,008 had a thirty-minute
+deadline and 18 an hour, and the net covers a quiet one past its thirtieth minute.
 
-**A Monitor can also be armed `persistent`, with no deadline at all**, and nothing
-in the payload says so. It would hold every turn end of its session until the net
-rang. Measured over three weeks of transcripts: 1,231 Monitor calls, none
-persistent; 1,008 with a thirty-minute deadline and 18 with an hour. So the rule
-counts the tool as work, and the net covers the two cases it gets wrong — a
-persistent Monitor, and a quiet hour-long one past its thirtieth minute.
+A Monitor armed on a server's own output — `npm run dev | grep ready` — still
+reads as a server, since its task looks exactly like a background `npm run dev`,
+and rings at once. The fifth of Monitor calls that do not follow a file is where
+that hides; it has not been counted.
 
-**A shell that never exits is a subscription wearing a shell's type, and it silenced
-sessions for a day at a time.** A dev server, `wrangler dev`, `tail -F`, a
+**A shell that never exits is a monitor wearing a shell's type, and it silenced
+sessions for a day at a time.** A dev server, `wrangler dev`, a
 `--watch` build: started in the background, used across many turns, and never
 handing anything back. While one ran, every turn end in its session was held —
 the user answered a question nine hours late because the question made no sound.
@@ -213,22 +209,28 @@ Measured over three months of the log: 5,152 turn ends held, 266 of them followe
 by fifteen minutes or more of silence in their session.
 
 Counting time instead would have broken the rule's original promise. Of 552
-background commands in three weeks of transcripts, 46% ran longer than three
+background commands whose end the transcripts recorded, 46% ran longer than three
 minutes and 3% longer than thirty — gates, renders, mutation runs the agent
 genuinely waits on. So a shell is judged by its `command`: one that starts a
-server or follows a file (`npm start`, `pnpm dev`, `wrangler dev`, `next start`,
-`http-server`, `--watch`, `tail -f`) counts as no work, the way a subscription does.
+server (`npm start`, `pnpm dev`, `wrangler dev`, `next start`, `http-server`,
+`--watch`) counts as no work, the way a monitor does.
+
+**Following a file is not a server, though it never exits by itself.** The first
+version counted `tail -f` too, and that rang false the same afternoon it shipped,
+twice: of all 1,909 background Bash calls in three weeks, not one followed a file
+with `tail`, while 1,010 of 1,260 Monitor calls did. A follower only means
+anything inside a Monitor, and the Monitor's deadline ends it.
 
 **It is judged by whole tokens in each segment of the command, never by a
 substring, and never by the prose in `description`.** The first version matched
 patterns anywhere in the text, and a review ran it against commands that exit:
-`npm run check 2>&1 | tail -40; rm -f out.log` read as a follower because a later
-segment carried `-f`; `npm install --save-dev` read as `dev`; `--watch=false` read
+`npm run check 2>&1 | tail -40; rm -f out.log` read as following a file because a
+later segment carried `-f`; `npm install --save-dev` read as `dev`; `--watch=false` read
 as `--watch`; a description saying "against the dev server" read as a server.
 Each of those would have rung a false «закончил ход» during the very builds the
 rule exists to stay quiet for. So the command is split on `&&`, `||`, `;`, `|`
 and `&`; a package runner counts only when a whole token before `--` is `start`,
-`dev`, `serve` or `preview`; `tail` counts only with a follow flag of its own.
+`dev`, `serve` or `preview`.
 A miss costs a late sound and a false match costs a false one, so the list leans
 to missing.
 

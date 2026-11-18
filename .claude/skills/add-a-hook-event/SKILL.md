@@ -39,7 +39,15 @@ to a path the model controls: it already decided the ping was worth sending.
 ## What the payload actually contains
 
 Do not trust the documentation, and do not trust this file either — read the
-log. Every hook writes its payload to `~/.claude/claude-notify/log.txt`
+log. **The engine's own `.d.ts` is documentation too.** Its `BackgroundTaskSummary`
+said a monitor carries `server` only for MCP tasks, so a phase taught the rule
+that a monitor without one was the Monitor tool — and the real log then showed
+the Monitor tool arriving as a `shell`, never a `monitor`. A type file says which
+fields can exist; only a logged payload says which one your case arrives as. When
+a rule rests on a shape nobody has logged, ship the log line that measures it in
+the same phase, and say in `PLAN.md` that the rule is unmeasured.
+
+Every hook writes its payload to `~/.claude/claude-notify/log.txt`
 (truncated to 400 characters), which is the only honest record of what Claude
 Code sends. That log is how we learned `Notification` never fires in the desktop
 app, and how the shape of `tool_input.questions` was confirmed.

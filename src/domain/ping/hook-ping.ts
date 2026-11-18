@@ -14,7 +14,7 @@ const TURN_END_RATE_LIMIT_MINUTES = 10;
 const QUESTION_RATE_LIMIT_MINUTES = 2;
 const LONGEST_QUOTED_QUESTION = 180;
 const ELLIPSIS = "…";
-const WORK_THAT_HANDS_THE_TURN_BACK = ["subagent", "shell", "monitor"];
+const WORK_THAT_HANDS_THE_TURN_BACK = ["subagent", "shell"];
 const SHELL = "shell";
 const MONITOR = "monitor";
 const NO_SERVER = "no server";
@@ -45,13 +45,9 @@ const endlessCommandOf = (task: BackgroundTask): string[] =>
 const serverOf = (task: BackgroundTask): string | null =>
   typeof task.server === "string" && task.server !== "" ? task.server : null;
 
-const isASubscription = (task: BackgroundTask): boolean =>
-  task.type === MONITOR && serverOf(task) !== null;
-
 const carriesOn = (task: BackgroundTask): boolean =>
   task.status === RUNNING &&
   WORK_THAT_HANDS_THE_TURN_BACK.includes(task.type ?? NO_FIELD) &&
-  !isASubscription(task) &&
   endlessCommandOf(task).length === 0;
 
 const wasJudged = (task: BackgroundTask): boolean =>

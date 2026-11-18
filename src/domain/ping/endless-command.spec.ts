@@ -27,12 +27,17 @@ describe("commandNeverExits", () => {
     "python -m http.server 8000",
     "npx tsc --watch",
     "npx vitest --watch",
-    "tail -f server.log",
-    "tail -n +1 -F build.log",
-    "tail --follow=name server.log",
-    "tail --follow server.log",
   ])("knows %s never exits", (command) => {
     expect(commandNeverExits(command)).toBe(true);
+  });
+
+  it.each([
+    "tail -f server.log",
+    "tail -n +1 -F build.log | grep --line-buffered -E \"^verdict:|failed\"",
+    'L=logs/gate.log; until [ -f "$L" ]; do sleep 1; done; tail -n +1 -f "$L" | grep --line-buffered "^verdict:"',
+    "tail --follow=name server.log",
+  ])("lets %s exit, since a follower only runs inside the Monitor tool, which has a deadline", (command) => {
+    expect(commandNeverExits(command)).toBe(false);
   });
 
   it.each([

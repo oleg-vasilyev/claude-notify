@@ -203,3 +203,13 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    access, and one such line in `pending.jsonl` strands the whole queue with no
    log line at all. Malformed is two categories, not one: **what will not parse,
    and what parses into something that is not the shape.**
+7. **When the subject classifies strings from the wild, has it been run over the
+   real ones?** A fixture list written by hand holds the cases its author already
+   thought of, so the negatives never carry the trap. The rule that tells a dev
+   server from a build first matched substrings, and its "exits" fixtures —
+   `npm run check`, `sleep 180` — contained none of its own trigger words; a
+   review then found `| tail -40; rm -f`, `--save-dev` and `--watch=false` all
+   read as servers. Six hundred real background commands were sitting in the
+   transcripts the whole time. Run the classifier over the corpus, read every
+   positive, and lift the surprises into the spec — the rewritten rule called
+   143 of 648 servers and every one of them was.

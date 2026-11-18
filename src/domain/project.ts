@@ -34,6 +34,8 @@ export const withMachineLabel = (message: string, machineLabel: string): string 
   return `[${machineLabel}] ${message}`;
 };
 
+export const bracketPrefixOf = (message: string): string => ANY_PREFIX.exec(message)?.[0] ?? "";
+
 export const underProject = (message: string, projectPrefix: string): string =>
   projectPrefix === "" ? message : `${projectPrefix}${message.replace(ANY_PREFIX, "")}`;
 

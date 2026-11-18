@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  bracketPrefixOf,
   EVERY_PROJECT,
   projectKeyOf,
   projectPrefixOf,
@@ -8,6 +9,16 @@ import {
   withMachineLabel,
 } from "#domain/project.ts";
 
+
+describe("bracketPrefixOf", () => {
+  it("takes the labelled prefix with the space after it", () => {
+    expect(bracketPrefixOf("[a-project@home] закончил ход")).toBe("[a-project@home] ");
+  });
+
+  it("finds none in a message that does not open with a bracket", () => {
+    expect(bracketPrefixOf("закончил ход [a-project]")).toBe("");
+  });
+});
 
 describe("underProject", () => {
   const WORKING_IN = "[a-project] ";

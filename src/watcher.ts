@@ -13,7 +13,7 @@ import {
 import { mayGoOut, wallToCheck } from "#domain/ping/session-activity.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
-import { DELIVERY, readConfig } from "#state/config.ts";
+import { DELIVERY, readConfig, type Config } from "#state/config.ts";
 import { readLastSent } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending, clearPending, readPending } from "#state/pending-queue.ts";
@@ -22,6 +22,7 @@ import { toolHasAnswered } from "#state/session-transcript.ts";
 import { claimWatcherLock, releaseWatcherLock } from "#state/watcher-lock.ts";
 import { ANSWERING_OUTCOME, collectAnswers, type AnsweringOutcome } from "#app/answering.ts";
 import { deliver } from "#app/deliver.ts";
+import { settleHeldTurnEnds } from "#app/safety-net.ts";
 import { watcherIsRunning } from "#app/watcher-process.ts";
 
 
@@ -40,11 +41,7 @@ if (watcherIsRunning()) {
 
 const config = readConfig();
 
-if (config === null) {
-  process.exit(0);
-}
-
-const telegram = config.delivery.kind === DELIVERY.telegram ? config.delivery : null;
+const telegram = config?.delivery.kind === DELIVERY.telegram ? config.delivery : null;
 
 claimWatcherLock(process.pid);
 log(`WATCHER started (pid ${process.pid})`);
@@ -109,7 +106,7 @@ const whyDropped = (dropped: DroppedPing): string => {
   }
 };
 
-const flush = async (idleNow: number): Promise<void> => {
+const flush = async (config: Config, idleNow: number): Promise<void> => {
   const now = Date.now();
   const pending = readPending();
 
@@ -148,17 +145,18 @@ try {
   const deadline = Date.now() + GIVE_UP_AFTER_MS;
 
   while (Date.now() < deadline) {
+    const holding = await settleHeldTurnEnds(Date.now());
     const asked = telegram === null ? 0 : readAskedQuestions().length;
-    const queued = readPending().length > 0;
+    const queued = config !== null && readPending().length > 0;
 
-    if (asked === 0 && !queued) {
+    if (asked === 0 && !queued && !holding) {
       break;
     }
 
     const idleNow = idleSeconds();
 
-    if (queued && idleNow >= config.minIdleMinutes * SECONDS_PER_MINUTE) {
-      await flush(idleNow);
+    if (config !== null && queued && idleNow >= config.minIdleMinutes * SECONDS_PER_MINUTE) {
+      await flush(config, idleNow);
     }
 
     if (telegram !== null && asked > 0) {

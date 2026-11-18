@@ -12,6 +12,7 @@ import {
 import { decideDelivery, DELIVERY_VERDICT, worthAnotherTry } from "#domain/ping/delivery.ts";
 import { impossible } from "#domain/impossible.ts";
 import { PING_OUTCOME, type PingOutcome } from "#domain/ping/ping-tool.ts";
+import { withChatTitle } from "#domain/ping/chat-title.ts";
 import { projectKeyOf, withMachineLabel } from "#domain/project.ts";
 import { readoutFor } from "#domain/ping/usage.ts";
 import { messageWith } from "#domain/telegram-html.ts";
@@ -22,6 +23,8 @@ import { readLastSent, writeLastSent } from "#state/last-sent.ts";
 import { rememberedUsage, rememberUsage } from "#state/last-usage.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
+import { readSessionNote } from "#state/session-note.ts";
+import { readChatTitle } from "#state/session-transcript.ts";
 import { pictureBytes, sendPicture } from "#telegram/picture.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
 import { fetchUsage } from "#usage/usage-api.ts";
@@ -126,6 +129,14 @@ const limitsBlock = async (): Promise<string> => {
   return readout.block;
 };
 
+const chatTitleOf = (sessionId: string | null): string | null => {
+  const transcriptPath = sessionId === null ? null : readSessionNote(sessionId)?.transcriptPath;
+
+  return transcriptPath === null || transcriptPath === undefined
+    ? null
+    : readChatTitle(transcriptPath);
+};
+
 const whenTheSendFailed = (
   why: string,
   request: PingRequest,
@@ -226,8 +237,9 @@ export const deliver = async (request: PingRequest): Promise<PingResult> => {
       return impossible(verdict);
   }
 
+  const titled = withChatTitle(message, chatTitleOf(request.sessionId ?? null));
   const block = config.includeUsage ? await limitsBlock() : "";
-  const text = messageWith(message, block);
+  const text = messageWith(titled, block);
 
   let carriedPicture: Attachment | null;
 
@@ -238,7 +250,7 @@ export const deliver = async (request: PingRequest): Promise<PingResult> => {
   }
 
   const carried = wasAttached(carriedPicture) ? `picture ${carriedPicture.name}` : "";
-  const written = [message, block, carried].filter((part) => part !== "").join(" | ");
+  const written = [titled, block, carried].filter((part) => part !== "").join(" | ");
 
   writeLastSent(project, { at: Date.now(), message });
   log(`${sentVia(config.delivery)} | ${written.replaceAll("\n", " | ")}`);

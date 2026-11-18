@@ -165,8 +165,19 @@ appears in a real log.**
 `willCarryOn` decides whether a turn end is real by matching `type` against
 `subagent` and `shell`. Those two, plus `monitor`, are every kind that has
 appeared in a logged payload — three from seventeen probes across five days.
-Claude Code documents none of them, so the list is a measurement with no promise
-behind it, and a rename on their side turns both of ours into unknowns.
+Claude Code's types now name more (`workflow`, `teammate`, `cloud session`,
+`MCP task`) but say nothing about which of them return a turn, so a rename on
+their side still turns ours into unknowns.
+
+**The servers a shell is recognised by are a token list**, in
+`domain/ping/endless-command.ts`. A server it lacks — `npx vite` with no
+subcommand, `node server.js`, `docker logs -f` — holds its session's turn ends
+until the thirty-minute net rings: late, not lost. Add one when the log shows
+`SOUND turnEnded | the safety net` for a session that was running a server, and
+add the commands that exit beside it in the spec first: every loosening so far
+was caught matching a build. The `command` field itself is taken from the
+engine's types rather than a logged payload, so the first `ENDLESS not counted as
+work` line in the real log is the measurement still owed.
 
 The statuses are thinner still: every sighting said `running`, so the rule's
 `status === RUNNING` clause has never been observed doing anything and is the

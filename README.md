@@ -145,6 +145,9 @@ Everything the notifier decides is one line in
 | `HOOK <event>` | a Claude Code hook fired, with its payload and the entrypoint that ran it |
 | `SOUND <which>` | this machine made a noise: `turnEnded` when a turn really ended, `waitingOnYou` for a question or a permission mid-turn |
 | `SKIP a session a script is running` | the hooks fired for a scripted session — no person is waiting, so the mechanical ping stays home |
+| `SKIP the turn ended but the agent will carry on` | an agent or a command is still running and will resume the session; the turn end is held, and rings after thirty quiet minutes |
+| `SOUND turnEnded \| the safety net` | a held turn end rang, because nothing happened in its session for thirty minutes |
+| `ENDLESS not counted as work` | a server or a follower was running; it never resumes a session, so it does not hold the turn end back |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
 | `WARN usage unavailable: <why>` | the limits line was skipped and the reason named; the ping itself went out |
@@ -178,7 +181,10 @@ src/domain/     every decision, pure — no files, no network, no clock
   written-number.ts a number somebody typed into a settings file
   ping/         what to say, and whether to say it now
     attachment.ts     whether a picture can go, and what to say when it cannot
+    chat-title.ts     the chat's title, found in its transcript and put in a ping
     delivery.ts       send, queue or skip, and whether a refusal is worth retrying
+    endless-command.ts whether a background command is a server that never exits
+    held-turn-end.ts  a turn end held for background work, and when it rings anyway
     hook-ping.ts      what each Claude Code event has to say
     hook-sound.ts     which sound an event deserves, and which gets none
     pending.ts        which queued pings may go now, and which one wins per project
@@ -201,12 +207,13 @@ src/state/      what this product remembers between runs
   asked-question.ts the question a hook waits on, and the answer it waits for
   config.ts         the settings, read from .env
   file-locations.ts every path it reads or writes, ours and Claude Code's
+  held-turn-end-files.ts the turn ends held back, one file per session
   last-sent.ts      what each project last said, and when
   last-usage.ts     the newest limits reading, kept for when the endpoint refuses
   log.ts            the one log file every decision lands in
   pending-queue.ts  pings held back while you were at the keyboard
   session-note.ts   what each session was last seen doing
-  session-transcript.ts whether a tool call has been answered in a session's record
+  session-transcript.ts whether a tool call was answered, and the chat's title
   update-offset.ts  how far the watcher has read Telegram
   watcher-lock.ts   who is delivering the queue right now
 src/presence/idle-time.ts   how long since you touched anything (win32 via koffi)
@@ -221,11 +228,12 @@ src/usage/usage-api.ts       the account's own limit windows
 src/deliver.ts          the funnel every ping goes through
 src/ask.ts              the funnel a question goes through, and waits in
 src/answering.ts        reading Telegram for answers, for the watcher
+src/safety-net.ts       ringing for a held turn end once its session went quiet
 src/watcher-process.ts  is a watcher running, and starting one that outlives us
 src/hook.ts     entry point: one Claude Code event
 src/notify.ts   entry point: one ping, by hand or from the ping tool
 src/mcp.ts      entry point: the ping tool the model sees, over MCP on stdio
-src/watcher.ts  entry point: delivers what presence held back, and collects answers
+src/watcher.ts  entry point: delivers what presence held back, rings for held turn ends, collects answers
 src/relay.ts    entry point: the resident forwarder, for other machines
 src/setup.ts    entry point: the installer
 ```

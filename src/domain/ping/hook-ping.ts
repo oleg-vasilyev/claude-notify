@@ -5,6 +5,7 @@ import {
   type HookEvent,
   type HookPayload,
 } from "#domain/hook-event.ts";
+import { commandNeverExits } from "#domain/ping/endless-command.ts";
 import { projectPrefixOf } from "#domain/project.ts";
 
 
@@ -14,8 +15,10 @@ const LONGEST_QUOTED_QUESTION = 180;
 const ELLIPSIS = "…";
 const WORK_THAT_HANDS_THE_TURN_BACK = ["subagent", "shell"];
 const WORK_THAT_WAITS_ON_SOMETHING_ELSE = ["monitor"];
+const SHELL = "shell";
 const RUNNING = "running";
 const NO_FIELD = "";
+const LONGEST_FAILURE_REASON = 120;
 
 export type HookPing = {
   message: string;
@@ -28,14 +31,29 @@ const asTask = (candidate: unknown): BackgroundTask =>
 const tasksIn = (payload: HookPayload): BackgroundTask[] =>
   Array.isArray(payload.background_tasks) ? payload.background_tasks.map(asTask) : [];
 
+const endlessCommandOf = (task: BackgroundTask): string[] =>
+  task.status === RUNNING &&
+  task.type === SHELL &&
+  typeof task.command === "string" &&
+  commandNeverExits(task.command)
+    ? [task.command]
+    : [];
+
 const carriesOn = (task: BackgroundTask): boolean =>
-  task.status === RUNNING && WORK_THAT_HANDS_THE_TURN_BACK.includes(task.type ?? NO_FIELD);
+  task.status === RUNNING &&
+  WORK_THAT_HANDS_THE_TURN_BACK.includes(task.type ?? NO_FIELD) &&
+  endlessCommandOf(task).length === 0;
 
 const wasJudged = (task: BackgroundTask): boolean =>
-  WORK_THAT_WAITS_ON_SOMETHING_ELSE.includes(task.type ?? NO_FIELD) || carriesOn(task);
+  WORK_THAT_WAITS_ON_SOMETHING_ELSE.includes(task.type ?? NO_FIELD) ||
+  carriesOn(task) ||
+  endlessCommandOf(task).length > 0;
 
 export const willCarryOn = (event: HookEvent, payload: HookPayload): boolean =>
   event === HOOK_EVENT.stop && tasksIn(payload).some(carriesOn);
+
+export const endlessWork = (payload: HookPayload): string[] =>
+  tasksIn(payload).flatMap(endlessCommandOf);
 
 export const unfamiliarWork = (payload: HookPayload): string[] => [
   ...new Set(
@@ -51,12 +69,12 @@ export const nobodyIsWatching = (entrypoint: string | undefined): boolean =>
   entrypoint !== undefined && entrypoint.startsWith(SCRIPT_RUNS_IT);
 
 
-const shortened = (text: string): string => {
-  if (text.length <= LONGEST_QUOTED_QUESTION) {
+const shortened = (text: string, longest: number): string => {
+  if (text.length <= longest) {
     return text;
   }
 
-  return `${text.slice(0, LONGEST_QUOTED_QUESTION - ELLIPSIS.length)}${ELLIPSIS}`;
+  return `${text.slice(0, longest - ELLIPSIS.length)}${ELLIPSIS}`;
 };
 
 const whatIsBeingAsked = (payload: HookPayload, quoting: boolean): string | undefined => {
@@ -74,8 +92,18 @@ const whatIsBeingAsked = (payload: HookPayload, quoting: boolean): string | unde
     return undefined;
   }
 
-  return shortened(copy.question(asked));
+  return shortened(copy.question(asked), LONGEST_QUOTED_QUESTION);
 };
+
+const whyTheTurnFailed = (payload: HookPayload): string =>
+  typeof payload.error === "string" && payload.error !== ""
+    ? copy.turnFailedWith(shortened(payload.error, LONGEST_FAILURE_REASON))
+    : copy.turnFailed;
+
+export const turnEndPing = (payload: HookPayload): HookPing => ({
+  message: projectPrefixOf(payload.cwd) + copy.turnEnded,
+  rateLimitMinutes: TURN_END_RATE_LIMIT_MINUTES,
+});
 
 export const pingFor = (
   event: HookEvent,
@@ -89,8 +117,11 @@ export const pingFor = (
       return null;
 
     case HOOK_EVENT.stop:
+      return turnEndPing(payload);
+
+    case HOOK_EVENT.stopFailure:
       return {
-        message: project + copy.turnEnded,
+        message: project + whyTheTurnFailed(payload),
         rateLimitMinutes: TURN_END_RATE_LIMIT_MINUTES,
       };
 

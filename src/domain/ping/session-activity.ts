@@ -37,6 +37,7 @@ export const activityAfter = (event: HookEvent, payload: HookPayload): SessionAc
       return { kind: SESSION_ACTIVITY.working };
 
     case HOOK_EVENT.stop:
+    case HOOK_EVENT.stopFailure:
     case HOOK_EVENT.notification:
       return { kind: SESSION_ACTIVITY.waitingAtTurnEnd };
 

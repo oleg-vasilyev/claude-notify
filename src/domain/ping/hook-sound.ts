@@ -15,6 +15,7 @@ export const soundFor = (event: HookEvent, payload: HookPayload): Sound | null =
       return null;
 
     case HOOK_EVENT.stop:
+    case HOOK_EVENT.stopFailure:
       return SOUND.turnEnded;
 
     case HOOK_EVENT.preToolUse:

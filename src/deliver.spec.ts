@@ -8,6 +8,8 @@ import { readConfig, type Config } from "#state/config.ts";
 import { readLastSent, writeLastSent } from "#state/last-sent.ts";
 import { log } from "#state/log.ts";
 import { appendPending } from "#state/pending-queue.ts";
+import { readSessionNote } from "#state/session-note.ts";
+import { readChatTitle } from "#state/session-transcript.ts";
 import { pictureBytes, sendPicture } from "#telegram/picture.ts";
 import { sendMessage } from "#telegram/telegram-api.ts";
 import { rememberedUsage, rememberUsage } from "#state/last-usage.ts";
@@ -33,6 +35,8 @@ vi.mock("#app/watcher-process.ts", () => ({
   watcherIsRunning: vi.fn(),
 }));
 vi.mock("#telegram/picture.ts", () => ({ pictureBytes: vi.fn(), sendPicture: vi.fn() }));
+vi.mock("#state/session-note.ts", () => ({ readSessionNote: vi.fn() }));
+vi.mock("#state/session-transcript.ts", () => ({ readChatTitle: vi.fn() }));
 
 const AWAY_SECONDS = 600;
 const PRESENT_SECONDS = 5;
@@ -72,7 +76,104 @@ describe("deliver", () => {
     vi.mocked(relayMessage).mockResolvedValue(undefined);
     vi.mocked(sendPicture).mockResolvedValue(undefined);
     vi.mocked(pictureBytes).mockReturnValue(A_SMALL_PICTURE);
+    vi.mocked(readSessionNote).mockReturnValue(null);
+    vi.mocked(readChatTitle).mockReturnValue(null);
     process.exitCode = undefined;
+  });
+
+  describe("naming the chat", () => {
+    const SESSION = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const TRANSCRIPT = "C:\\Users\\someone\\.claude\\projects\\a-project\\session.jsonl";
+
+    beforeEach(() => {
+      vi.mocked(readSessionNote).mockReturnValue({
+        activity: { kind: "waiting-at-turn-end" },
+        transcriptPath: TRANSCRIPT,
+        at: 0,
+      });
+      vi.mocked(readChatTitle).mockReturnValue("Разбор логов");
+    });
+
+    it("puts the chat's title after the project, so a ping says which conversation it is", async () => {
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] «Разбор логов» жду апрув");
+    });
+
+    it("reads the title from the transcript the session's note points at", async () => {
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(readSessionNote).toHaveBeenCalledWith(SESSION);
+      expect(readChatTitle).toHaveBeenCalledWith(TRANSCRIPT);
+    });
+
+    it("queues the message untitled, so the title is read again when it finally goes", async () => {
+      vi.mocked(idleSeconds).mockReturnValue(PRESENT_SECONDS);
+
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(readChatTitle).not.toHaveBeenCalled();
+      expect(appendPending).toHaveBeenCalledWith({
+        queuedAt: expect.any(Number),
+        message: "[a-project@home] жду апрув",
+        sessionId: SESSION,
+      });
+    });
+
+    it("remembers what it said untitled, so a queued repeat still compares like with like", async () => {
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(writeLastSent).toHaveBeenCalledWith("a-project", {
+        at: expect.any(Number),
+        message: "[a-project@home] жду апрув",
+      });
+    });
+
+    it("logs the message as it was sent, title and all", async () => {
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(log).toHaveBeenCalledWith("SENT | [a-project@home] «Разбор логов» жду апрув");
+    });
+
+    it("puts a failed send back in the queue untitled", async () => {
+      vi.mocked(sendMessage).mockRejectedValue(new Error("fetch failed"));
+
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(appendPending).toHaveBeenCalledWith({
+        queuedAt: expect.any(Number),
+        message: "[a-project@home] жду апрув",
+        sessionId: SESSION,
+      });
+    });
+
+    it("leaves the message alone when the session has no note to find the transcript by", async () => {
+      vi.mocked(readSessionNote).mockReturnValue(null);
+
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(readChatTitle).not.toHaveBeenCalled();
+      expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
+    });
+
+    it("leaves the message alone when the note never learned its transcript", async () => {
+      vi.mocked(readSessionNote).mockReturnValue({
+        activity: { kind: "working" },
+        transcriptPath: null,
+        at: 0,
+      });
+
+      await deliver({ ...ping, sessionId: SESSION });
+
+      expect(readChatTitle).not.toHaveBeenCalled();
+    });
+
+    it("does not look anything up for a ping that names no session", async () => {
+      await deliver(ping);
+
+      expect(readSessionNote).not.toHaveBeenCalled();
+      expect(sendMessage).toHaveBeenCalledWith("T", "42", "[a-project@home] жду апрув");
+    });
   });
 
   it("sends the ping once the user is away", async () => {

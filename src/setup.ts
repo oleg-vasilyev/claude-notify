@@ -89,6 +89,7 @@ const askCommand = (event: HookEvent): HookCommand => ({
 
 const REGISTRATIONS: Registration[] = [
   { event: HOOK_EVENT.stop, command: pingCommand(HOOK_EVENT.stop) },
+  { event: HOOK_EVENT.stopFailure, command: pingCommand(HOOK_EVENT.stopFailure) },
   { event: HOOK_EVENT.notification, command: pingCommand(HOOK_EVENT.notification) },
   {
     event: HOOK_EVENT.preToolUse,

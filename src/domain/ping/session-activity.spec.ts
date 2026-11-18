@@ -67,6 +67,26 @@ describe("activityAfter", () => {
     expect(activityAfter("Stop", watched)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
   });
 
+  it("reads a turn that ended with only a server running as waiting, since a server never exits", () => {
+    const serving: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "shell", status: "running", command: "pnpm dev" }],
+    };
+
+    expect(activityAfter("Stop", serving)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
+  });
+
+  it("reads a failed turn as a session waiting for the user, even with an agent still running", () => {
+    const failedWhileBusy: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "subagent", status: "running" }],
+    };
+
+    expect(activityAfter("StopFailure", failedWhileBusy)).toEqual({
+      kind: SESSION_ACTIVITY.waitingAtTurnEnd,
+    });
+  });
+
   it("survives a wall whose payload names no tool call", () => {
     expect(activityAfter("PermissionRequest", {})).toEqual({
       kind: SESSION_ACTIVITY.waitingOnAWall,

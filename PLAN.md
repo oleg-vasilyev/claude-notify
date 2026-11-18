@@ -37,6 +37,7 @@ Two sources, deliberately redundant:
 | Event | Fires when | Message | Sound |
 | --- | --- | --- | --- |
 | `Stop` | the turn ended; the ball is in the user's court | `закончил ход, ждёт тебя` | turn ended |
+| `StopFailure` | an API error ended the turn instead — `Stop` does not fire then | `ход упал с ошибкой: <error>` | turn ended |
 | `PreToolUse` on `AskUserQuestion` | a question dialog opened mid-turn | `вопрос: <the question itself>` | waiting |
 | `PreToolUse` on `ExitPlanMode` | a plan awaits approval mid-turn | `план готов, жду апрув` | waiting |
 | `PermissionRequest` | a permission prompt is about to show | `просит разрешение: <tool>` | waiting, unless `PreToolUse` owns the tool |
@@ -46,6 +47,28 @@ Two sources, deliberately redundant:
 The mid-turn events matter because `Stop` cannot see them: a question dialog or
 a permission prompt suspends the turn without ending it. All four have now been
 observed firing in the desktop app; `Notification` alone never has.
+
+**`StopFailure` exists because a failed turn is silent otherwise.** Claude Code
+fires it *instead of* `Stop` when the turn dies on an API error — a rate limit, an
+overloaded server, a refused credential — so before it was registered such a turn
+made no sound at all while the session sat waiting. Its payload names the reason
+in `error`, and the message carries it when it is a string. A turn the user
+interrupts fires neither, which is right: they are already looking.
+
+**Every ping names the chat it came from** once the chat has a title, right after
+the bracket — `[a-project@home] «Разбор логов» закончил ход` —
+because the bracket names a folder, and several chats share one. The title is
+read in `deliver` from the last `custom-title` record in the session's transcript,
+found through the session's note; so the model's own pings get it too. The record
+is rewritten every few turns, so the last two megabytes of a transcript hold it —
+measured on a 57 MB one, where the widest gap between two was 1.4 MB.
+
+**The title goes on at the moment of sending and nowhere earlier.** The queue, a
+retry and the last-sent stamp all keep the message untitled, so the queue's repeat
+check compares like with like, a queued ping cannot be named twice on its way back
+through the funnel, and a chat renamed while its ping waited is named as it is
+now. Outside the bracket it leaves the project key, and with it the rate limit,
+untouched.
 
 **The two answerable events do not take the same answer.** `PreToolUse` reads
 `hookSpecificOutput.permissionDecision` with a reason beside it; `PermissionRequest`
@@ -153,11 +176,65 @@ kinds mean the session will resume on its own:
 | `type` | What it is | Counts as work |
 | --- | --- | --- |
 | `subagent` | an agent working on its own; it finishes and returns a turn | yes |
-| `shell` | a background command; it exits and returns a turn | yes |
+| `shell` | a background command; it exits and returns a turn | yes, unless it is a server |
 | `monitor` | a standing watcher, armed until something disarms it | no |
 
 `status` must be `running` too, since the field carries one and a finished task
 should never hold a ping.
+
+**A shell that never exits is a monitor wearing a shell's type, and it silenced
+sessions for a day at a time.** A dev server, `wrangler dev`, `tail -F`, a
+`--watch` build: started in the background, used across many turns, and never
+handing anything back. While one ran, every turn end in its session was held —
+the user answered a question nine hours late because the question made no sound.
+Measured over three months of the log: 5,152 turn ends held, 266 of them followed
+by fifteen minutes or more of silence in their session.
+
+Counting time instead would have broken the rule's original promise. Of 552
+background commands in three weeks of transcripts, 46% ran longer than three
+minutes and 3% longer than thirty — gates, renders, mutation runs the agent
+genuinely waits on. So a shell is judged by its `command`: one that starts a
+server or follows a file (`npm start`, `pnpm dev`, `wrangler dev`, `next start`,
+`http-server`, `--watch`, `tail -f`) counts as no work, the way a monitor does.
+
+**It is judged by whole tokens in each segment of the command, never by a
+substring, and never by the prose in `description`.** The first version matched
+patterns anywhere in the text, and a review ran it against commands that exit:
+`npm run check 2>&1 | tail -40; rm -f out.log` read as a follower because a later
+segment carried `-f`; `npm install --save-dev` read as `dev`; `--watch=false` read
+as `--watch`; a description saying "against the dev server" read as a server.
+Each of those would have rung a false «закончил ход» during the very builds the
+rule exists to stay quiet for. So the command is split on `&&`, `||`, `;`, `|`
+and `&`; a package runner counts only when a whole token before `--` is `start`,
+`dev`, `serve` or `preview`; `tail` counts only with a follow flag of its own.
+A miss costs a late sound and a false match costs a false one, so the list leans
+to missing.
+
+The `command` field comes from the engine's own published types, not from a
+logged payload — the log cuts a payload at 400 characters, before
+`background_tasks` — so the hook logs every command it dismisses as `ENDLESS not
+counted as work | <command>`, and the first such line in the real log is the
+measurement.
+
+**And a held turn end is not forgotten: after thirty minutes of silence it rings
+anyway.** The word list will miss a server somebody names differently, and an
+agent can hang. So every held `Stop` is written down beside the session's note,
+with the ping it would have sent. The watcher checks it on every poll: anything
+newer in that session — a prompt, a question, another turn end — supersedes it;
+thirty minutes with nothing makes the sound and sends the ping through the usual
+funnel, then marks the session as waiting so a queued ping for it may go out.
+The ping counts as raised when it rings, not when the turn was held — a hold is
+thirty minutes old by construction, and the queue's staleness rule would drop it
+before its first retry. A machine with no Telegram settings still gets the sound:
+the watcher keeps running for the holds when it has no queue to deliver.
+Thirty, not three, by the same measurement: only 3% of background commands and
+two of 619 agents outlive it, so the net is almost never a false alarm. The cost
+is a late sound for whatever the list misses — a sound thirty minutes late beats
+the nine hours it replaces.
+
+A task notification arrives as a `UserPromptSubmit`, indistinguishable in the
+log from the user typing — which is why the log alone could not say how many held
+turn ends were real waits, and the transcripts were measured instead.
 
 **Anything unmeasured counts as no work, and pings** — a fourth kind, an
 unmeasured status, a task that is not an object, a `background_tasks` that is not
@@ -386,7 +463,7 @@ being logged:
 
 | The session last did this | It is | A ping from it |
 | --- | --- | --- |
-| ended a turn (`Stop`) | waiting for the user | goes out |
+| ended a turn (`Stop`, `StopFailure`) | waiting for the user | goes out |
 | took a prompt (`UserPromptSubmit`) | working | waits its turn |
 | hit a permission or a question | standing at a wall | goes out while the wall stands |
 
@@ -569,7 +646,7 @@ threshold is the knob if it ever is not.
    ping is sent rather than swallowed — a false ping costs a glance, a
    swallowed one costs hours.
 7. **Every outcome is one log line** — `SENT`, `QUEUED`, `RETRY`, `SKIP`,
-   `DROP`, `WARN`, `ERROR`, `BACKGROUND`, `RELAY`, `HOOK`, `WATCHER` — because
+   `DROP`, `WARN`, `ERROR`, `BACKGROUND`, `ENDLESS`, `RELAY`, `HOOK`, `WATCHER` — because
    the first real debugging session was blind without it.
 8. **The OAuth token is read, never written, never logged, never refreshed.**
    It appears in exactly one function, lives in one local variable, and leaves

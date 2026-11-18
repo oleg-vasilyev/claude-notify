@@ -1,5 +1,6 @@
 export const HOOK_EVENT = {
   stop: "Stop",
+  stopFailure: "StopFailure",
   preToolUse: "PreToolUse",
   permissionRequest: "PermissionRequest",
   notification: "Notification",
@@ -13,6 +14,8 @@ export type HookEvent = (typeof HOOK_EVENT)[keyof typeof HOOK_EVENT];
 export type BackgroundTask = {
   type?: string;
   status?: string;
+  command?: unknown;
+  description?: unknown;
 };
 
 export type HookPayload = {
@@ -23,6 +26,7 @@ export type HookPayload = {
   session_id?: string;
   tool_use_id?: string;
   background_tasks?: unknown;
+  error?: unknown;
   tool_input?: {
     questions?: {
       question?: string;

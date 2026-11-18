@@ -1,5 +1,8 @@
 export const copy = {
   turnEnded: "закончил ход, ждёт тебя",
+  turnFailed: "ход упал с ошибкой",
+  turnFailedWith: (reason: string) => `ход упал с ошибкой: ${reason}`,
+  chatTitle: (title: string) => `«${title}»`,
   planReady: "план готов, жду апрув",
   question: (asked: string) => `вопрос: ${asked}`,
   awaitingAnswer: "ждёт твоего ответа",

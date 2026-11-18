@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
 import {
+  endlessWork,
   nobodyIsWatching,
   pingFor as maybePing,
   unfamiliarWork,
@@ -67,6 +68,40 @@ describe("nobodyIsWatching", () => {
 describe("pingFor", () => {
   it("says nothing when the user submits a prompt — that event only records that work resumed", () => {
     expect(maybePing("UserPromptSubmit", inProject, QUOTING)).toBeNull();
+  });
+
+  it("says the turn failed, and why, when an API error ended it", () => {
+    expect(pingFor("StopFailure", { ...inProject, error: "rate_limit" }, QUOTING).message).toBe(
+      "[another-project] ход упал с ошибкой: rate_limit"
+    );
+  });
+
+  it("still says the turn failed when the payload gave no usable reason", () => {
+    expect(pingFor("StopFailure", { ...inProject, error: "" }, QUOTING).message).toBe(
+      "[another-project] ход упал с ошибкой"
+    );
+    expect(pingFor("StopFailure", { ...inProject, error: { code: 529 } }, QUOTING).message).toBe(
+      "[another-project] ход упал с ошибкой"
+    );
+  });
+
+  it("shortens a failure reason that would not fit a notification", () => {
+    const LONGEST_FAILURE_REASON = 120;
+    const rambling = "x".repeat(LONGEST_FAILURE_REASON + 1);
+    const message = pingFor("StopFailure", { error: rambling }, QUOTING).message;
+
+    expect(message).toBe(`ход упал с ошибкой: ${"x".repeat(LONGEST_FAILURE_REASON - 1)}…`);
+  });
+
+  it("keeps a failure reason that just fits", () => {
+    const LONGEST_FAILURE_REASON = 120;
+    const exact = "x".repeat(LONGEST_FAILURE_REASON);
+
+    expect(pingFor("StopFailure", { error: exact }, QUOTING).message).toBe(`ход упал с ошибкой: ${exact}`);
+  });
+
+  it("rate-limits a failed turn like a turn end, since errors come in bursts", () => {
+    expect(pingFor("StopFailure", inProject, QUOTING).rateLimitMinutes).toBe(10);
   });
 
   it("says the turn ended", () => {
@@ -234,6 +269,44 @@ describe("willCarryOn", () => {
     expect(willCarryOn("PreToolUse", { background_tasks: [AGENT] })).toBe(false);
   });
 
+  it("says nothing about a turn that failed, which nothing will resume", () => {
+    expect(willCarryOn("StopFailure", { background_tasks: [AGENT] })).toBe(false);
+  });
+
+  describe("a background command that never exits", () => {
+    const SERVER = { ...COMMAND, command: "pnpm dev" };
+
+    it("does not hold the turn for a server, which hands nothing back", () => {
+      expect(willCarryOn("Stop", { background_tasks: [SERVER] })).toBe(false);
+    });
+
+    it("still holds the turn for a command that exits", () => {
+      expect(willCarryOn("Stop", { background_tasks: [{ ...COMMAND, command: "npm run check" }] })).toBe(
+        true
+      );
+    });
+
+    it("judges a shell by its command alone, never by the prose describing it", () => {
+      expect(
+        willCarryOn("Stop", {
+          background_tasks: [{ ...COMMAND, command: "npx playwright test", description: "Test against the dev server" }],
+        })
+      ).toBe(true);
+    });
+
+    it("judges only a shell by its command, since an agent is not one", () => {
+      expect(willCarryOn("Stop", { background_tasks: [{ ...AGENT, command: "pnpm dev" }] })).toBe(true);
+    });
+
+    it("still holds the turn for an agent running beside a server", () => {
+      expect(willCarryOn("Stop", { background_tasks: [SERVER, AGENT] })).toBe(true);
+    });
+
+    it("holds the turn for a shell whose command is not a string, rather than dying", () => {
+      expect(willCarryOn("Stop", { background_tasks: [{ ...COMMAND, command: 7 }] })).toBe(true);
+    });
+  });
+
   it("says nothing about a permission, for the same reason", () => {
     expect(willCarryOn("PermissionRequest", { background_tasks: [AGENT] })).toBe(false);
   });
@@ -290,5 +363,53 @@ describe("unfamiliarWork", () => {
 
   it("says nothing when there was no background work at all", () => {
     expect(unfamiliarWork({})).toEqual([]);
+  });
+
+  it("says nothing about a server, which was judged and deliberately not counted", () => {
+    expect(
+      unfamiliarWork({ background_tasks: [{ type: "shell", status: "running", command: "pnpm dev" }] })
+    ).toEqual([]);
+  });
+
+  it("names a server that has stopped, the same as any shell that has", () => {
+    expect(
+      unfamiliarWork({ background_tasks: [{ type: "shell", status: "completed", command: "pnpm dev" }] })
+    ).toEqual(["shell/completed"]);
+  });
+});
+
+describe("endlessWork", () => {
+  it("names a running server by its command, so the log shows what stopped holding the turn", () => {
+    expect(
+      endlessWork({
+        background_tasks: [
+          { type: "shell", status: "running", command: "pnpm dev", description: "Start the dev server" },
+        ],
+      })
+    ).toEqual(["pnpm dev"]);
+  });
+
+  it("names nothing for a shell that came without a command", () => {
+    expect(
+      endlessWork({
+        background_tasks: [{ type: "shell", status: "running", description: "Start the dev server" }],
+      })
+    ).toEqual([]);
+  });
+
+  it("leaves out a server that has stopped, every command that exits, and anything not a shell", () => {
+    expect(
+      endlessWork({
+        background_tasks: [
+          { type: "shell", status: "completed", command: "pnpm dev" },
+          { type: "shell", status: "running", command: "npm run check" },
+          { type: "subagent", status: "running", command: "pnpm dev" },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it("says nothing when there was no background work at all", () => {
+    expect(endlessWork({})).toEqual([]);
   });
 });

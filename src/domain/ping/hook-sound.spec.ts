@@ -13,6 +13,10 @@ describe("soundFor", () => {
     expect(soundFor("Stop", NO_PAYLOAD)).toBe(SOUND.turnEnded);
   });
 
+  it("plays the turn-ended sound when an API error ended the turn, since the user is needed all the same", () => {
+    expect(soundFor("StopFailure", NO_PAYLOAD)).toBe(SOUND.turnEnded);
+  });
+
   it("plays a different sound mid-turn, so a question is not heard as a finished turn", () => {
     expect(soundFor("PreToolUse", askingTheUser)).toBe(SOUND.waitingOnYou);
     expect(soundFor("PermissionRequest", writingAFile)).toBe(SOUND.waitingOnYou);

@@ -1,6 +1,12 @@
 import { isHookEvent, type HookPayload } from "#domain/hook-event.ts";
 import { TURN_END, turnEndVerdict } from "#domain/ping/held-turn-end.ts";
-import { endlessWork, nobodyIsWatching, pingFor, unfamiliarWork } from "#domain/ping/hook-ping.ts";
+import {
+  endlessWork,
+  monitorsIn,
+  nobodyIsWatching,
+  pingFor,
+  unfamiliarWork,
+} from "#domain/ping/hook-ping.ts";
 import { impossible } from "#domain/impossible.ts";
 import { soundFor } from "#domain/ping/hook-sound.ts";
 import { noteAfter } from "#domain/ping/session-activity.ts";
@@ -70,6 +76,10 @@ const endless = endlessWork(payload);
 
 if (endless.length > NOTHING_TO_SAY) {
   log(`ENDLESS not counted as work | ${flattenPayload(endless.join(" | "))}`);
+}
+
+for (const monitor of monitorsIn(payload)) {
+  log(`MONITOR ${flattenPayload(monitor)}`);
 }
 
 const speak = async (): Promise<void> => {

@@ -58,13 +58,22 @@ describe("activityAfter", () => {
     expect(activityAfter("Stop", stillBusy)).toEqual({ kind: SESSION_ACTIVITY.working });
   });
 
-  it("reads a turn that ended with only a monitor armed as waiting, since nothing will resume it", () => {
+  it("reads a turn that ended with only an MCP subscription armed as waiting, since nothing will resume it", () => {
     const watched: HookPayload = {
       ...payload,
-      background_tasks: [{ type: "monitor", status: "running" }],
+      background_tasks: [{ type: "monitor", status: "running", server: "an-mcp-server" }],
     };
 
     expect(activityAfter("Stop", watched)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
+  });
+
+  it("reads a turn that ended while the Monitor tool watches as working, since it wakes the agent", () => {
+    const watching: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "monitor", status: "running", description: "the gate's verdict" }],
+    };
+
+    expect(activityAfter("Stop", watching)).toEqual({ kind: SESSION_ACTIVITY.working });
   });
 
   it("reads a turn that ended on a question as waiting, even with a subagent still running", () => {

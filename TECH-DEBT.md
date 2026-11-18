@@ -163,8 +163,8 @@ appears in a real log.**
 ## The kinds of background work are known only from what has been seen
 
 `willCarryOn` decides whether a turn end is real by matching `type` against
-`subagent` and `shell`. Those two, plus `monitor`, are every kind that has
-appeared in a logged payload — three from seventeen probes across five days.
+`subagent`, `shell` and `monitor`. Those three are every kind that has appeared
+in a logged payload — three from seventeen probes across five days.
 Claude Code's types now name more (`workflow`, `teammate`, `cloud session`,
 `MCP task`) but say nothing about which of them return a turn, so a rename on
 their side still turns ours into unknowns.
@@ -175,9 +175,23 @@ subcommand, `node server.js`, `docker logs -f` — holds its session's turn ends
 until the thirty-minute net rings: late, not lost. Add one when the log shows
 `SOUND turnEnded | the safety net` for a session that was running a server, and
 add the commands that exit beside it in the spec first: every loosening so far
-was caught matching a build. The `command` field itself is taken from the
-engine's types rather than a logged payload, so the first `ENDLESS not counted as
-work` line in the real log is the measurement still owed.
+was caught matching a build. The `command` field has since been measured: the
+first `ENDLESS not counted as work` lines in the real log carry it.
+
+**The two kinds of `monitor` are told apart by a field nobody has logged yet.**
+A monitor naming a `server` is read as an MCP subscription and one without as the
+Monitor tool — from the engine's types alone. The hook writes a `MONITOR` line for
+every monitor it sees; once a published artifact's subscription and an armed
+Monitor tool have each appeared there, the split is measured. If the subscription
+turns out to carry no server, its sessions wait thirty minutes for the net on
+every turn end — the symptom to look for is `SOUND turnEnded | the safety net` in
+a session that published an artifact.
+
+**A persistent Monitor is counted as work and never hands a turn back.** Nothing
+in the payload tells it from one with a deadline, and none of 1,231 measured
+Monitor calls was persistent, so the net covers it. Look for the same symptom in
+a session whose `MONITOR` line describes a session-long watch; the fix then needs
+a field from Claude Code, or a note of when each monitor was first seen.
 
 The statuses are thinner still: every sighting said `running`, so the rule's
 `status === RUNNING` clause has never been observed doing anything and is the
@@ -188,7 +202,9 @@ urgent. It is also not silent: on every hook event the log names whatever was
 running and was neither counted as work nor deliberately dismissed, as
 `BACKGROUND not counted as work | <type>/<status>`. That covers an unknown kind
 *and* a known kind in an unmeasured status, which is the half that guesses. A
-monitor never appears there; it is judged, not unknown.
+monitor never appears there, in any status — every one is named by its own
+`MONITOR` line instead, so drop that line only after `BACKGROUND` learns to name a
+Monitor tool in an unmeasured status.
 
 **Add a kind when that line names one that should have held the ping** — a false
 ping while an agent was plainly still working is the symptom, and the log line

@@ -148,6 +148,7 @@ Everything the notifier decides is one line in
 | `SKIP the turn ended but the agent will carry on` | an agent or a command is still running and will resume the session; the turn end is held, and rings after thirty quiet minutes |
 | `SOUND turnEnded \| the safety net` | a held turn end rang, because nothing happened in its session for thirty minutes |
 | `ENDLESS not counted as work` | a server or a follower was running; it never resumes a session, so it does not hold the turn end back |
+| `MONITOR <server> \| <status> \| <description>` | a monitor was present when a hook fired: `no server` is the Monitor tool, which holds a turn end while it runs; a server name is a subscription, which never does |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
 | `WARN usage unavailable: <why>` | the limits line was skipped and the reason named; the ping itself went out |

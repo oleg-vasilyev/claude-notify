@@ -16,6 +16,7 @@ export type BackgroundTask = {
   status?: string;
   command?: unknown;
   description?: unknown;
+  server?: unknown;
 };
 
 export type HookPayload = {

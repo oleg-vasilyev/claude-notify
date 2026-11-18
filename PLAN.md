@@ -170,19 +170,41 @@ From that moment every turn end in that session was swallowed. Measured, not
 guessed: seventeen payloads logged, and three of them were a lone monitor with no
 agent behind it, each followed by silence.
 
-So the rule reads the tasks rather than counting them, and only two measured
-kinds mean the session will resume on its own:
+So the rule reads the tasks rather than counting them, and only these kinds mean
+the session will resume on its own:
 
 | `type` | What it is | Counts as work |
 | --- | --- | --- |
 | `subagent` | an agent working on its own; it finishes and returns a turn | yes |
 | `shell` | a background command; it exits and returns a turn | yes, unless it is a server |
-| `monitor` | a standing watcher, armed until something disarms it | no |
+| `monitor` with no `server` | the Monitor tool: wakes the agent on each event, and at its deadline | yes |
+| `monitor` naming a `server` | an MCP subscription, armed until something disarms it | no |
 
 `status` must be `running` too, since the field carries one and a finished task
 should never hold a ping.
 
-**A shell that never exits is a monitor wearing a shell's type, and it silenced
+**Two different things arrive as `monitor`, and treating them as one rang a false
+turn end.** The rule above was measured in August on the one an artifact arms — a
+subscription through an MCP server that never hands anything back. Claude Code
+also has a Monitor tool: the agent watches a command's output, is woken on every
+matching line, and is woken once more at its deadline — five minutes by default,
+an hour at most. An agent that started a gate outside the task registry and armed
+a Monitor on its log said «Жду вердикт», ended its turn, and rang «закончил ход»
+a minute before the verdict woke it. The engine's types give `server` (and
+`tool`) only to MCP tasks, so a monitor naming a server is the subscription and
+one without is the tool. That split is read from the types, not a logged payload,
+so the hook logs every monitor it sees as `MONITOR <server> | <status> |
+<description>`; should a subscription arrive without a server after all, the
+thirty-minute net below turns its silence into a late sound, not a lost one.
+
+**A Monitor can also be armed `persistent`, with no deadline at all**, and nothing
+in the payload says so. It would hold every turn end of its session until the net
+rang. Measured over three weeks of transcripts: 1,231 Monitor calls, none
+persistent; 1,008 with a thirty-minute deadline and 18 with an hour. So the rule
+counts the tool as work, and the net covers the two cases it gets wrong — a
+persistent Monitor, and a quiet hour-long one past its thirtieth minute.
+
+**A shell that never exits is a subscription wearing a shell's type, and it silenced
 sessions for a day at a time.** A dev server, `wrangler dev`, `tail -F`, a
 `--watch` build: started in the background, used across many turns, and never
 handing anything back. While one ran, every turn end in its session was held —
@@ -195,7 +217,7 @@ background commands in three weeks of transcripts, 46% ran longer than three
 minutes and 3% longer than thirty — gates, renders, mutation runs the agent
 genuinely waits on. So a shell is judged by its `command`: one that starts a
 server or follows a file (`npm start`, `pnpm dev`, `wrangler dev`, `next start`,
-`http-server`, `--watch`, `tail -f`) counts as no work, the way a monitor does.
+`http-server`, `--watch`, `tail -f`) counts as no work, the way a subscription does.
 
 **It is judged by whole tokens in each segment of the command, never by a
 substring, and never by the prose in `description`.** The first version matched
@@ -672,7 +694,7 @@ threshold is the knob if it ever is not.
    ping is sent rather than swallowed — a false ping costs a glance, a
    swallowed one costs hours.
 7. **Every outcome is one log line** — `SENT`, `QUEUED`, `RETRY`, `SKIP`,
-   `DROP`, `WARN`, `ERROR`, `BACKGROUND`, `ENDLESS`, `RELAY`, `HOOK`, `WATCHER` — because
+   `DROP`, `WARN`, `ERROR`, `BACKGROUND`, `ENDLESS`, `MONITOR`, `RELAY`, `HOOK`, `WATCHER` — because
    the first real debugging session was blind without it.
 8. **The OAuth token is read, never written, never logged, never refreshed.**
    It appears in exactly one function, lives in one local variable, and leaves

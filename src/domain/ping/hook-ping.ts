@@ -14,9 +14,11 @@ const TURN_END_RATE_LIMIT_MINUTES = 10;
 const QUESTION_RATE_LIMIT_MINUTES = 2;
 const LONGEST_QUOTED_QUESTION = 180;
 const ELLIPSIS = "…";
-const WORK_THAT_HANDS_THE_TURN_BACK = ["subagent", "shell"];
-const WORK_THAT_WAITS_ON_SOMETHING_ELSE = ["monitor"];
+const WORK_THAT_HANDS_THE_TURN_BACK = ["subagent", "shell", "monitor"];
 const SHELL = "shell";
+const MONITOR = "monitor";
+const NO_SERVER = "no server";
+const NO_STATUS = "no status";
 const RUNNING = "running";
 const NO_FIELD = "";
 const LONGEST_FAILURE_REASON = 120;
@@ -40,15 +42,28 @@ const endlessCommandOf = (task: BackgroundTask): string[] =>
     ? [task.command]
     : [];
 
+const serverOf = (task: BackgroundTask): string | null =>
+  typeof task.server === "string" && task.server !== "" ? task.server : null;
+
+const isASubscription = (task: BackgroundTask): boolean =>
+  task.type === MONITOR && serverOf(task) !== null;
+
 const carriesOn = (task: BackgroundTask): boolean =>
   task.status === RUNNING &&
   WORK_THAT_HANDS_THE_TURN_BACK.includes(task.type ?? NO_FIELD) &&
+  !isASubscription(task) &&
   endlessCommandOf(task).length === 0;
 
 const wasJudged = (task: BackgroundTask): boolean =>
-  WORK_THAT_WAITS_ON_SOMETHING_ELSE.includes(task.type ?? NO_FIELD) ||
-  carriesOn(task) ||
-  endlessCommandOf(task).length > 0;
+  task.type === MONITOR || carriesOn(task) || endlessCommandOf(task).length > 0;
+
+export const monitorsIn = (payload: HookPayload): string[] =>
+  tasksIn(payload)
+    .filter((task) => task.type === MONITOR)
+    .map(
+      (task) =>
+        `${serverOf(task) ?? NO_SERVER} | ${task.status ?? NO_STATUS} | ${typeof task.description === "string" ? task.description : NO_FIELD}`
+    );
 
 export const willCarryOn = (event: HookEvent, payload: HookPayload): boolean =>
   event === HOOK_EVENT.stop &&

@@ -261,6 +261,18 @@ describe("willCarryOn", () => {
     expect(willCarryOn("Stop", { background_tasks: { running: true } })).toBe(false);
   });
 
+  it("does not hold a turn that ended on a question, since an agent still running does not answer it", () => {
+    expect(
+      willCarryOn("Stop", { background_tasks: [AGENT], last_assistant_message: "Пока агент пишет спеки: делаем фазу?" })
+    ).toBe(false);
+  });
+
+  it("still holds a turn that ended on a statement while an agent runs", () => {
+    expect(
+      willCarryOn("Stop", { background_tasks: [AGENT], last_assistant_message: "Агент пишет спеки. Жду его." })
+    ).toBe(true);
+  });
+
   it("looks past a monitor to the agent behind it, rather than judging the first task", () => {
     expect(willCarryOn("Stop", { background_tasks: [WATCHER, AGENT] })).toBe(true);
   });

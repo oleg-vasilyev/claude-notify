@@ -212,4 +212,8 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    read as servers. Six hundred real background commands were sitting in the
    transcripts the whole time. Run the classifier over the corpus, read every
    positive, and lift the surprises into the spec — the rewritten rule called
-   143 of 648 servers and every one of them was.
+   143 of 648 servers and every one of them was. **Lift the shape, never the
+   words:** the corpus is other projects' transcripts, this repository is public,
+   and `docs:check` only sees a ping prefix — the next phase copied seven real
+   questions from another project into a spec before review caught it. Rewrite
+   each case about this product, keeping the punctuation that made it a case.

@@ -189,6 +189,7 @@ src/domain/     every decision, pure — no files, no network, no clock
     hook-sound.ts     which sound an event deserves, and which gets none
     pending.ts        which queued pings may go now, and which one wins per project
     ping-tool.ts      what the model's own ping tool says, and how it reports back
+    question-in-reply.ts whether the agent's last reply put a question to the user
     session-activity.ts  whether a session is working, waiting, or stuck at a wall
     usage.ts          the limits block, and how old a reading may get
   asking/       putting a question on the phone, and reading the answer

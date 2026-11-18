@@ -67,6 +67,16 @@ describe("activityAfter", () => {
     expect(activityAfter("Stop", watched)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
   });
 
+  it("reads a turn that ended on a question as waiting, even with a subagent still running", () => {
+    const askedWhileBusy: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "subagent", status: "running" }],
+      last_assistant_message: "Агент ещё пишет спеки. Коммитить в `main`?",
+    };
+
+    expect(activityAfter("Stop", askedWhileBusy)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
+  });
+
   it("reads a turn that ended with only a server running as waiting, since a server never exits", () => {
     const serving: HookPayload = {
       ...payload,

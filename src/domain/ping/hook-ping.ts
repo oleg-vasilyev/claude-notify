@@ -5,6 +5,7 @@ import {
   type HookEvent,
   type HookPayload,
 } from "#domain/hook-event.ts";
+import { replyAsksAQuestion } from "#domain/ping/question-in-reply.ts";
 import { commandNeverExits } from "#domain/ping/endless-command.ts";
 import { projectPrefixOf } from "#domain/project.ts";
 
@@ -50,7 +51,9 @@ const wasJudged = (task: BackgroundTask): boolean =>
   endlessCommandOf(task).length > 0;
 
 export const willCarryOn = (event: HookEvent, payload: HookPayload): boolean =>
-  event === HOOK_EVENT.stop && tasksIn(payload).some(carriesOn);
+  event === HOOK_EVENT.stop &&
+  !replyAsksAQuestion(payload.last_assistant_message) &&
+  tasksIn(payload).some(carriesOn);
 
 export const endlessWork = (payload: HookPayload): string[] =>
   tasksIn(payload).flatMap(endlessCommandOf);

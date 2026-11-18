@@ -26,6 +26,7 @@ export type HookPayload = {
   session_id?: string;
   tool_use_id?: string;
   background_tasks?: unknown;
+  last_assistant_message?: unknown;
   error?: unknown;
   tool_input?: {
     questions?: {

@@ -236,6 +236,32 @@ A task notification arrives as a `UserPromptSubmit`, indistinguishable in the
 log from the user typing — which is why the log alone could not say how many held
 turn ends were real waits, and the transcripts were measured instead.
 
+**A turn that ends on a question is never held, whatever is still running.** An
+agent working in the background answers nothing; the question waits on the user
+either way, and holding it is how «закончил ход» stayed silent while a chat sat on
+a numbered list of questions. The desktop app paints such a chat yellow by the
+same reading: its own bundle, read for this, marks a session as needing input
+when the CLI's summary of the final reply says it is blocked on the user, and
+checks that before any background work. The payload carries that reply as
+`last_assistant_message`. A Stop that rings this way also marks the session as
+waiting, so pings queued for it may go out.
+
+A question is **a sentence that ends in `?`** — a letter or digit, optionally
+closing markdown, then the mark (`?!` too), then a space, markdown or the end.
+It is read anywhere in the reply, not only at its end, because questions here come
+numbered and explained — «1. Какой порог у страховки? Если…» — and the reply ends
+on the last option, not on the mark. Quoted text is not the speaker's question: a
+`?` inside a code block or a `>` line does not count, and inline code, «…» and
+"…" are read as one word, so «Коммитить в `main`?» is still heard while a label
+quoted as «Ready? Press start» is not. A rhetorical question in prose rings; the
+text cannot tell it apart, and a ping nobody needed costs a glance.
+
+Measured over three weeks of transcripts: the rule hears a question in 581 of
+4,593 turn ends the user answered, and in 73 of 6,434 that a background task
+resumed instead. Those 73 are 26 distinct replies, and 25 of them were questions
+to the user that the background work arrived before; the one exception quoted
+the user's own question back.
+
 **Anything unmeasured counts as no work, and pings** — a fourth kind, an
 unmeasured status, a task that is not an object, a `background_tasks` that is not
 a list. The payload is somebody else's JSON and the type says `unknown`, because

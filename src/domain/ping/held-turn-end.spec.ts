@@ -46,6 +46,12 @@ describe("turnEndVerdict", () => {
     expect(turnEndVerdict("Stop", agentRunning, HELD_AT)).toEqual({ kind: TURN_END.hold, held });
   });
 
+  it("speaks at once for a turn end that asks the user something, whatever is running", () => {
+    expect(
+      turnEndVerdict("Stop", { ...agentRunning, last_assistant_message: "Делаем?" }, HELD_AT)
+    ).toEqual({ kind: TURN_END.speak });
+  });
+
   it("speaks at once for a turn end nothing will resume", () => {
     expect(turnEndVerdict("Stop", { ...agentRunning, background_tasks: [] }, HELD_AT)).toEqual({
       kind: TURN_END.speak,

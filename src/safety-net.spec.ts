@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HeldTurnEnd } from "#domain/ping/held-turn-end.ts";
-import { SESSION_ACTIVITY, type SessionNote } from "#domain/ping/session-activity.ts";
+import { SESSION_ACTIVITY, type SessionNote } from "#domain/session/session-activity.ts";
+import { TURN_OWNER } from "#domain/session/prompt-origin.ts";
 import { playSound } from "#sound/play-sound.ts";
 import { forgetHeldTurnEnd, readHeldTurnEnds } from "#state/held-turn-end-files.ts";
 import { log } from "#state/log.ts";
@@ -15,7 +16,10 @@ vi.mock("#state/held-turn-end-files.ts", () => ({
   forgetHeldTurnEnd: vi.fn(),
   readHeldTurnEnds: vi.fn(),
 }));
-vi.mock("#state/log.ts", () => ({ log: vi.fn() }));
+vi.mock("#state/log.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#state/log.ts")>()),
+  log: vi.fn(),
+}));
 vi.mock("#state/session-note.ts", () => ({ readSessionNote: vi.fn(), writeSessionNote: vi.fn() }));
 vi.mock("#app/deliver.ts", () => ({ deliver: vi.fn() }));
 
@@ -37,6 +41,8 @@ const quietSince = (at: number): SessionNote => ({
   activity: { kind: SESSION_ACTIVITY.working },
   transcriptPath: TRANSCRIPT,
   at,
+  turnOwner: TURN_OWNER.user,
+  sideSessions: [],
 });
 
 describe("settleHeldTurnEnds", () => {
@@ -70,7 +76,20 @@ describe("settleHeldTurnEnds", () => {
       activity: { kind: SESSION_ACTIVITY.waitingAtTurnEnd },
       transcriptPath: TRANSCRIPT,
       at: QUIET_LONG_ENOUGH,
+      turnOwner: TURN_OWNER.user,
+      sideSessions: [],
     });
+  });
+
+  it("keeps the sessions the held one started, read from its own note", async () => {
+    vi.mocked(readSessionNote).mockReturnValue({ ...quietSince(HELD_AT), sideSessions: ["two"] });
+
+    await settleHeldTurnEnds(QUIET_LONG_ENOUGH);
+
+    expect(writeSessionNote).toHaveBeenCalledWith(
+      "one",
+      expect.objectContaining({ sideSessions: ["two"] })
+    );
   });
 
   it("forgets the hold it rang for, so it rings once", async () => {
@@ -83,7 +102,7 @@ describe("settleHeldTurnEnds", () => {
     await settleHeldTurnEnds(QUIET_LONG_ENOUGH);
 
     expect(log).toHaveBeenCalledWith(
-      "SOUND turnEnded | the safety net, nothing happened since a held turn end"
+      "[one] SOUND turnEnded | the safety net, nothing happened since a held turn end"
     );
   });
 

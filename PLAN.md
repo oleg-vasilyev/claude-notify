@@ -42,7 +42,7 @@ Two sources, deliberately redundant:
 | `PreToolUse` on `ExitPlanMode` | a plan awaits approval mid-turn | `план готов, жду апрув` | waiting |
 | `PermissionRequest` | a permission prompt is about to show | `просит разрешение: <tool>` | waiting, unless `PreToolUse` owns the tool |
 | `Notification` | permission prompts and idle waiting, per the docs | never observed to fire — see tombstones | waiting |
-| `UserPromptSubmit` | the user wrote into the session | nothing — it only records that work resumed | none |
+| `UserPromptSubmit` | the user, another session or the session's own work wrote into it | nothing — it records that work resumed, and on whose behalf | none |
 
 The mid-turn events matter because `Stop` cannot see them: a question dialog or
 a permission prompt suspends the turn without ending it. All four have now been
@@ -285,6 +285,85 @@ Measured over three weeks of transcripts: the rule hears a question in 581 of
 resumed instead. Those 73 are 26 distinct replies, and 25 of them were questions
 to the user that the background work arrived before; the one exception quoted
 the user's own question back.
+
+**A chat that starts other sessions rang twice for every report one of them
+sent, and neither ring was for the user.** The desktop app lets a session start
+sessions of its own. When one of them ends a turn, the app wakes the session that
+started it with a report; that session reads it, perhaps messages it back, and
+ends its turn; the messaged session works and ends its turn too. Both `Stop`s
+rang, and when the user was away both reached the phone, while the only party
+waiting on either was another session. So who started a turn is now part of the
+decision, read from the `prompt` a `UserPromptSubmit` carries:
+
+| What woke the session | Recognised by | Who the turn belongs to |
+| --- | --- | --- |
+| the user typing | none of the below | the user |
+| a message from another session | the prompt opens with `<cross-session-message from=` | that session |
+| the brief it was started with | the prompt opens with `Background (from the session that started this one):`, or `Task (…)` | the session that started it |
+| a report from a session it started | one of the reminders the prompt opens with is `The session "…" you started (local_…) finished a turn` | whoever the turn before it belonged to |
+| a background task, a subagent handing back, a compaction's summary, the app resuming after a usage limit | the prompt opens with `<task-notification>`, `<agent-message from=`, or the sentence the app writes for each | whoever the turn before it belonged to |
+
+"Opens with" means after the `<system-reminder>` blocks the app puts first, and
+the position is the rule, not a detail: a user who pastes a log line, a brief or
+a report into a chat has written something that *contains* the marker without
+*opening* with it, and reading containment would have silenced that turn with no
+safety net behind it. A message may come with or without the app's `Another
+Claude session sent a message:` preface, and a compaction summary may follow the
+app's note about artifacts; both are read through.
+
+The last two rows carry the owner over rather than naming one, because they are
+the session's own work coming back: an errand another session gave is still that
+session's errand after a background agent hands back, and the user's task is
+still the user's after a report arrives. The owner is kept in the session's note,
+written at the prompt and read at the turn end. A prompt the rule does not know —
+a scheduled wake-up, an idle notice from the app — hands the turn to the user, so
+in a session running another session's errand that turn and every own-work turn
+after it ring, until the other session writes to it again. That is the direction
+chosen: an unknown prompt rings rather than silences.
+
+**A turn another session asked for ends silently.** That session gets the report
+and decides what the user hears; a question in the reply is put to it, not to the
+user. A question dialog, a permission prompt and a failed turn still ring, since
+only the user can answer the first two and a failure is worth hearing first-hand.
+
+**A session it started counts as background work while it works on that
+errand.** A report names the reporting session's Claude Code id — `Its Claude Code
+session is <id>`, read only from the app's own sentence and never from the quoted
+report after it — and the note of the session receiving it collects every id it
+has seen. At a turn end the hook reads those sessions' notes: if one of them is
+working on a turn another session owns, the turn end is held exactly like one
+with an agent running, the safety net included, and a question in the reply still
+rings at once. A session it started that the user now drives directly does not
+count: its turns report to nobody.
+
+The app wakes a starting session only once none of the sessions it started is
+working, so the turn ends this rule holds are the ones where the starter has just
+written to a side session, and that session's note is seconds old. Observed once
+before it shipped: the side session's prompt was logged at 15:14:20 and the
+starter's turn end at 15:14:25. A starter that loses that race rings, the cheaper
+error.
+
+A note stops counting thirty minutes after it was written, because a session
+closed mid-turn keeps saying `working` forever, and a turn end held behind it
+would wait out the net every time. A note is written only at a prompt, a turn end
+or a wall, so the thirty minutes run from the start of the side session's turn,
+not from its last action: a single side-session turn that outlasts them stops
+holding the starter, which then rings at its next turn end. A false ring costs a
+glance; a missed one costs half an hour.
+
+Measured over every transcript on the home machine before it shipped, against
+the origin the app itself records beside each prompt: the recognition gave the
+turn to the user in all 6,427 prompts the user typed; to the session's own work
+in all 3,325 task notifications, 6,368 subagent hand-backs, 425 reports, 82
+compaction summaries and 16 resumes after a limit; and to another session in all
+147 messages and 43 briefs. The only other prompts it gave to the user are 23
+from scripts, which the hook ignores anyway, 6 scheduled wake-ups and 4 idle
+notices. Only reports from this year's app name a Claude Code id (47 ids in the
+44 newest); an older report names none, so the session that got it learns of no
+session and holds nothing.
+
+**The first turn end after starting sessions still rings**, since no report has
+named them yet — see [`TECH-DEBT.md`](TECH-DEBT.md#the-first-turn-after-starting-sessions-still-rings).
 
 **Anything unmeasured counts as no work, and pings** — a fourth kind, an
 unmeasured status, a task that is not an object, a `background_tasks` that is not

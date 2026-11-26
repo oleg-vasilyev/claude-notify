@@ -5,24 +5,28 @@ import {
   SAFETY_NET_SOUND,
   type HeldTurnEnd,
 } from "#domain/ping/held-turn-end.ts";
+import type { SessionNote } from "#domain/session/session-activity.ts";
 import { impossible } from "#domain/impossible.ts";
 import { playSound } from "#sound/play-sound.ts";
 import { forgetHeldTurnEnd, readHeldTurnEnds } from "#state/held-turn-end-files.ts";
-import { log } from "#state/log.ts";
+import { log, sessionLabel } from "#state/log.ts";
 import { readSessionNote, writeSessionNote } from "#state/session-note.ts";
 import { deliver } from "#app/deliver.ts";
 
 
-const ring = async (held: HeldTurnEnd, now: number): Promise<void> => {
+const ring = async (held: HeldTurnEnd, note: SessionNote | null, now: number): Promise<void> => {
   forgetHeldTurnEnd(held);
-  writeSessionNote(held.sessionId, noteAfterRinging(held, now));
+  writeSessionNote(held.sessionId, noteAfterRinging(held, note, now));
   playSound(SAFETY_NET_SOUND);
-  log(`SOUND ${SAFETY_NET_SOUND} | the safety net, nothing happened since a held turn end`);
+  log(
+    `${sessionLabel(held.sessionId)}SOUND ${SAFETY_NET_SOUND} | the safety net, nothing happened since a held turn end`
+  );
   await deliver({ ...held.ping, sessionId: held.sessionId, raisedAt: now });
 };
 
 const settleOne = async (held: HeldTurnEnd, now: number): Promise<boolean> => {
-  const verdict = heldVerdict(held, readSessionNote(held.sessionId), now);
+  const note = readSessionNote(held.sessionId);
+  const verdict = heldVerdict(held, note, now);
 
   switch (verdict) {
     case HELD_VERDICT.superseded:
@@ -34,7 +38,7 @@ const settleOne = async (held: HeldTurnEnd, now: number): Promise<boolean> => {
       return true;
 
     case HELD_VERDICT.ring:
-      await ring(held, now);
+      await ring(held, note, now);
 
       return false;
 

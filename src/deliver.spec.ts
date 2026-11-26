@@ -90,6 +90,8 @@ describe("deliver", () => {
         activity: { kind: "waiting-at-turn-end" },
         transcriptPath: TRANSCRIPT,
         at: 0,
+        turnOwner: "user",
+        sideSessions: [],
       });
       vi.mocked(readChatTitle).mockReturnValue("Разбор логов");
     });
@@ -161,6 +163,8 @@ describe("deliver", () => {
         activity: { kind: "working" },
         transcriptPath: null,
         at: 0,
+        turnOwner: "user",
+        sideSessions: [],
       });
 
       await deliver({ ...ping, sessionId: SESSION });

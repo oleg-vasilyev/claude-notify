@@ -28,6 +28,7 @@ export type HookPayload = {
   tool_use_id?: string;
   background_tasks?: unknown;
   last_assistant_message?: unknown;
+  prompt?: unknown;
   error?: unknown;
   tool_input?: {
     questions?: {

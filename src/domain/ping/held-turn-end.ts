@@ -1,7 +1,8 @@
-import type { HookEvent, HookPayload } from "#domain/hook-event.ts";
+import { HOOK_EVENT, type HookEvent, type HookPayload } from "#domain/hook-event.ts";
 import { turnEndPing, willCarryOn, type HookPing } from "#domain/ping/hook-ping.ts";
 import { SOUND, type Sound } from "#domain/ping/hook-sound.ts";
-import { SESSION_ACTIVITY, type SessionNote } from "#domain/ping/session-activity.ts";
+import { SESSION_ACTIVITY, type SessionNote } from "#domain/session/session-activity.ts";
+import { TURN_OWNER, type TurnOwner } from "#domain/session/prompt-origin.ts";
 
 
 const SAFETY_NET_MINUTES = 30;
@@ -20,19 +21,31 @@ export const TURN_END = {
   speak: "speak",
   hold: "hold",
   carryOnUnheld: "carry-on-unheld",
+  anotherSessionsTurn: "another-sessions-turn",
 } as const;
 
 export type TurnEndVerdict =
   | { kind: typeof TURN_END.speak }
   | { kind: typeof TURN_END.hold; held: HeldTurnEnd }
-  | { kind: typeof TURN_END.carryOnUnheld };
+  | { kind: typeof TURN_END.carryOnUnheld }
+  | { kind: typeof TURN_END.anotherSessionsTurn };
+
+export type TurnSoFar = {
+  turnOwner: TurnOwner;
+  sideSessionAtWork: boolean;
+};
 
 export const turnEndVerdict = (
   event: HookEvent,
   payload: HookPayload,
-  now: number
+  now: number,
+  turn: TurnSoFar
 ): TurnEndVerdict => {
-  if (!willCarryOn(event, payload)) {
+  if (event === HOOK_EVENT.stop && turn.turnOwner === TURN_OWNER.anotherSession) {
+    return { kind: TURN_END.anotherSessionsTurn };
+  }
+
+  if (!willCarryOn(event, payload, turn.sideSessionAtWork)) {
     return { kind: TURN_END.speak };
   }
 
@@ -69,8 +82,14 @@ export const heldVerdict = (held: HeldTurnEnd, note: SessionNote | null, now: nu
     : HELD_VERDICT.waiting;
 };
 
-export const noteAfterRinging = (held: HeldTurnEnd, now: number): SessionNote => ({
+export const noteAfterRinging = (
+  held: HeldTurnEnd,
+  note: SessionNote | null,
+  now: number
+): SessionNote => ({
   activity: { kind: SESSION_ACTIVITY.waitingAtTurnEnd },
   transcriptPath: held.transcriptPath,
   at: now,
+  turnOwner: note?.turnOwner ?? TURN_OWNER.user,
+  sideSessions: note?.sideSessions ?? [],
 });

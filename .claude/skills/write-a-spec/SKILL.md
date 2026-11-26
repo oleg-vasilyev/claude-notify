@@ -217,3 +217,11 @@ nothing to decide — the moment one grows a branch, the branch belongs in
    and `docs:check` only sees a ping prefix — the next phase copied seven real
    questions from another project into a spec before review caught it. Rewrite
    each case about this product, keeping the punctuation that made it a case.
+   **A corpus cannot show the input that does not exist yet.** The rule that
+   tells another session's prompt from the user's matched its markers anywhere
+   in the text, and 6,427 typed prompts held none of them — because nobody had
+   yet discussed the feature in a chat. The first user to paste a log line would
+   have silenced their own turn with no safety net. **When a match silences, it
+   is anchored where the producer writes the marker, and the negatives include
+   the marker pasted inside the user's own words**: a review found this, not the
+   corpus.

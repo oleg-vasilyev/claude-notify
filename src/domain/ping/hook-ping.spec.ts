@@ -214,6 +214,10 @@ describe("pingFor", () => {
 });
 
 describe("willCarryOn", () => {
+  const NO_SIDE_SESSION_AT_WORK = false;
+  const SIDE_SESSION_AT_WORK = true;
+  const carriesOnAlone = (event: HookEvent, payload: HookPayload): boolean =>
+    willCarryOn(event, payload, NO_SIDE_SESSION_AT_WORK);
   const AGENT = { type: "subagent", status: "running" };
   const COMMAND = { type: "shell", status: "running" };
   const WATCHER = { type: "monitor", status: "running", server: "an-mcp-server", tool: "subscribe" };
@@ -225,119 +229,135 @@ describe("willCarryOn", () => {
   };
 
   it("is true while a subagent runs, since it will hand the turn back itself", () => {
-    expect(willCarryOn("Stop", { background_tasks: [AGENT] })).toBe(true);
+    expect(carriesOnAlone("Stop", { background_tasks: [AGENT] })).toBe(true);
   });
 
   it("is true while a background command runs, for the same reason", () => {
-    expect(willCarryOn("Stop", { background_tasks: [COMMAND] })).toBe(true);
+    expect(carriesOnAlone("Stop", { background_tasks: [COMMAND] })).toBe(true);
   });
 
   it("is true while the Monitor tool follows a log, which arrives as a shell and wakes the agent", () => {
-    expect(willCarryOn("Stop", { background_tasks: [MONITOR_TOOL] })).toBe(true);
+    expect(carriesOnAlone("Stop", { background_tasks: [MONITOR_TOOL] })).toBe(true);
   });
 
   it("is false for a monitor, which stays armed and hands nothing back", () => {
-    expect(willCarryOn("Stop", { background_tasks: [WATCHER] })).toBe(false);
+    expect(carriesOnAlone("Stop", { background_tasks: [WATCHER] })).toBe(false);
   });
 
   it("is false for a monitor whatever server it names, or none", () => {
     const { server: _none, ...unnamed } = WATCHER;
 
-    expect(willCarryOn("Stop", { background_tasks: [unnamed] })).toBe(false);
+    expect(carriesOnAlone("Stop", { background_tasks: [unnamed] })).toBe(false);
   });
 
   it("is false for a kind nobody has measured, so an unknown task pings rather than silences", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ type: "seance", status: "running" }] })).toBe(
+    expect(carriesOnAlone("Stop", { background_tasks: [{ type: "seance", status: "running" }] })).toBe(
       false
     );
   });
 
   it("is false for work that has stopped running, whatever kind it was", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ ...AGENT, status: "completed" }] })).toBe(
+    expect(carriesOnAlone("Stop", { background_tasks: [{ ...AGENT, status: "completed" }] })).toBe(
       false
     );
   });
 
   it("is false for a task that names no status at all", () => {
-    expect(willCarryOn("Stop", { background_tasks: [{ type: "subagent" }] })).toBe(false);
+    expect(carriesOnAlone("Stop", { background_tasks: [{ type: "subagent" }] })).toBe(false);
   });
 
   it("is false once nothing is running, which is the turn that really waits on the user", () => {
-    expect(willCarryOn("Stop", { background_tasks: [] })).toBe(false);
+    expect(carriesOnAlone("Stop", { background_tasks: [] })).toBe(false);
   });
 
   it("is false for a payload that never mentioned background work", () => {
-    expect(willCarryOn("Stop", {})).toBe(false);
+    expect(carriesOnAlone("Stop", {})).toBe(false);
   });
 
   it("pings rather than dying when a task is not an object at all", () => {
-    expect(willCarryOn("Stop", { background_tasks: [null, 7, "busy"] })).toBe(false);
+    expect(carriesOnAlone("Stop", { background_tasks: [null, 7, "busy"] })).toBe(false);
   });
 
   it("pings rather than dying when the field is not even a list", () => {
-    expect(willCarryOn("Stop", { background_tasks: { running: true } })).toBe(false);
+    expect(carriesOnAlone("Stop", { background_tasks: { running: true } })).toBe(false);
   });
 
   it("does not hold a turn that ended on a question, since an agent still running does not answer it", () => {
     expect(
-      willCarryOn("Stop", { background_tasks: [AGENT], last_assistant_message: "Пока агент пишет спеки: делаем фазу?" })
+      carriesOnAlone("Stop", { background_tasks: [AGENT], last_assistant_message: "Пока агент пишет спеки: делаем фазу?" })
     ).toBe(false);
   });
 
   it("still holds a turn that ended on a statement while an agent runs", () => {
     expect(
-      willCarryOn("Stop", { background_tasks: [AGENT], last_assistant_message: "Агент пишет спеки. Жду его." })
+      carriesOnAlone("Stop", { background_tasks: [AGENT], last_assistant_message: "Агент пишет спеки. Жду его." })
     ).toBe(true);
   });
 
   it("looks past a monitor to the agent behind it, rather than judging the first task", () => {
-    expect(willCarryOn("Stop", { background_tasks: [WATCHER, AGENT] })).toBe(true);
+    expect(carriesOnAlone("Stop", { background_tasks: [WATCHER, AGENT] })).toBe(true);
   });
 
   it("says nothing about a question, which waits on the user whatever else is running", () => {
-    expect(willCarryOn("PreToolUse", { background_tasks: [AGENT] })).toBe(false);
+    expect(carriesOnAlone("PreToolUse", { background_tasks: [AGENT] })).toBe(false);
   });
 
   it("says nothing about a turn that failed, which nothing will resume", () => {
-    expect(willCarryOn("StopFailure", { background_tasks: [AGENT] })).toBe(false);
+    expect(carriesOnAlone("StopFailure", { background_tasks: [AGENT] })).toBe(false);
   });
 
   describe("a background command that never exits", () => {
     const SERVER = { ...COMMAND, command: "pnpm dev" };
 
     it("does not hold the turn for a server, which hands nothing back", () => {
-      expect(willCarryOn("Stop", { background_tasks: [SERVER] })).toBe(false);
+      expect(carriesOnAlone("Stop", { background_tasks: [SERVER] })).toBe(false);
     });
 
     it("still holds the turn for a command that exits", () => {
-      expect(willCarryOn("Stop", { background_tasks: [{ ...COMMAND, command: "npm run check" }] })).toBe(
+      expect(carriesOnAlone("Stop", { background_tasks: [{ ...COMMAND, command: "npm run check" }] })).toBe(
         true
       );
     });
 
     it("judges a shell by its command alone, never by the prose describing it", () => {
       expect(
-        willCarryOn("Stop", {
+        carriesOnAlone("Stop", {
           background_tasks: [{ ...COMMAND, command: "npx playwright test", description: "Test against the dev server" }],
         })
       ).toBe(true);
     });
 
     it("judges only a shell by its command, since an agent is not one", () => {
-      expect(willCarryOn("Stop", { background_tasks: [{ ...AGENT, command: "pnpm dev" }] })).toBe(true);
+      expect(carriesOnAlone("Stop", { background_tasks: [{ ...AGENT, command: "pnpm dev" }] })).toBe(true);
     });
 
     it("still holds the turn for an agent running beside a server", () => {
-      expect(willCarryOn("Stop", { background_tasks: [SERVER, AGENT] })).toBe(true);
+      expect(carriesOnAlone("Stop", { background_tasks: [SERVER, AGENT] })).toBe(true);
     });
 
     it("holds the turn for a shell whose command is not a string, rather than dying", () => {
-      expect(willCarryOn("Stop", { background_tasks: [{ ...COMMAND, command: 7 }] })).toBe(true);
+      expect(carriesOnAlone("Stop", { background_tasks: [{ ...COMMAND, command: 7 }] })).toBe(true);
     });
   });
 
   it("says nothing about a permission, for the same reason", () => {
-    expect(willCarryOn("PermissionRequest", { background_tasks: [AGENT] })).toBe(false);
+    expect(carriesOnAlone("PermissionRequest", { background_tasks: [AGENT] })).toBe(false);
+  });
+
+  describe("a session it started that is still at work", () => {
+    it("holds the turn, since that session reports back and wakes this one", () => {
+      expect(willCarryOn("Stop", {}, SIDE_SESSION_AT_WORK)).toBe(true);
+    });
+
+    it("does not hold a turn that ended on a question, which waits on the user regardless", () => {
+      expect(
+        willCarryOn("Stop", { last_assistant_message: "Ветка готова: мержим?" }, SIDE_SESSION_AT_WORK)
+      ).toBe(false);
+    });
+
+    it("says nothing about a turn that failed, which no report resumes", () => {
+      expect(willCarryOn("StopFailure", {}, SIDE_SESSION_AT_WORK)).toBe(false);
+    });
   });
 });
 

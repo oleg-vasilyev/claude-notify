@@ -10,7 +10,7 @@ import {
   type PendingPing,
   type SentPing,
 } from "#domain/ping/pending.ts";
-import { mayGoOut, wallToCheck } from "#domain/ping/session-activity.ts";
+import { mayGoOut, wallToCheck } from "#domain/session/session-activity.ts";
 import { idleSeconds } from "#presence/idle-time.ts";
 import { readAskedQuestions } from "#state/asked-question.ts";
 import { DELIVERY, readConfig, type Config } from "#state/config.ts";

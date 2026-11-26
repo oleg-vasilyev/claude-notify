@@ -50,7 +50,30 @@ problem. Sessions a script runs leave nothing, which is what keeps it small: a
 job classifying email would otherwise have left a note per message.
 
 **Sweep notes untouched for a day, the first time the state directory is
-annoying to read**, or fold it into whatever ends up rotating `log.txt`.
+annoying to read**, or fold it into whatever ends up rotating `log.txt`. A swept
+note costs nothing: a session that started others reads a missing note as a
+session not at work, and a day-old one stopped counting long before.
+
+---
+
+## The first turn after starting sessions still rings
+
+A session learns which sessions it started from their reports, so the turn that
+starts them ends before any report has named one, and it rings while they work.
+The user has usually just typed that turn, so it is one sound at the keyboard per
+launch rather than a ping to the phone. The link exists earlier: the first line of
+a started session's transcript is `{"type":"derived-from","sessions":[{"id":
+"<the starting session's Claude Code id>","via":"launch"}]}`, so a started
+session could name its starter in its own note at its first prompt. That line is
+not proof on its own — the session that built this rule carried one with
+`via: "launch"` although the user typed its first prompt — so it would need the
+brief (`Background (from the session that started this one):`) beside it, and
+the starting session would have to look for notes naming it rather than read the
+ones it knows.
+
+**Close it the first time the launch sound is called noise**, by having a started
+session write its starter into its note and the starter's turn end look for
+notes that name it.
 
 ---
 

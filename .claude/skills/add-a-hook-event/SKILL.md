@@ -15,7 +15,7 @@ An event is named in seven places, and missing one is the whole failure mode:
 3. **`soundFor`** in `domain/ping/hook-sound.ts` — whether the machine itself
    makes a noise, and which of the two it is. An event that does not mean
    *waiting on the user* returns `null` here.
-4. **`activityAfter`** in `domain/ping/session-activity.ts` — what the event says
+4. **`activityAfter`** in `domain/session/session-activity.ts` — what the event says
    the session is now doing, which decides whether a ping held in the queue is
    still worth delivering.
 5. **`copy.ru.ts`** — the Russian the user reads. No string a user sees may appear

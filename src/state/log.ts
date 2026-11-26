@@ -6,6 +6,17 @@ import { logFile, stateHome } from "#state/file-locations.ts";
 const PAYLOAD_KEPT_CHARACTERS = 400;
 const WHITESPACE_RUN = /\s+/g;
 const TWO_DIGITS = 2;
+const SESSION_ID_KEPT_CHARACTERS = 8;
+const NO_LABEL = "";
+
+let label = NO_LABEL;
+
+export const sessionLabel = (sessionId: string): string =>
+  `[${sessionId.slice(0, SESSION_ID_KEPT_CHARACTERS)}] `;
+
+export const labelLogWith = (sessionId: string): void => {
+  label = sessionLabel(sessionId);
+};
 
 const padded = (part: number): string => `${part}`.padStart(TWO_DIGITS, "0");
 
@@ -20,7 +31,7 @@ const stamp = (): string => {
 export const log = (line: string): void => {
   try {
     mkdirSync(stateHome(), { recursive: true });
-    appendFileSync(logFile(), `${stamp()} ${line}\n`, "utf8");
+    appendFileSync(logFile(), `${stamp()} ${label}${line}\n`, "utf8");
   } catch {
     console.error(`claude-notify: could not write the log: ${line}`);
   }

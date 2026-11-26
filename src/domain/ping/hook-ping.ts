@@ -61,10 +61,14 @@ export const monitorsIn = (payload: HookPayload): string[] =>
         `${serverOf(task) ?? NO_SERVER} | ${task.status ?? NO_STATUS} | ${typeof task.description === "string" ? task.description : NO_FIELD}`
     );
 
-export const willCarryOn = (event: HookEvent, payload: HookPayload): boolean =>
+export const willCarryOn = (
+  event: HookEvent,
+  payload: HookPayload,
+  sideSessionAtWork: boolean
+): boolean =>
   event === HOOK_EVENT.stop &&
   !replyAsksAQuestion(payload.last_assistant_message) &&
-  tasksIn(payload).some(carriesOn);
+  (sideSessionAtWork || tasksIn(payload).some(carriesOn));
 
 export const endlessWork = (payload: HookPayload): string[] =>
   tasksIn(payload).flatMap(endlessCommandOf);

@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SESSION_ACTIVITY, type SessionNote } from "#domain/ping/session-activity.ts";
+import { SESSION_ACTIVITY, type SessionNote } from "#domain/session/session-activity.ts";
+import { TURN_OWNER } from "#domain/session/prompt-origin.ts";
 import { readSessionNote, writeSessionNote } from "#state/session-note.ts";
 
 
@@ -28,6 +29,8 @@ const waiting: SessionNote = {
   activity: { kind: SESSION_ACTIVITY.waitingAtTurnEnd },
   transcriptPath: "C:\\sessions\\one.jsonl",
   at: AT,
+  turnOwner: TURN_OWNER.anotherSession,
+  sideSessions: [ANOTHER_SESSION],
 };
 
 describe("what a session was last seen doing", () => {
@@ -60,6 +63,22 @@ describe("what a session was last seen doing", () => {
     writeSessionNote(A_SESSION, { ...waiting, activity: { kind: SESSION_ACTIVITY.working } });
 
     expect(readSessionNote(A_SESSION)?.activity.kind).toBe(SESSION_ACTIVITY.working);
+  });
+
+  it("reads a note an older version wrote, before it knew who started a turn", () => {
+    writeFileSync(
+      join(state, `session-${A_SESSION}.json`),
+      '{"activity":{"kind":"working"},"transcriptPath":null,"at":1}',
+      "utf8"
+    );
+
+    expect(readSessionNote(A_SESSION)).toEqual({
+      activity: { kind: SESSION_ACTIVITY.working },
+      transcriptPath: null,
+      at: 1,
+      turnOwner: TURN_OWNER.user,
+      sideSessions: [],
+    });
   });
 
   it("treats a half-written note as no note, rather than as a session that is working", () => {

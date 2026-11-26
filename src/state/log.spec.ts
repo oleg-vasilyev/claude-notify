@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { flattenPayload } from "#state/log.ts";
+import { flattenPayload, sessionLabel } from "#state/log.ts";
 
 
 const KEPT_CHARACTERS = 400;
@@ -28,5 +28,15 @@ describe("flattenPayload", () => {
 
   it("handles an empty payload", () => {
     expect(flattenPayload("")).toBe("");
+  });
+});
+
+describe("sessionLabel", () => {
+  it("names a session by the start of its id, enough to tell two at the same second apart", () => {
+    expect(sessionLabel("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")).toBe("[aaaaaaaa] ");
+  });
+
+  it("keeps a short id whole", () => {
+    expect(sessionLabel("one")).toBe("[one] ");
   });
 });

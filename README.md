@@ -132,7 +132,9 @@ apart. Running state — the log, the queue, the per-project stamps — lives in
 ## When a ping does not arrive
 
 Everything the notifier decides is one line in
-`~/.claude/claude-notify/log.txt`:
+`~/.claude/claude-notify/log.txt`. A line a hook wrote names its session after
+the time — `[9712c0e5]`, the start of the session's id — so two chats that ended
+in the same second can be told apart:
 
 | Line | Meaning |
 | --- | --- |
@@ -145,7 +147,8 @@ Everything the notifier decides is one line in
 | `HOOK <event>` | a Claude Code hook fired, with its payload and the entrypoint that ran it |
 | `SOUND <which>` | this machine made a noise: `turnEnded` when a turn really ended, `waitingOnYou` for a question or a permission mid-turn |
 | `SKIP a session a script is running` | the hooks fired for a scripted session — no person is waiting, so the mechanical ping stays home |
-| `SKIP the turn ended but the agent will carry on` | an agent or a command is still running and will resume the session; the turn end is held, and rings after thirty quiet minutes |
+| `SKIP the turn ended but the agent will carry on` | an agent, a command or a session this one started is still running and will resume the session; the turn end is held, and rings after thirty quiet minutes |
+| `SKIP the turn was another session's errand` | another session asked for this turn and gets its report, so nobody waits on you |
 | `SOUND turnEnded \| the safety net` | a held turn end rang, because nothing happened in its session for thirty minutes |
 | `ENDLESS not counted as work` | a server was running; it never resumes a session, so it does not hold the turn end back |
 | `MONITOR <server> \| <status> \| <description>` | a background task of type `monitor` was present when a hook fired; it never holds a turn end. Logged so its shape can be measured |
@@ -185,14 +188,19 @@ src/domain/     every decision, pure — no files, no network, no clock
     chat-title.ts     the chat's title, found in its transcript and put in a ping
     delivery.ts       send, queue or skip, and whether a refusal is worth retrying
     endless-command.ts whether a background command is a server that never exits
-    held-turn-end.ts  a turn end held for background work, and when it rings anyway
+    held-turn-end.ts  a turn end held for background work, silenced for another
+                      session's errand, and when a held one rings anyway
     hook-ping.ts      what each Claude Code event has to say
     hook-sound.ts     which sound an event deserves, and which gets none
     pending.ts        which queued pings may go now, and which one wins per project
     ping-tool.ts      what the model's own ping tool says, and how it reports back
     question-in-reply.ts whether the agent's last reply put a question to the user
-    session-activity.ts  whether a session is working, waiting, or stuck at a wall
     usage.ts          the limits block, and how old a reading may get
+  session/      what a session is doing, and on whose behalf
+    session-activity.ts  whether a session is working, waiting, or stuck at a wall,
+                      and whether a session it started is still at work
+    prompt-origin.ts  what woke a session, who the turn belongs to, and which
+                      sessions it started have reported in
   asking/       putting a question on the phone, and reading the answer
     answer.ts         which Telegram update answers which question
     asking.ts         ask on the phone, or leave it to the app

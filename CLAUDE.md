@@ -43,7 +43,7 @@ lists every key — the token must never be committed.
 ```
 src/
   domain/     every decision, pure: state in as arguments, verdict out as a value
-    ping/ asking/ setup/   one folder per thing being decided about
+    ping/ asking/ setup/ session/   one folder per thing being decided about
   state/      what is remembered between runs: settings, log, queue, stamps, lock
   presence/   whether the user is at the keyboard
   sound/      the notification the machine itself makes

@@ -9,12 +9,12 @@ import {
 } from "#domain/ping/hook-ping.ts";
 import { impossible } from "#domain/impossible.ts";
 import { soundFor } from "#domain/ping/hook-sound.ts";
-import { noteAfter } from "#domain/ping/session-activity.ts";
+import { aSideSessionIsAtWork, noteAfter } from "#domain/session/session-activity.ts";
 import { playSound } from "#sound/play-sound.ts";
 import { readConfig } from "#state/config.ts";
 import { holdTurnEnd } from "#state/held-turn-end-files.ts";
-import { flattenPayload, log } from "#state/log.ts";
-import { writeSessionNote } from "#state/session-note.ts";
+import { flattenPayload, labelLogWith, log } from "#state/log.ts";
+import { readSessionNote, writeSessionNote } from "#state/session-note.ts";
 import { ask } from "#app/ask.ts";
 import { deliver } from "#app/deliver.ts";
 import { startWatcher, watcherIsRunning } from "#app/watcher-process.ts";
@@ -49,11 +49,17 @@ if (!isHookEvent(event)) {
 
 const raw = await readStdin();
 
+const payload = parsed(raw);
+
+const sessionId = typeof payload.session_id === "string" ? payload.session_id : null;
+
+if (sessionId !== null) {
+  labelLogWith(sessionId);
+}
+
 const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT;
 
 log(`HOOK ${event} entrypoint=${entrypoint ?? "-"} | ${flattenPayload(raw)}`);
-
-const payload = parsed(raw);
 
 if (nobodyIsWatching(entrypoint)) {
   log(`SKIP a session a script is running | ${event}`);
@@ -62,8 +68,15 @@ if (nobodyIsWatching(entrypoint)) {
 
 const now = Date.now();
 
-if (payload.session_id !== undefined) {
-  writeSessionNote(payload.session_id, noteAfter(event, payload, now));
+const previous = sessionId === null ? null : readSessionNote(sessionId);
+const sideSessionAtWork = aSideSessionIsAtWork(
+  (previous?.sideSessions ?? []).map(readSessionNote),
+  now
+);
+const note = noteAfter(event, payload, now, previous, sideSessionAtWork);
+
+if (sessionId !== null) {
+  writeSessionNote(sessionId, note);
 }
 
 const unfamiliar = unfamiliarWork(payload);
@@ -99,13 +112,16 @@ const speak = async (): Promise<void> => {
   const answered = await ask(event, payload);
 
   if (answered === null) {
-    await deliver({ ...ping, sessionId: payload.session_id ?? null });
+    await deliver({ ...ping, sessionId });
   } else if (Object.keys(answered).length > NOTHING_TO_SAY) {
     process.stdout.write(JSON.stringify(answered));
   }
 };
 
-const verdict = turnEndVerdict(event, payload, now);
+const verdict = turnEndVerdict(event, payload, now, {
+  turnOwner: note.turnOwner,
+  sideSessionAtWork,
+});
 
 switch (verdict.kind) {
   case TURN_END.speak:
@@ -124,6 +140,10 @@ switch (verdict.kind) {
 
   case TURN_END.carryOnUnheld:
     log(`SKIP the turn ended but the agent will carry on | ${event}`);
+    break;
+
+  case TURN_END.anotherSessionsTurn:
+    log(`SKIP the turn was another session's errand, and that session gets the report | ${event}`);
     break;
 
   default:

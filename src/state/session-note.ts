@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
-import { isSessionActivity, type SessionNote } from "#domain/ping/session-activity.ts";
+import { asSessionNote, type SessionNote } from "#domain/session/session-activity.ts";
 import { sessionNoteFile, stateHome } from "#state/file-locations.ts";
 
 
@@ -15,9 +15,7 @@ export const readSessionNote = (sessionId: string): SessionNote | null => {
   }
 
   try {
-    const parsed = JSON.parse(readFileSync(sessionNoteFile(sessionId), "utf8")) as Partial<SessionNote>;
-
-    return isSessionActivity(parsed.activity) ? (parsed as SessionNote) : null;
+    return asSessionNote(JSON.parse(readFileSync(sessionNoteFile(sessionId), "utf8")));
   } catch {
     return null;
   }

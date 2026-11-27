@@ -240,14 +240,76 @@ describe("willCarryOn", () => {
     expect(carriesOnAlone("Stop", { background_tasks: [MONITOR_TOOL] })).toBe(true);
   });
 
-  it("is false for a monitor, which stays armed and hands nothing back", () => {
-    expect(carriesOnAlone("Stop", { background_tasks: [WATCHER] })).toBe(false);
-  });
+  describe("a task of type monitor", () => {
+    const MONITOR_TOOL_AS_MONITOR = { type: "monitor", status: "running", description: "the gate's verdict" };
+    const ARTIFACT_SUBSCRIPTION = {
+      type: "monitor",
+      status: "running",
+      description: "live updates for artifact https://claude.ai/code/artifact/00000000-0000-0000-0000-000000000000 (auto-armed on publish)",
+    };
 
-  it("is false for a monitor whatever server it names, or none", () => {
-    const { server: _none, ...unnamed } = WATCHER;
+    it("is true for one naming no server, which is how the Monitor tool arrives now, and it wakes the agent", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [MONITOR_TOOL_AS_MONITOR] })).toBe(true);
+    });
 
-    expect(carriesOnAlone("Stop", { background_tasks: [unnamed] })).toBe(false);
+    it("is true for one whose server is empty, which names no server either", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [{ ...MONITOR_TOOL_AS_MONITOR, server: "" }] })).toBe(true);
+    });
+
+    it("is true for one whose server is not text, which names no server either", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [{ ...MONITOR_TOOL_AS_MONITOR, server: 7 }] })).toBe(true);
+    });
+
+    it("is true for one with no description at all, since nothing says an artifact armed it", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [{ type: "monitor", status: "running" }] })).toBe(true);
+    });
+
+    it("is false for the subscription publishing an artifact arms, in the shape the log caught in August", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [ARTIFACT_SUBSCRIPTION] })).toBe(false);
+    });
+
+    it("is false for a subscription whose description only begins the way an artifact's does", () => {
+      const reworded = { ...ARTIFACT_SUBSCRIPTION, description: "live updates for artifact a-page" };
+
+      expect(carriesOnAlone("Stop", { background_tasks: [reworded] })).toBe(false);
+    });
+
+    it("is true for a Monitor whose own description mentions an artifact's live updates further in", () => {
+      const watching = { ...MONITOR_TOOL_AS_MONITOR, description: "the e2e run, watching live updates for artifact pages" };
+
+      expect(carriesOnAlone("Stop", { background_tasks: [watching] })).toBe(true);
+    });
+
+    it("is false for a subscription whose description only says it was armed on publish", () => {
+      const reworded = { ...ARTIFACT_SUBSCRIPTION, description: "a page's comments (auto-armed on publish)" };
+
+      expect(carriesOnAlone("Stop", { background_tasks: [reworded] })).toBe(false);
+    });
+
+    it("is false for one an MCP server armed, a subscription that stays armed and hands nothing back", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [WATCHER] })).toBe(false);
+    });
+
+    it("is false once the Monitor tool has stopped, whatever its type", () => {
+      expect(
+        carriesOnAlone("Stop", { background_tasks: [{ ...MONITOR_TOOL_AS_MONITOR, status: "completed" }] })
+      ).toBe(false);
+    });
+
+    it("does not hold a turn that ended on a question while the Monitor tool watches", () => {
+      expect(
+        carriesOnAlone("Stop", {
+          background_tasks: [MONITOR_TOOL_AS_MONITOR],
+          last_assistant_message: "Gate ещё идёт. Коммитить фазу?",
+        })
+      ).toBe(false);
+    });
+
+    it("looks past an artifact's subscription to the Monitor tool beside it", () => {
+      expect(carriesOnAlone("Stop", { background_tasks: [ARTIFACT_SUBSCRIPTION, MONITOR_TOOL_AS_MONITOR] })).toBe(
+        true
+      );
+    });
   });
 
   it("is false for a kind nobody has measured, so an unknown task pings rather than silences", () => {
@@ -368,12 +430,13 @@ describe("unfamiliarWork", () => {
     ]);
   });
 
-  it("says nothing about work that was judged — counted, or a watcher deliberately not counted", () => {
+  it("says nothing about work that was judged — counted, or a subscription deliberately not counted", () => {
     expect(
       unfamiliarWork({
         background_tasks: [
           { type: "shell", status: "running" },
           { type: "monitor", status: "running" },
+          { type: "monitor", status: "running", description: "live updates for artifact a-page (auto-armed on publish)" },
           { type: "monitor", status: "whatever a watcher does" },
         ],
       })

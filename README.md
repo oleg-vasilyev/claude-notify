@@ -151,7 +151,7 @@ in the same second can be told apart:
 | `SKIP the turn was another session's errand` | another session asked for this turn and gets its report, so nobody waits on you |
 | `SOUND turnEnded \| the safety net` | a held turn end rang, because nothing happened in its session for thirty minutes |
 | `ENDLESS not counted as work` | a server was running; it never resumes a session, so it does not hold the turn end back |
-| `MONITOR <server> \| <status> \| <description>` | a background task of type `monitor` was present when a hook fired; it never holds a turn end. Logged so its shape can be measured |
+| `MONITOR <server> \| <status> \| <description>` | a background task of type `monitor` was present when a hook fired. The Monitor tool holds the turn end; an artifact's subscription (`live updates for artifact …`) and a task naming a server do not |
 | `RELAY listening on N` | this machine is forwarding for others, on that port |
 | `RELAY sent` \| `RELAY refused` | it forwarded a ping for another machine, or turned one away |
 | `WARN usage unavailable: <why>` | the limits line was skipped and the reason named; the ping itself went out |

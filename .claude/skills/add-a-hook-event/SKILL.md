@@ -42,10 +42,17 @@ Do not trust the documentation, and do not trust this file either — read the
 log. **The engine's own `.d.ts` is documentation too.** Its `BackgroundTaskSummary`
 said a monitor carries `server` only for MCP tasks, so a phase taught the rule
 that a monitor without one was the Monitor tool — and the real log then showed
-the Monitor tool arriving as a `shell`, never a `monitor`. A type file says which
-fields can exist; only a logged payload says which one your case arrives as. When
-a rule rests on a shape nobody has logged, ship the log line that measures it in
-the same phase, and say in `PLAN.md` that the rule is unmeasured.
+the Monitor tool arriving as a `shell`, never a `monitor`. Six days later the app
+began sending it as a `monitor` after all, with no `server` — and an artifact's
+subscription had never carried one either, so the field the types promised told
+the two apart in no logged payload; their descriptions did. A type file says which
+fields can exist; only a logged payload says which one your case arrives as, and
+only for the app version that sent it. When a rule rests on a shape nobody has
+logged, ship the log line that measures it in the same phase, say in `PLAN.md`
+that the rule is unmeasured, and **before a fix that separates two kinds, read
+the logged payload of each** — the fix that taught the hook about the new shape
+was reviewed against the types and would have held every turn end of a session
+that published an artifact.
 
 Every hook writes its payload to `~/.claude/claude-notify/log.txt`
 (truncated to 400 characters), which is the only honest record of what Claude

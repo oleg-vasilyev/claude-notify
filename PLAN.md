@@ -176,31 +176,55 @@ the session will resume on its own:
 | `type` | What it is | Counts as work |
 | --- | --- | --- |
 | `subagent` | an agent working on its own; it finishes and returns a turn | yes |
-| `shell` | a background command, or the Monitor tool watching one; it exits and returns a turn | yes, unless it is a server |
-| `monitor` | a standing watcher an artifact arms, until something disarms it | no |
+| `shell` | a background command, or the Monitor tool watching one as older apps sent it; it exits and returns a turn | yes, unless it is a server |
+| `monitor` | the Monitor tool, as the app has sent it since 24 November; it wakes the agent on every event and at its deadline | yes |
+| `monitor` whose description begins `live updates for artifact` or says `(auto-armed on publish)` | the standing subscription publishing an artifact arms, until something disarms it | no |
+| `monitor` naming a `server` | a subscription an MCP server arms, by Claude Code's types; never logged | no |
 
 `status` must be `running` too, since the field carries one and a finished task
 should never hold a ping.
 
-**The Monitor tool arrives as a `shell`, not as a `monitor`.** The agent arms it on
-a command — four times in five `tail -f <log> | grep <verdict>` — and is woken on every
-matching line and once more at its deadline: five minutes by default, an hour at
-most, or none if armed `persistent`. Its task in the payload carries that command
-under type `shell`. Measured the hard way: a phase that read the engine's types
-assumed the tool came as `monitor`, taught the rule to count such a monitor as
-work, and the real log then showed no `monitor` at all while two chats rang
-«закончил ход» waiting on a Monitor's `tail -f`. That phase is undone; the hook
-still logs every `monitor` it sees as `MONITOR <server> | <status> |
-<description>`, so the next one has evidence instead of a type file. Of 1,231
-Monitor calls in three weeks none was persistent: 1,008 had a thirty-minute
-deadline and 18 an hour, and the net covers a quiet one past its thirtieth minute.
+**The Monitor tool first arrived as a `shell`, not as a `monitor`.** The agent
+arms it on a command — four times in five `tail -f <log> | grep <verdict>` — and
+is woken on every matching line and once more at its deadline: five minutes by
+default, an hour at most, or none if armed `persistent`. Its task in the payload
+carried that command under type `shell`. Measured the hard way: a phase that read
+the engine's types assumed the tool came as `monitor`, taught the rule to count
+such a monitor as work, and the real log then showed no `monitor` at all while two
+chats rang «закончил ход» waiting on a Monitor's `tail -f`. That phase was undone;
+the hook kept logging every `monitor` it sees as `MONITOR <server> | <status> |
+<description>`, so the next one would have evidence instead of a type file. Of
+1,231 Monitor calls in the three weeks measured then, none was persistent: 1,008
+had a thirty-minute deadline and 18 an hour, and the net covers a quiet one past
+its thirtieth minute.
+
+**And then the app started sending it as a `monitor`.** The first such line in
+the log is from 24 November; by the 27th there were more than 350, every one naming no
+`server`, and each description was one an agent had written into a Monitor call
+in its transcript. A chat waiting on a `tail -F` Monitor over a long batch rang
+«закончил ход» about once a minute — each event woke it, it wrote a line of
+progress and ended its turn — from the moment the subagent that had been holding
+its turns finished. So a `monitor` counts as work now, and the `shell` reading
+stays for machines whose app still sends that.
+
+**What tells the Monitor tool from an artifact's subscription is the
+description, and nothing else that was logged.** The four August payloads that
+caught the subscription — the one that silenced a session for a day — carried
+`type`, `status`, an `id` and `live updates for artifact <url> (auto-armed on
+publish)`, and no `server`. So a `monitor` is dismissed when its description
+begins with that phrase or carries that parenthesis; one wording change on the
+app's side and the subscription counts as work again, held behind the net — thirty
+minutes late, not a day. None of the November sightings described an artifact.
+The `server` clause stays because Claude Code's types say an MCP server's task
+carries one; no such payload has been logged.
 
 A Monitor armed on a server's own output — `npm run dev | grep ready` — still
-reads as a server, since its task looks exactly like a background `npm run dev`,
-and rings at once. The fifth of Monitor calls that do not follow a file is where
-that hides; it has not been counted.
+reads as a server when it arrives as a `shell`, since its task then looks exactly
+like a background `npm run dev`, and rings at once; arriving as a `monitor` it is
+held like any other Monitor, and its deadline ends it. The fifth of Monitor calls
+that do not follow a file is where that hides; it has not been counted.
 
-**A shell that never exits is a monitor wearing a shell's type, and it silenced
+**A shell that never exits is a subscription wearing a shell's type, and it silenced
 sessions for a day at a time.** A dev server, `wrangler dev`, a
 `--watch` build: started in the background, used across many turns, and never
 handing anything back. While one ran, every turn end in its session was held —
@@ -213,7 +237,7 @@ background commands whose end the transcripts recorded, 46% ran longer than thre
 minutes and 3% longer than thirty — gates, renders, mutation runs the agent
 genuinely waits on. So a shell is judged by its `command`: one that starts a
 server (`npm start`, `pnpm dev`, `wrangler dev`, `next start`, `http-server`,
-`--watch`) counts as no work, the way a monitor does.
+`--watch`) counts as no work, the way an artifact's subscription does.
 
 **Following a file is not a server, though it never exits by itself.** The first
 version counted `tail -f` too, and that rang false the same afternoon it shipped,

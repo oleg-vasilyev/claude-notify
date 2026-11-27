@@ -75,13 +75,24 @@ describe("activityAfter", () => {
     expect(activityAfter("Stop", stillBusy, NO_SIDE_SESSION_AT_WORK)).toEqual({ kind: SESSION_ACTIVITY.working });
   });
 
-  it("reads a turn that ended with only a monitor armed as waiting, since nothing will resume it", () => {
+  it("reads a turn that ended with only an artifact's subscription armed as waiting, since nothing will resume it", () => {
     const watched: HookPayload = {
       ...payload,
-      background_tasks: [{ type: "monitor", status: "running" }],
+      background_tasks: [
+        { type: "monitor", status: "running", description: "live updates for artifact a-page (auto-armed on publish)" },
+      ],
     };
 
     expect(activityAfter("Stop", watched, NO_SIDE_SESSION_AT_WORK)).toEqual({ kind: SESSION_ACTIVITY.waitingAtTurnEnd });
+  });
+
+  it("reads a turn that ended while the Monitor tool watches as a monitor as working, since it wakes the agent", () => {
+    const watching: HookPayload = {
+      ...payload,
+      background_tasks: [{ type: "monitor", status: "running", description: "the gate's verdict" }],
+    };
+
+    expect(activityAfter("Stop", watching, NO_SIDE_SESSION_AT_WORK)).toEqual({ kind: SESSION_ACTIVITY.working });
   });
 
   it("reads a turn that ended while the Monitor tool follows a log as working, since it wakes the agent", () => {

@@ -186,8 +186,9 @@ appears in a real log.**
 ## The kinds of background work are known only from what has been seen
 
 `willCarryOn` decides whether a turn end is real by matching `type` against
-`subagent` and `shell`. Those two, plus `monitor`, are every kind that has
-appeared in a logged payload — three from seventeen probes across five days.
+`subagent`, `shell` and `monitor`. Those three are every kind that has appeared
+in a logged payload — the seventeen probes of August, and the `MONITOR` lines
+since 24 November.
 Claude Code's types now name more (`workflow`, `teammate`, `cloud session`,
 `MCP task`) but say nothing about which of them return a turn, so a rename on
 their side still turns ours into unknowns.
@@ -201,23 +202,32 @@ add the commands that exit beside it in the spec first: every loosening so far
 was caught matching a build. The `command` field has since been measured: the
 first `ENDLESS not counted as work` lines in the real log carry it.
 
-**A Monitor armed on a server's output rings at once.** The Monitor tool arrives
-as a `shell` carrying its command, so `npm run dev | grep ready` under a Monitor
-looks exactly like a background dev server, though the Monitor's deadline would
-end it. The symptom is a false «закончил ход» next to an `ENDLESS` line whose
+**A Monitor armed on a server's output rings at once where the app sends it as a
+`shell`.** That shell carries its command, so `npm run dev | grep ready` under a
+Monitor looks exactly like a background dev server, though the Monitor's deadline
+would end it. Sent as a `monitor`, as it has been since 24 November, it is held
+like any Monitor. The symptom is a false «закончил ход» next to an `ENDLESS` line whose
 command pipes a server into `grep`. Count the fifth of Monitor calls that do not
 follow a file before acting: if this shape is common, a pipe into `grep` may be
 the tell.
 
-**What arrives as `monitor` today is unknown.** August's payloads showed one when
-an artifact was published; the Monitor tool arrives as `shell`. The hook writes a
-`MONITOR` line for every monitor it sees, which is how the next sighting gets
-measured instead of read from a type file — the mistake that cost one phase.
-Delete the line once a few have been seen and the table in `PLAN.md` agrees.
+**An artifact's subscription is told from the Monitor tool by its description
+alone.** Neither carries a `server`: the four August payloads that caught the
+subscription had only `id`, `type`, `status` and `live updates for artifact <url>
+(auto-armed on publish)`, and every November sighting of the Monitor tool had the
+agent's own description. The rule dismisses a `monitor` whose description begins
+with that phrase or carries that parenthesis, and counts every other one as work.
+No subscription has been logged since August, so whether the app still arms one,
+and in which words, is unmeasured. **Look here if a session that published an
+artifact rings only through the net** — `SOUND turnEnded | the safety net` after
+every statement it ends on, with a `MONITOR` line naming the artifact: the
+wording moved, and the phrase in `hook-ping.ts` follows it. The `MONITOR` line
+stays for exactly this; it is how the November change was found in one read of
+the log.
 
 **A persistent Monitor is counted as work and never hands a turn back.** It
-arrives as a shell like any Monitor, nothing in the payload tells it from one
-with a deadline, and none of 1,231 measured Monitor calls was persistent, so the
+arrives like any Monitor, nothing in the payload tells it from one with a
+deadline, and none of 1,231 measured Monitor calls was persistent, so the
 net covers it. The symptom is `SOUND turnEnded | the safety net` in a session
 that armed a session-long watch; the fix then needs a field from Claude Code, or
 a note of when each task id was first seen.

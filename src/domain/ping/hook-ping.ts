@@ -17,6 +17,8 @@ const ELLIPSIS = "…";
 const WORK_THAT_HANDS_THE_TURN_BACK = ["subagent", "shell"];
 const SHELL = "shell";
 const MONITOR = "monitor";
+const ARTIFACT_SUBSCRIPTION = "live updates for artifact";
+const ARMED_ON_PUBLISH = "(auto-armed on publish)";
 const NO_SERVER = "no server";
 const NO_STATUS = "no status";
 const RUNNING = "running";
@@ -45,10 +47,17 @@ const endlessCommandOf = (task: BackgroundTask): string[] =>
 const serverOf = (task: BackgroundTask): string | null =>
   typeof task.server === "string" && task.server !== "" ? task.server : null;
 
+const armedByAnArtifact = (task: BackgroundTask): boolean =>
+  typeof task.description === "string" &&
+  (task.description.startsWith(ARTIFACT_SUBSCRIPTION) || task.description.includes(ARMED_ON_PUBLISH));
+
+const isTheMonitorTool = (task: BackgroundTask): boolean =>
+  task.type === MONITOR && serverOf(task) === null && !armedByAnArtifact(task);
+
 const carriesOn = (task: BackgroundTask): boolean =>
   task.status === RUNNING &&
-  WORK_THAT_HANDS_THE_TURN_BACK.includes(task.type ?? NO_FIELD) &&
-  endlessCommandOf(task).length === 0;
+  ((WORK_THAT_HANDS_THE_TURN_BACK.includes(task.type ?? NO_FIELD) && endlessCommandOf(task).length === 0) ||
+    isTheMonitorTool(task));
 
 const wasJudged = (task: BackgroundTask): boolean =>
   task.type === MONITOR || carriesOn(task) || endlessCommandOf(task).length > 0;

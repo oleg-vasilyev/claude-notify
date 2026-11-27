@@ -63,12 +63,14 @@ const exists = (path: string): boolean => {
   }
 };
 
+const OTHER_CHATS_CHECKOUTS = join(".claude", "worktrees");
+
 const everyFileUnder = (directory: string, suffixes: string[]): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
 
     if (entry.isDirectory()) {
-      return everyFileUnder(path, suffixes);
+      return path === OTHER_CHATS_CHECKOUTS ? [] : everyFileUnder(path, suffixes);
     }
 
     return suffixes.some((suffix) => entry.name.endsWith(suffix)) ? [path] : [];

@@ -9,3 +9,7 @@ reports/
 # Local Claude Code overrides. The rest of .claude/ is committed on purpose:
 # the hooks, skills and reviewer are how the conventions are enforced.
 .claude/settings.local.json
+
+# Each chat's own checkout of this repository, with its own node_modules.
+# docs:check skips it too, so one open worktree cannot fail the gate in another.
+.claude/worktrees/
